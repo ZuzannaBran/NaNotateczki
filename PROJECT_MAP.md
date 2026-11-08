@@ -2747,7 +2747,12 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
 - `test/library_controller_lifecycle_test.dart`: dispose podczas
   asynchronicznego ładowania biblioteki.
 - `integration_test/app_smoke_test.dart`: start rzeczywistej aplikacji
-  i inicjalizacja platformy bez utknięcia na ekranie ładowania.
+  i inicjalizacja platformy bez utknięcia na ekranie ładowania;
+  wspólny kontrakt CRDT v2 jest też uruchamiany na desktopie i urządzeniach.
+- `test/support/v2_platform_replay_contract.dart` i
+  `test/cross_platform/v2_replay_contract_test.dart`: sześć przenośnych
+  regresji Quill, kolejności, tombstone, asset embed, transportu i formatowania;
+  Chrome oraz realny Linux/Windows/macOS/Android/iOS.
 - `integration_test/document_lifecycle_test.dart`: create/rename/read/delete
   w rzeczywistej bazie danej platformy; działa wyłącznie z flagą
   `NANOTATECZKI_ISOLATED_CI=true` na izolowanym runnerze.

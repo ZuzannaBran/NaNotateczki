@@ -44,6 +44,9 @@ dart format --output=none --set-exit-if-changed \
   lib/features/editor/presentation/widgets/text_edit_toolbar.dart \
   lib/features/editor/presentation/widgets/text_hud_block.dart \
   integration_test/stage12_live_api_test.dart \
+  integration_test/app_smoke_test.dart \
+  test/support/v2_platform_replay_contract.dart \
+  test/cross_platform/v2_replay_contract_test.dart \
   test/sync_engine_test.dart \
   test/realtime_channel_cleanup_test.dart \
   test/editor_history_checkpoint_test.dart \
@@ -83,6 +86,7 @@ flutter test --concurrency=1 \
   test/editor_v2_rich_paste_test.dart \
   test/editor_v2_inline_file_sync_test.dart \
   test/operation_store_test.dart \
+  test/cross_platform/v2_replay_contract_test.dart \
   test/persistent_operation_actor_test.dart \
   test/sync_engine_test.dart \
   test/realtime_channel_cleanup_test.dart \

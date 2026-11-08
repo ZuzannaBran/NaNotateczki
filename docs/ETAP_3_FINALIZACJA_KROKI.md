@@ -1,5 +1,19 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Pełna macierz regresji platform (2026-11-08)
+
+Sześć wspólnych testów kontraktu operacji v2 uruchamia się w Chrome
+oraz w rzeczywistym `app_smoke_test.dart` na Linux, Windows, macOS,
+Android i symulatorach iPhone/iPad. Obejmują równoczesne inserty i
+formatowanie Quill, usunięte kotwice, konflikt stylów, walidację
+embedów i duplikatów, serializację oraz końcowe białe znaki.
+To kontrole CRDT, nie zastępstwo E2E baz danych ani transportu mediów.
+
+Jedno uruchomienie pełnego Actions bez selektywnych znaczników CI
+wykonuje niezależne joby wszystkich platform równolegle. Dopiero po
+wynikach macierzy należy naprawiać błędy. Flutter/Dart niedostępne
+lokalnie, więc testy nie są jeszcze zaliczone. V2 pozostaje opt-in.
+
 ## Test konwergencji Quill po restarcie (2026-11-08)
 
 Dodano regresje obu kolejności dostarczenia równoczesnych
