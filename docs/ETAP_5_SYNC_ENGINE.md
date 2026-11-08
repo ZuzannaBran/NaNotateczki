@@ -1,5 +1,17 @@
 # Etap 5 — silnik synchronizacji operacji v2
 
+## Niezależne metadane i atomy przy zaległym outboxie (2026-11-08)
+
+W opt-in v2 'document.set' i 'page.set' mogą zostać odebrane podczas
+lokalnych oczekujących edycji obiektów bez podmiany ich zawartości.
+Zdalne usunięcia i równoczesne zmiany tych samych metadanych nadal
+wstrzymują kursor do rebase. Dla tego samego bloku Quill formatowanie
+może minąć oczekujący insert/delete wyłącznie na rozłącznych atomach.
+Outbox pozostaje niezmieniony; nie wykonuje się żadnego snapshotowego
+zapisania dokumentu. Nowe regresje REST/SQLite w
+'test/editor_v2_account_startup_test.dart' wymagają potwierdzenia w CI.
+Nie włączać globalnego cutover.
+
 ## Przyrost rebase niezależnych obiektów — 2026-11-08
 
 Runtime konta v2 aplikuje zdalną operację obiektu przy lokalnym outboxie

@@ -640,6 +640,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   izolowany HTTP, outbox offline, niezależną zdalną kreskę, rozłączne
   kolor, szerokość, transformację, kolejność warstw oraz rozłączne
   formatowanie Quill i konflikt wspólnego atrybutu/atomu;
+  dodatkowe regresje: zdalne metadane przy offline ink, ochrona
+  przed document.delete i niezależny Quill insert + format;
   produkcyjne realtime pozostaje domyślnie włączone i jest testowane
   przez realny Linux E2E, który używa tego samego startu co AppScope.
 - `lib/app/app_scope.dart`: przełączenie konta v2 jest **opt-in** przez

@@ -69,6 +69,47 @@ bool _canMergeIndependentTextFormat(
       .isEmpty;
 }
 
+/// Only edits of disjoint Quill atoms commute with text formatting.
+bool _canMergeFormatWithTextEdit(
+  OperationEnvelope remote,
+  OperationEnvelope local,
+) {
+  if (remote.pageId != local.pageId) {
+    return false;
+  }
+  final remoteFormat = remote.kind == OperationKind.textFormat;
+  final localFormat = local.kind == OperationKind.textFormat;
+  if (remoteFormat == localFormat) {
+    return false;
+  }
+  final format = remoteFormat ? remote : local;
+  final edit = remoteFormat ? local : remote;
+  if (edit.kind != OperationKind.textInsert &&
+      edit.kind != OperationKind.textDelete) {
+    return false;
+  }
+  final formatIds = format.payload['atomIds'];
+  if (formatIds is! List) {
+    return false;
+  }
+  final List<dynamic> editIds;
+  if (edit.kind == OperationKind.textDelete) {
+    final ids = edit.payload['atomIds'];
+    if (ids is! List) {
+      return false;
+    }
+    editIds = ids;
+  } else {
+    final atoms = edit.payload['atoms'];
+    if (atoms is! List ||
+        atoms.any((atom) => atom is! Map || atom['id'] is! String)) {
+      return false;
+    }
+    editIds = [for (final atom in atoms) (atom as Map)['id']];
+  }
+  return formatIds.toSet().intersection(editIds.toSet()).isEmpty;
+}
+
 String? _referencedAssetId(OperationEnvelope operation) {
   if (operation.kind == OperationKind.assetAttach ||
       operation.kind == OperationKind.assetDetach) {
@@ -91,6 +132,15 @@ bool _canProjectIndependentRemote(
   if (pendingLocal.isEmpty) {
     return true;
   }
+  // Metadata-only patches do not rewrite pending object content.
+  if (remote.kind == OperationKind.documentSet ||
+      remote.kind == OperationKind.pageSet) {
+    return pendingLocal.every(
+      (local) =>
+          local.documentId == remote.documentId &&
+          local.kind.target == OperationTarget.object,
+    );
+  }
   if (remote.kind.target != OperationTarget.object) {
     return false;
   }
@@ -102,7 +152,8 @@ bool _canProjectIndependentRemote(
     }
     if (local.objectId == remote.objectId) {
       return _canMergeDifferentFields(remote, local) ||
-          _canMergeIndependentTextFormat(remote, local);
+          _canMergeIndependentTextFormat(remote, local) ||
+          _canMergeFormatWithTextEdit(remote, local);
     }
     final localAssetId = _referencedAssetId(local);
     if (remoteAssetId == null || localAssetId == null) {

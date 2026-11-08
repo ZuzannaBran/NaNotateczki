@@ -1,5 +1,13 @@
 # Dane NaNotateczki
 
+## Bezkolizyjne metadane i Quill przy offline outboxie (2026-11-08)
+
+Opt-in runtime v2 dopuszcza 'document.set'/'page.set' podczas lokalnych
+operacji obiektów oraz 'text.format' przy rozłącznym 'text.insert/delete'.
+Zdalne usunięcia, współdzielone pola i niejawne przywracanie snapshotów
+pozostają zabronione. Operacje lokalne pozostają w outboxie bez zmian;
+wynik wymaga potwierdzenia regresjami Actions.
+
 ## Kontrola Quill przy każdej kolejnej edycji (2026-11-08)
 
 `EditorSqliteProjector._applyText` weryfikuje SHA-256 oraz długość
