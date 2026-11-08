@@ -509,8 +509,7 @@ void main() {
       await fixture.runtime.store.operation(competing.operationId),
       isNull,
     );
-    final afterConflict =
-        (await fixture.repository.getNotebook(notebook.uid))!;
+    final afterConflict = (await fixture.repository.getNotebook(notebook.uid))!;
     expect(
       afterConflict.pages.single.inkStrokes
           .singleWhere((stroke) => stroke.id == remote.objectId)
