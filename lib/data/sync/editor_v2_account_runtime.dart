@@ -11,8 +11,45 @@ import 'operation_store.dart';
 import 'sync_engine.dart';
 import 'verified_editor_asset_buffer.dart';
 
-/// Only distinct object IDs have disjoint SQLite projections.
-/// Container changes and edits of the same object still need full rebase.
+/// Two scalar property edits of the same UID can merge by field.
+bool _canMergeDifferentFields(
+  OperationEnvelope remote,
+  OperationEnvelope local,
+) {
+  if (remote.kind != OperationKind.objectSet ||
+      local.kind != OperationKind.objectSet ||
+      remote.pageId != local.pageId) {
+    return false;
+  }
+  final remoteProperties = remote.payload['properties'];
+  final localProperties = local.payload['properties'];
+  if (remoteProperties is! Map ||
+      localProperties is! Map ||
+      remoteProperties.containsKey('assetId') ||
+      localProperties.containsKey('assetId')) {
+    return false;
+  }
+  return remoteProperties.keys
+      .toSet()
+      .intersection(localProperties.keys.toSet())
+      .isEmpty;
+}
+
+String? _referencedAssetId(OperationEnvelope operation) {
+  if (operation.kind == OperationKind.assetAttach ||
+      operation.kind == OperationKind.assetDetach) {
+    return operation.payload['assetId'] as String?;
+  }
+  if (operation.kind == OperationKind.objectSet) {
+    final properties = operation.payload['properties'];
+    if (properties is Map && properties['assetId'] is String) {
+      return properties['assetId'] as String;
+    }
+  }
+  return null;
+}
+
+/// Keeps local outbox immutable while applying independent remote changes.
 bool _canProjectIndependentRemote(
   OperationEnvelope remote,
   List<OperationEnvelope> pendingLocal,
@@ -23,12 +60,20 @@ bool _canProjectIndependentRemote(
   if (remote.kind.target != OperationTarget.object) {
     return false;
   }
-  return pendingLocal.every(
-    (local) =>
-        local.documentId == remote.documentId &&
-        local.kind.target == OperationTarget.object &&
-        local.objectId != remote.objectId,
-  );
+  final remoteAssetId = _referencedAssetId(remote);
+  return pendingLocal.every((local) {
+    if (local.documentId != remote.documentId ||
+        local.kind.target != OperationTarget.object) {
+      return false;
+    }
+    if (local.objectId == remote.objectId) {
+      return _canMergeDifferentFields(remote, local);
+    }
+    final localAssetId = _referencedAssetId(local);
+    return remoteAssetId == null ||
+        localAssetId == null ||
+        remoteAssetId != localAssetId;
+  });
 }
 
 /// Owns the operational editor journal for one confirmed v2 account.
@@ -74,8 +119,8 @@ class EditorV2AccountRuntime {
       apiClient: apiClient,
       enableRealtime: enableRealtime,
       applyRemote: (operation, pendingLocal) async {
-        // Different objects can merge without overwriting local edits.
-        // Same-ID and container conflicts must wait for full rebase.
+        // Disjoint objects and scalar fields merge without snapshots.
+        // Shared fields, assets and containers require full rebase.
         if (!_canProjectIndependentRemote(operation, pendingLocal)) {
           throw StateError('Remote v2 operation awaits local outbox ACK.');
         }

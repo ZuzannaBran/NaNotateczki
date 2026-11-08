@@ -486,12 +486,39 @@ void main() {
       },
       apply: fixture.runtime.projector.apply,
     );
-    final competing = OperationEnvelope(
+    final remoteColor = OperationEnvelope(
       operationId: '00000000-0000-4000-8000-000000000502',
       actorId: 'other-device',
       actorSeq: 2,
       logicalClock: localSet.logicalClock + 1,
       dependencies: [remote.operationId],
+      documentId: notebook.uid,
+      pageId: pageId,
+      objectId: remote.objectId,
+      kind: OperationKind.objectSet,
+      payload: const {
+        'properties': {'colorValue': 0xFF345678},
+      },
+    );
+    fixture.accepted.add(remoteColor.toJson());
+    await fixture.runtime.engine.syncNow();
+    expect(
+      await fixture.runtime.store.checkpoint('account:startup-account'),
+      4,
+    );
+    final merged = (await fixture.repository.getNotebook(notebook.uid))!
+        .pages.single.inkStrokes.singleWhere(
+          (stroke) => stroke.id == remote.objectId,
+        );
+    expect(merged.width, 3.0);
+    expect(merged.color.toARGB32(), 0xFF345678);
+
+    final competing = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-000000000503',
+      actorId: 'other-device',
+      actorSeq: 3,
+      logicalClock: remoteColor.logicalClock + 1,
+      dependencies: [remoteColor.operationId],
       documentId: notebook.uid,
       pageId: pageId,
       objectId: remote.objectId,
@@ -504,7 +531,7 @@ void main() {
     await fixture.runtime.engine.syncNow();
     expect(
       await fixture.runtime.store.checkpoint('account:startup-account'),
-      3,
+      4,
     );
     expect(
       await fixture.runtime.store.operation(competing.operationId),
