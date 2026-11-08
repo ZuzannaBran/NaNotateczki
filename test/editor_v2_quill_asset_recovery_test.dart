@@ -143,14 +143,17 @@ void main() {
         after: changed,
       );
       expect(
-        operations.where((op) => op.kind == OperationKind.assetDetach)
+        operations
+            .where((op) => op.kind == OperationKind.assetDetach)
             .map((op) => op.payload['assetId']),
         [image.assetId],
       );
-      final refs = await session.database.customSelect(
-        'SELECT asset_id FROM asset_references WHERE document_id = ?',
-        variables: [Variable<String>(notebook.uid)],
-      ).get();
+      final refs = await session.database
+          .customSelect(
+            'SELECT asset_id FROM asset_references WHERE document_id = ?',
+            variables: [Variable<String>(notebook.uid)],
+          )
+          .get();
       expect(refs.map((row) => row.read<String>('asset_id')), [pdf.assetId]);
       expect(
         await session.projector.verifiedTextAssetBytes(
@@ -167,7 +170,8 @@ void main() {
         orderedEquals(imageBytes),
       );
       final pending = (await session.store.pending())
-          .map((op) => op.operationId).toList();
+          .map((op) => op.operationId)
+          .toList();
       await session.close();
       session = _Session(file);
       final reopened = (await session.repository.getNotebook(notebook.uid))!;

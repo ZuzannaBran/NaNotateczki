@@ -2834,6 +2834,11 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
 - `.github/workflows/cross_platform_tests.yml`: znacznik
   `[ci:android-only]` uruchamia wyłącznie emulator Android na `dev`;
   `[ci:failed-only]` zachowuje dawny tryb zredukowanej weryfikacji.
+  Połączenie `[ci:failed-only] [ci:ios-override]` uruchamia tylko
+  analizę/testy Dart oraz symulator iPad (bez ponownego iPhone),
+  zastępując bieżący pełny przebieg przez wspólną grupę concurrency.
+  Dla iOS krok testowy ma limit 25 minut, żeby zawieszony symulator
+  nie blokował CI przez cały 70-minutowy timeout joba.
 - `.github/workflows/cross_platform_tests.yml`: CI na Linux, Windows, macOS,
   Chrome, Android oraz symulatorach iPhone i iPad, na push `dev`.
   Eksport PNG/PDF jest osobnym jobem z własnym timeoutem; pozostałe testy
