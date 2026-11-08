@@ -54,8 +54,8 @@ jobs:
         run: bash .github/scripts/test_flutter_integration_retry.sh
       - name: Verify sqlite3 hash retry never masks test failures
         run: bash .github/scripts/test_flutter_sqlite3_download_retry.sh
-      - name: Verify iOS suite restart does not reuse a stale runner
-        run: bash .github/scripts/test_reset_ios_simulator_between_suites.sh
+      - name: Verify single-app native iOS test matrix
+        run: bash .github/scripts/test_ios_integration_matrix.sh
       - name: Execute non-render native test suite
         shell: bash
         run: |
@@ -586,30 +586,6 @@ jobs:
           xcrun simctl boot "$SIMULATOR_UDID"
           xcrun simctl bootstatus "$SIMULATOR_UDID" -b
           echo "SIMULATOR_UDID=$SIMULATOR_UDID" >> "$GITHUB_ENV"
-      - name: Verify iOS app bootstrap
-        timeout-minutes: 12
-        run: >-
-          flutter test integration_test/app_smoke_test.dart
-          -d "$SIMULATOR_UDID" --reporter expanded
-      - name: Reset simulator after bootstrap
-        timeout-minutes: 5
-        run: >-
-          bash .github/scripts/reset_ios_simulator_between_suites.sh
-          "$SIMULATOR_UDID"
-      - name: Verify iOS isolated document lifecycle
-        timeout-minutes: 12
-        run: >-
-          flutter test integration_test/document_lifecycle_test.dart
-          -d "$SIMULATOR_UDID"
-          --dart-define=NANOTATECZKI_ISOLATED_CI=true
-          --reporter expanded
-      - name: Reset simulator after document lifecycle
-        timeout-minutes: 5
-        run: >-
-          bash .github/scripts/reset_ios_simulator_between_suites.sh
-          "$SIMULATOR_UDID"
-      - name: Verify iOS pointer contact matrix
-        timeout-minutes: 10
-        run: >-
-          flutter test integration_test/pointer_contact_matrix_test.dart
-          -d "$SIMULATOR_UDID" --reporter expanded
+      - name: Run all iOS integration cases in a single app process
+        timeout-minutes: 30
+        run: bash .github/scripts/ios_integration_matrix.sh "$SIMULATOR_UDID"

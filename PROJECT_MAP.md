@@ -2365,9 +2365,12 @@ przesuwa obiekt, a dwa kontakty nie zmieniają obiektu ani canvasa.
   przekazanie osobnej nazwy bazy danych do publicznego API otwierania.
 - `test/support/pointer_contact_matrix.dart`: regresja trwałości ostatniej
   kreski; fixture przed zamknięciem SQLite musi poczekać na flush edytora.
-- `.github/scripts/reset_ios_simulator_between_suites.sh`: restartuje
-  symulator między natywnymi testami Flutter, żeby zlikwidować pozostały
-  runner iOS; test kontraktu w `test_reset_ios_simulator_between_suites.sh`.
+- `integration_test/native_platform_matrix_test.dart`: grupuje smoke,
+  lifecycle i pointer w jednym procesie Flutter na iOS; izoluje hooki
+  setup/teardown każdej grupy.
+- `.github/scripts/ios_integration_matrix.sh`: jedno uruchomienie
+  aplikacji testowej na symulatorze; regresja kontraktu skryptu:
+  `test_ios_integration_matrix.sh`.
 
 
 - `data.md`: źródło prawdy dla lokalnego układu plików, trybów konta,

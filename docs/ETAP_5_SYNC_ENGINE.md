@@ -18,17 +18,23 @@ Nie włączać produkcyjnego cutover na podstawie tego przyrostu.
 ## Regresje Dart, Android i izolacja testów iOS (2026-11-08)
 
 Pełny przebieg 42503975095 ujawnił kolizję importu `isNull` w teście
-startu konta v2; ograniczono import Drift do `QueryExecutor`.
+startu konta v2; import Drift ograniczono do `LazyDatabase` oraz
+`QueryExecutor`. Pełny przebieg 42507495400 ujawnił, że `LazyDatabase`
+używany w dwóch regresjach nie może zostać ukryty przez import z `show`.
 Testy pointerów na Androidzie wykryły rozpoczęty zapis ink po zamknięciu
 testowej bazy SQLite. Fixture zapisuje notatnik przed uruchomieniem
 edytora, wywołuje `flushPendingSaves` przed `dispose` i dopiero potem
 zamyka Drift. Dodatkowa regresja sprawdza trwałość ostatniej kreski.
 
-Na iPhone drugi osobny proces `flutter test` wisi po udanym Xcode build,
-zanim rozpocznie pierwszy test. Każda kolejna paczka testów w macOS CI
-otrzymuje zrestartowany, gotowy symulator (`simctl shutdown/boot/bootstatus`).
-Skrypt resetu ma niezależny test shell bez sprzętu. To izolacja problemu
-runnera, nie potwierdzenie naprawy natywnego błędu — wymaga CI iPhone.
+Przebieg 42507495400 powtórzył zawieszenie drugiego procesu `flutter test`
+na iPhone i iPad po poprawnym Xcode build, mimo restartu symulatora.
+Skorygowano strategię: `native_platform_matrix_test.dart` rejestruje
+scenariusze smoke, lifecycle i pointer jako oddzielne grupy w JEDNYM
+procesie testowym, bez ponownego instalowania/debugowania aplikacji.
+Izolowane `setUpAll` testów dokumentów nie obejmuje scenariusza smoke.
+Skrypt uruchomieniowy ma test kontraktu (jedno wywołanie, wymagany
+`--dart-define`, propagacja błędów). Przyczyna natywnego zawieszenia
+nie jest jeszcze potwierdzona; weryfikacja iOS CI pozostaje obowiązkowa.
 
 ## Stop bez blokady handshake i seryjny restart — 2026-11-06
 
