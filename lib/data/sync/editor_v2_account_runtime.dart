@@ -11,6 +11,26 @@ import 'operation_store.dart';
 import 'sync_engine.dart';
 import 'verified_editor_asset_buffer.dart';
 
+/// Only distinct object IDs have disjoint SQLite projections.
+/// Container changes and edits of the same object still need full rebase.
+bool _canProjectIndependentRemote(
+  OperationEnvelope remote,
+  List<OperationEnvelope> pendingLocal,
+) {
+  if (pendingLocal.isEmpty) {
+    return true;
+  }
+  if (remote.kind.target != OperationTarget.object) {
+    return false;
+  }
+  return pendingLocal.every(
+    (local) =>
+        local.documentId == remote.documentId &&
+        local.kind.target == OperationTarget.object &&
+        local.objectId != remote.objectId,
+  );
+}
+
 /// Owns the operational editor journal for one confirmed v2 account.
 ///
 /// It is intentionally separate from the legacy account sync. The caller
@@ -54,10 +74,9 @@ class EditorV2AccountRuntime {
       apiClient: apiClient,
       enableRealtime: enableRealtime,
       applyRemote: (operation, pendingLocal) async {
-        // A conflict must not be flattened to a snapshot or silently
-        // overwrite an optimistic local gesture. The engine pushes the
-        // durable local outbox and retries this remote cursor afterwards.
-        if (pendingLocal.isNotEmpty) {
+        // Different objects can merge without overwriting local edits.
+        // Same-ID and container conflicts must wait for full rebase.
+        if (!_canProjectIndependentRemote(operation, pendingLocal)) {
           throw StateError('Remote v2 operation awaits local outbox ACK.');
         }
         await projector.apply(operation);

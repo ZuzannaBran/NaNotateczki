@@ -1,5 +1,15 @@
 # Etap 5 — silnik synchronizacji operacji v2
 
+## Przyrost rebase niezależnych obiektów — 2026-11-08
+
+Runtime konta v2 aplikuje zdalną operację obiektu przy lokalnym outboxie
+wyłącznie, gdy wszystkie oczekujące operacje dotyczą innych UID obiektów
+w tym samym dokumencie. SQLite utrwala patch i envelope atomowo;
+nie usuwa ani nie przepisuje outboxu. Zmiana strony/dokumentu lub
+kolizja UID nadal blokuje kursor do pełnego rebase. Regresja HTTP/SQLite
+sprawdza niezależną kreskę offline i konflikt tego samego UID.
+Nie włączać produkcyjnego cutover na podstawie tego przyrostu.
+
 ## Stop bez blokady handshake i seryjny restart — 2026-11-06
 
 `stop()` współdzieli trwającą operację i nadal czeka na aktywny REST.

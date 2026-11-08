@@ -18,9 +18,11 @@
   transformacji pokrywają atomowe Undo/Redo, historię po restarcie,
   autosave, blokadę legacy writera oraz odrzucenie anulowanych
   podglądów bez zapisu operacji.
-- Pozostała bramka: wynik pełnych Actions dla bieżącej wersji
-  wszystkich systemów, wraz z Dart analyze, testami natywnymi
-  i rzeczywistym Linux backend E2E. Wyniku nie uznajemy przed CI.
+- Pozostała bramka: pełna macierz Actions na bieżącym commicie.
+  Ostatni sukces 42491403934 (d043973) objął wyłącznie Dart i iPad.
+  Wcześniejszy pełny przebieg 42483337185 został anulowany;
+  Chrome zatrzymał się na błędnym hashu pobranego natywnego SQLite.
+  Pozostałe platformy nie potwierdzają jeszcze bieżącego HEAD.
 - Zakres poza lokalnym etapem 3: deterministyczny rebase całego konta
   (dwóch klientów po kolizji i offline), migracja v1→v2 oraz globalny
   produkcyjny cutover pozostają wyłączone i wymagają osobnego etapu.

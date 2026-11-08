@@ -10,6 +10,7 @@ import 'package:http/testing.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/data/sync/api_client.dart';
 import 'package:program/data/sync/editor_v2_account_runtime.dart';
+import 'package:program/data/sync/operation_protocol.dart';
 import 'package:program/features/editor/state/editor_controller.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 
@@ -40,6 +41,7 @@ class _Fixture {
   late final EditorV2AccountRuntime runtime;
   final requests = <http.Request>[];
   final accepted = <Map<String, dynamic>>[];
+  bool rejectPosts = false;
 
   Future<http.Response> _handle(http.Request request) async {
     requests.add(request);
@@ -60,6 +62,9 @@ class _Fixture {
     }
     if (request.method == 'POST' &&
         request.url.path == '/v2/operations/batch') {
+      if (rejectPosts) {
+        return http.Response('Temporary outage', 503);
+      }
       final operations =
           (jsonDecode(request.body) as Map)['operations'] as List;
       final acks = <Map<String, dynamic>>[];
@@ -407,4 +412,116 @@ void main() {
       );
     },
   );
+  test('offline independent merge keeps same-object conflicts', () async {
+    final fixture = _Fixture(NativeDatabase.memory());
+    addTearDown(fixture.close);
+    expect(
+      await fixture.runtime.startForCurrentAccount(isCurrent: () => true),
+      isTrue,
+    );
+    final notebook = await fixture.repository.createNotebook();
+    await fixture.runtime.engine.syncNow();
+    expect(fixture.accepted, hasLength(2));
+    final pageId = notebook.pages.single.id;
+    const strokePayload = {
+      'value': {
+        'objectType': 'stroke',
+        'colorValue': 0xFF123456,
+        'width': 2.0,
+        'toolIndex': 0,
+        'sortIndex': 0,
+        'points': [
+          [1.0, 2.0, 0.5],
+        ],
+      },
+    };
+    final local = await fixture.runtime.store.writeLocal(
+      actorId: fixture.runtime.engine.actorIdForDocument(notebook.uid),
+      documentId: notebook.uid,
+      kind: OperationKind.strokeCreate,
+      pageId: pageId,
+      objectId: 'offline-stroke',
+      payload: strokePayload,
+      apply: fixture.runtime.projector.apply,
+    );
+    fixture.rejectPosts = true;
+    final remote = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-000000000501',
+      actorId: 'other-device',
+      actorSeq: 1,
+      logicalClock: local.logicalClock + 1,
+      dependencies: [fixture.accepted.last['operationId'] as String],
+      documentId: notebook.uid,
+      pageId: pageId,
+      objectId: 'peer-stroke',
+      kind: OperationKind.strokeCreate,
+      payload: strokePayload,
+    );
+    fixture.accepted.add(remote.toJson());
+    await fixture.runtime.engine.syncNow();
+    final first = (await fixture.repository.getNotebook(notebook.uid))!;
+    expect(
+      first.pages.single.inkStrokes.map((stroke) => stroke.id).toSet(),
+      {'offline-stroke', 'peer-stroke'},
+    );
+    expect(
+      await fixture.runtime.store.checkpoint('account:startup-account'),
+      3,
+    );
+    expect(
+      (await fixture.runtime.store.pending(includeDeferred: true))
+          .map((operation) => operation.operationId),
+      [local.operationId],
+    );
+
+    final localSet = await fixture.runtime.store.writeLocal(
+      actorId: fixture.runtime.engine.actorIdForDocument(notebook.uid),
+      documentId: notebook.uid,
+      kind: OperationKind.objectSet,
+      pageId: pageId,
+      objectId: remote.objectId,
+      payload: const {
+        'properties': {'width': 3.0},
+      },
+      apply: fixture.runtime.projector.apply,
+    );
+    final competing = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-000000000502',
+      actorId: 'other-device',
+      actorSeq: 2,
+      logicalClock: localSet.logicalClock + 1,
+      dependencies: [remote.operationId],
+      documentId: notebook.uid,
+      pageId: pageId,
+      objectId: remote.objectId,
+      kind: OperationKind.objectSet,
+      payload: const {
+        'properties': {'width': 4.0},
+      },
+    );
+    fixture.accepted.add(competing.toJson());
+    await fixture.runtime.engine.syncNow();
+    expect(
+      await fixture.runtime.store.checkpoint('account:startup-account'),
+      3,
+    );
+    expect(
+      await fixture.runtime.store.operation(competing.operationId),
+      isNull,
+    );
+    final afterConflict =
+        (await fixture.repository.getNotebook(notebook.uid))!;
+    expect(
+      afterConflict.pages.single.inkStrokes
+          .singleWhere((stroke) => stroke.id == remote.objectId)
+          .width,
+      3.0,
+    );
+    expect(
+      (await fixture.runtime.store.pending(includeDeferred: true))
+          .map((operation) => operation.operationId),
+      [local.operationId, localSet.operationId],
+    );
+  });
+
 }
