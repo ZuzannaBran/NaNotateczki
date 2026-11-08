@@ -799,8 +799,12 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   rzeczywistego właściciela UID po konkurencyjnym `object.move` i
   utrwala tombstone także po zmianie strony; historyczne tombstones
   chronią UID globalnie. Tworzenie zdublowanego UID jest zabronione.
-  Regresje lustrzane: `server/api/tests/test_operation_projection.py`
-  i `server/api/tests/test_stage12_real_stack.py` (prawdziwy PostgreSQL).
+  `assetReceipts` zapamiętuje ID i checksumy assetów całego dokumentu
+  po detach/delete. Ponowne przypisanie innych bajtów jest odrzucane;
+  historyczny, odłączony asset bez receiptu nie jest automatycznie wznawiany.
+  Regresje lustrzane: `server/api/tests/test_operation_projection.py`,
+  `server/api/tests/test_stage2_assets.py` oraz
+  `server/api/tests/test_stage12_real_stack.py` (PostgreSQL).
   Produkcyjny cutover pozostaje wyłączony.
 
 - `lib/data/sync/api_client.dart`: klient REST z wymuszeniem HTTPS,
