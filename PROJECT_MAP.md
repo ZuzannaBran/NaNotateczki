@@ -543,6 +543,9 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `test/editor_sqlite_projector_test.dart`: atomowość, rollback,
   Quill CRDT, tombstones, ACK, restart i ochrona usunięć, a także
   brak obrazu do czasu zweryfikowanego `asset.attach`.
+  Regresje równoczesnych insertów Quill w obu kolejnościach dostarczenia
+  z formatowaniem, restartem plikowej SQLite i duplikatem envelope
+  sprawdzają stabilność Delta, atomów, outboxu oraz checkpointu.
 - `lib/data/drift/operation_schema.dart`: SQLite v8, `editorHistorySchema`
   (lokalne checkpointy historii, klucz dokument/aktor i FK głowy);
   wcześniej v7 (durable asset BLOB) oraz migracja v3 → v4

@@ -1,5 +1,14 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Test konwergencji Quill po restarcie (2026-11-08)
+
+Dodano regresje obu kolejności dostarczenia równoczesnych
+`text.insert`, niezależnego `text.format`, ponownego otwarcia
+plikowej SQLite i duplikatu zdalnego envelope. Weryfikują tę samą Delta,
+niezmienność trwałych atomów, checkpointu i lokalnego outboxu.
+Nie zamyka to pełnego rebase całego konta.
+Wynik nowego testu wymaga potwierdzenia w CI.
+
 ## Kontrola integralności Quill przy usuwaniu (2026-11-08)
 
 Przebieg 42416001001 na b732b18 zakończył się sukcesem: natywna analiza,

@@ -466,6 +466,189 @@ void main() {
     );
   });
 
+  for (final reverseOrder in [false, true]) {
+    test(
+      'concurrent Quill replay survives restart, reverse=$reverseOrder',
+      () async {
+        final directory = await Directory.systemTemp.createTemp(
+          'nn-concurrent-quill-',
+        );
+        addTearDown(() => directory.delete(recursive: true));
+        final file = File('${directory.path}/notes.sqlite');
+        var reopenedDatabase = NotesDatabase(NativeDatabase(file));
+        addTearDown(() => reopenedDatabase.close());
+        final isolatedRepository = NotebookRepository(reopenedDatabase);
+        final isolatedStore = OperationStore(reopenedDatabase);
+        final isolatedProjector = EditorSqliteProjector(reopenedDatabase);
+        final notebook = await isolatedRepository.createNotebook();
+        final page = notebook.pages.single.id;
+
+        const initialAtom = '11111111-1111-4111-8111-111111111111';
+        const newlineAtom = '22222222-2222-4222-8222-222222222222';
+        const alphaAtom = '33333333-3333-4333-8333-333333333333';
+        const betaAtom = '44444444-4444-4444-8444-444444444444';
+        const objectId = 'concurrent-text';
+
+        final created = await isolatedStore.writeLocalBatch(
+          actorId: 'quill-seed',
+          documentId: notebook.uid,
+          operations: [
+            LocalOperationDraft(
+              kind: OperationKind.objectCreate,
+              pageId: page,
+              objectId: objectId,
+              payload: const {
+                'value': {
+                  'objectType': 'text',
+                  'dx': 0.0,
+                  'dy': 0.0,
+                  'width': 200.0,
+                  'fontSize': 18.0,
+                  'rotation': 0.0,
+                  'colorValue': 0xFF000000,
+                  'sortIndex': 0,
+                },
+              },
+            ),
+            LocalOperationDraft(
+              kind: OperationKind.textInsert,
+              pageId: page,
+              objectId: objectId,
+              payload: const {
+                'afterAtomId': null,
+                'atoms': [
+                  {'id': initialAtom, 'text': 'A'},
+                  {'id': newlineAtom, 'text': '\n'},
+                ],
+              },
+            ),
+          ],
+          apply: isolatedProjector.apply,
+        );
+        final seed = created.last;
+
+        OperationEnvelope concurrent({
+          required String actor,
+          required int clock,
+          required String atomId,
+          required String value,
+        }) => OperationEnvelope(
+          operationId: const Uuid().v4(),
+          actorId: actor,
+          actorSeq: 1,
+          logicalClock: clock,
+          documentId: notebook.uid,
+          pageId: page,
+          objectId: objectId,
+          kind: OperationKind.textInsert,
+          payload: {
+            'afterAtomId': initialAtom,
+            'atoms': [
+              {'id': atomId, 'text': value},
+            ],
+          },
+          dependencies: [seed.operationId],
+        );
+        final alpha = concurrent(
+          actor: 'quill-alpha',
+          clock: 30,
+          atomId: alphaAtom,
+          value: 'x',
+        );
+        final beta = concurrent(
+          actor: 'quill-beta',
+          clock: 40,
+          atomId: betaAtom,
+          value: 'y',
+        );
+        final format = OperationEnvelope(
+          operationId: const Uuid().v4(),
+          actorId: 'quill-format',
+          actorSeq: 1,
+          logicalClock: 50,
+          documentId: notebook.uid,
+          pageId: page,
+          objectId: objectId,
+          kind: OperationKind.textFormat,
+          payload: const {
+            'atomIds': [initialAtom],
+            'attributes': {'bold': true},
+          },
+          dependencies: [seed.operationId],
+        );
+
+        final order = reverseOrder
+            ? [beta, alpha, format]
+            : [alpha, beta, format];
+        for (var index = 0; index < order.length; index++) {
+          final operation = order[index];
+          expect(
+            await isolatedStore.applyRemote(
+              operation,
+              serverSequence: index + 1,
+              checkpointScope: 'quill-concurrent',
+              apply: () => isolatedProjector.apply(operation),
+            ),
+            isTrue,
+          );
+        }
+
+        final savedNotebook = await isolatedRepository.getNotebook(notebook.uid);
+        final saved = savedNotebook!.pages.single.textBlocks.single;
+        expect(saved.text, 'Ayx');
+        expect(jsonDecode(saved.deltaJson!), [
+          {
+            'insert': 'A',
+            'attributes': {'bold': true},
+          },
+          {'insert': 'yx\n'},
+        ]);
+        expect(await isolatedStore.pending(), hasLength(created.length));
+        expect(await isolatedStore.checkpoint('quill-concurrent'), 3);
+
+        await reopenedDatabase.close();
+        reopenedDatabase = NotesDatabase(NativeDatabase(file));
+        final reopenedRepository = NotebookRepository(reopenedDatabase);
+        final persistedNotebook = await reopenedRepository.getNotebook(
+          notebook.uid,
+        );
+        final persisted = persistedNotebook!.pages.single.textBlocks.single;
+        expect(persisted.text, saved.text);
+        expect(persisted.deltaJson, saved.deltaJson);
+
+        final recoveredStore = OperationStore(reopenedDatabase);
+        expect(
+          await recoveredStore.textAtoms(
+            documentId: notebook.uid,
+            pageId: page,
+            objectId: objectId,
+          ),
+          hasLength(4),
+        );
+        expect(await recoveredStore.pending(), hasLength(created.length));
+        expect(await recoveredStore.checkpoint('quill-concurrent'), 3);
+        expect(
+          await recoveredStore.applyRemote(
+            order.last,
+            serverSequence: 3,
+            checkpointScope: 'quill-concurrent',
+            apply: () => EditorSqliteProjector(
+              reopenedDatabase,
+            ).apply(order.last),
+          ),
+          isFalse,
+        );
+        final duplicateNotebook = await reopenedRepository.getNotebook(
+          notebook.uid,
+        );
+        expect(
+          duplicateNotebook!.pages.single.textBlocks.single.deltaJson,
+          saved.deltaJson,
+        );
+      },
+    );
+  }
+
   test('invalid text gesture rolls back atom history and SQLite', () async {
     await expectLater(
       write([
