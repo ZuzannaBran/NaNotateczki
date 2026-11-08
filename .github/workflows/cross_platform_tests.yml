@@ -584,9 +584,20 @@ jobs:
           xcrun simctl boot "$SIMULATOR_UDID"
           xcrun simctl bootstatus "$SIMULATOR_UDID" -b
           echo "SIMULATOR_UDID=$SIMULATOR_UDID" >> "$GITHUB_ENV"
-      - name: Run app in iOS simulator
-        timeout-minutes: 25
-        run: |
-          flutter test integration_test/app_smoke_test.dart -d "$SIMULATOR_UDID"
-          flutter test integration_test/document_lifecycle_test.dart -d "$SIMULATOR_UDID" --dart-define=NANOTATECZKI_ISOLATED_CI=true
-          flutter test integration_test/pointer_contact_matrix_test.dart -d "$SIMULATOR_UDID"
+      - name: Verify iOS app bootstrap
+        timeout-minutes: 12
+        run: >-
+          flutter test integration_test/app_smoke_test.dart
+          -d "$SIMULATOR_UDID" --reporter expanded
+      - name: Verify iOS isolated document lifecycle
+        timeout-minutes: 12
+        run: >-
+          flutter test integration_test/document_lifecycle_test.dart
+          -d "$SIMULATOR_UDID"
+          --dart-define=NANOTATECZKI_ISOLATED_CI=true
+          --reporter expanded
+      - name: Verify iOS pointer contact matrix
+        timeout-minutes: 10
+        run: >-
+          flutter test integration_test/pointer_contact_matrix_test.dart
+          -d "$SIMULATOR_UDID" --reporter expanded

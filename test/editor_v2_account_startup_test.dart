@@ -460,17 +460,18 @@ void main() {
     fixture.accepted.add(remote.toJson());
     await fixture.runtime.engine.syncNow();
     final first = (await fixture.repository.getNotebook(notebook.uid))!;
-    expect(
-      first.pages.single.inkStrokes.map((stroke) => stroke.id).toSet(),
-      {'offline-stroke', 'peer-stroke'},
-    );
+    expect(first.pages.single.inkStrokes.map((stroke) => stroke.id).toSet(), {
+      'offline-stroke',
+      'peer-stroke',
+    });
     expect(
       await fixture.runtime.store.checkpoint('account:startup-account'),
       3,
     );
     expect(
-      (await fixture.runtime.store.pending(includeDeferred: true))
-          .map((operation) => operation.operationId),
+      (await fixture.runtime.store.pending(
+        includeDeferred: true,
+      )).map((operation) => operation.operationId),
       [local.operationId],
     );
 
@@ -517,10 +518,10 @@ void main() {
       3.0,
     );
     expect(
-      (await fixture.runtime.store.pending(includeDeferred: true))
-          .map((operation) => operation.operationId),
+      (await fixture.runtime.store.pending(
+        includeDeferred: true,
+      )).map((operation) => operation.operationId),
       [local.operationId, localSet.operationId],
     );
   });
-
 }

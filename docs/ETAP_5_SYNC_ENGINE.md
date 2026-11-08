@@ -10,6 +10,15 @@ kolizja UID nadal blokuje kursor do pełnego rebase. Regresja HTTP/SQLite
 sprawdza niezależną kreskę offline i konflikt tego samego UID.
 Nie włączać produkcyjnego cutover na podstawie tego przyrostu.
 
+## Diagnostyka zawieszenia iOS (2026-11-08)
+
+W poprzednim pełnym przebiegu (42499752832) iPhone zakończył Xcode build
+dla `document_lifecycle_test.dart`, lecz nie zwrócił wyniku przed limitem
+25 minut. Ten sam scenariusz przeszedł na iPadzie. W celu ustalenia miejsca
+blokady CI uruchamia osobne kroki smoke, lifecycle i pointer, każdy z
+limitem czasu oraz `--reporter expanded`. To nie jest potwierdzenie
+naprawy zawieszenia; wynik wymaga nowego iOS CI.
+
 ## Stop bez blokady handshake i seryjny restart — 2026-11-06
 
 `stop()` współdzieli trwającą operację i nadal czeka na aktywny REST.
