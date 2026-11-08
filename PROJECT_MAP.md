@@ -625,12 +625,12 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 
 - `lib/data/sync/editor_v2_account_runtime.dart` tworzy izolowany
   `OperationStore`, `SyncEngine`, projektor i zweryfikowany asset gateway
-  tylko dla konta z potwierdzonym protokołem v2. Wysyłanie lokalnego outboxu
-  nie jest już wymagana dla różnych UID obiektów tego samego dokumentu.
-  Konflikty tego samego UID lub zmiany kontenera nadal blokują kursor
-  do pełnego rebase, bez nadpisania lokalnego gestu.
-  101: `attachEditor`; 110: `detachEditor`; 117: `editorForDocument`;
-  144: `startForCurrentAccount` wiąże i waliduje repozytorium oraz
+  tylko dla konta z potwierdzonym protokołem v2. Zdalne operacje
+  dotyczące różnych UID obiektów mogą być zapisane pomimo lokalnego
+  outboxu. Kolizje UID i zmiany kontenera blokują kursor do pełnego
+  rebase, bez nadpisania lokalnego gestu.
+  120: `attachEditor`; 129: `detachEditor`; 136: `editorForDocument`;
+  163: `startForCurrentAccount` wiąże i waliduje repozytorium oraz
   sprawdza właściciela przed startem i po każdym await. Anulowanie
   zatrzymuje transport, zachowując blokadę snapshotów v1. Przekazuje
   `isCurrent` do silnika, aby ponowił kontrolę po drenażu starej generacji.
