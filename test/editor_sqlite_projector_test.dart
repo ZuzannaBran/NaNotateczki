@@ -2054,4 +2054,154 @@ void main() {
         .get();
     expect(blobs, isEmpty);
   });
+
+  Future<void> checkCorruptQuillDeletion({required bool deletePage}) async {
+    const extraPage = 'corrupt-embed-page';
+    final targetPage = deletePage ? extraPage : pageId;
+    final objectId = deletePage ? 'corrupt-embed-page-text' : 'corrupt-text';
+    final assetId = deletePage ? 'corrupt-page-asset' : 'corrupt-text-asset';
+    if (deletePage) {
+      await write([
+        const LocalOperationDraft(
+          kind: OperationKind.pageCreate,
+          objectId: extraPage,
+          payload: {
+            'value': {'title': 'Corrupt media', 'isBookmarked': false},
+          },
+        ),
+      ]);
+    }
+
+    final bytes = Uint8List.fromList([
+      137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3, 4,
+    ]);
+    final receipt = <String, dynamic>{
+      'assetId': assetId,
+      'sha256': crypto.sha256.convert(bytes).toString(),
+      'sizeBytes': bytes.length,
+      'mediaType': 'image/png',
+    };
+    final buffer = VerifiedEditorAssetBuffer();
+    buffer.stage(receipt: receipt, bytes: bytes);
+    final checkedProjector = EditorSqliteProjector(
+      database,
+      verifiedAssetBuffer: buffer,
+    );
+
+    await store.writeLocalBatch(
+      actorId: 'valid-quill-setup',
+      documentId: documentId,
+      operations: [
+        LocalOperationDraft(
+          kind: OperationKind.objectCreate,
+          pageId: targetPage,
+          objectId: objectId,
+          payload: const {
+            'value': {
+              'objectType': 'text',
+              'fontSize': 18.0,
+              'colorValue': 0xFF123456,
+              'width': 200.0,
+              'rotation': 0.0,
+              'dx': 0.0,
+              'dy': 0.0,
+              'sortIndex': 0,
+            },
+          },
+        ),
+        LocalOperationDraft(
+          kind: OperationKind.assetAttach,
+          pageId: targetPage,
+          objectId: objectId,
+          payload: receipt,
+        ),
+        LocalOperationDraft(
+          kind: OperationKind.textInsert,
+          pageId: targetPage,
+          objectId: objectId,
+          payload: {
+            'afterAtomId': null,
+            'atoms': [
+              {
+                'id': const Uuid().v4(),
+                'text': '\uFFFC',
+                'embed': {'image': 'asset:$assetId'},
+              },
+              {'id': const Uuid().v4(), 'text': '\n'},
+            ],
+          },
+        ),
+      ],
+      apply: checkedProjector.apply,
+    );
+
+    final deletion = LocalOperationDraft(
+      kind: deletePage ? OperationKind.pageDelete : OperationKind.objectDelete,
+      pageId: deletePage ? null : targetPage,
+      objectId: deletePage ? targetPage : objectId,
+      payload: const {},
+    );
+    final pendingBefore = await store.pending();
+    await database.customStatement(
+      'UPDATE operation_asset_bytes SET bytes = ? WHERE checksum_sha256 = ?',
+      [Uint8List.fromList(List<int>.filled(bytes.length, 0)), receipt['sha256']],
+    );
+
+    await expectLater(write([deletion]), throwsFormatException);
+    expect(await store.pending(), hasLength(pendingBefore.length));
+    expect(
+      await database.customSelect(
+        'SELECT uid FROM text_block_rows WHERE uid = ?',
+        variables: [Variable<String>(objectId)],
+      ).get(),
+      hasLength(1),
+    );
+    expect(
+      await database.customSelect(
+        'SELECT asset_id FROM asset_references '
+        'WHERE document_id = ? AND asset_id = ?',
+        variables: [Variable<String>(documentId), Variable<String>(assetId)],
+      ).get(),
+      hasLength(1),
+    );
+
+    await database.customStatement(
+      'UPDATE operation_asset_bytes SET bytes = ? WHERE checksum_sha256 = ?',
+      [bytes, receipt['sha256']],
+    );
+    await write([deletion]);
+    expect(
+      await database.customSelect(
+        'SELECT uid FROM text_block_rows WHERE uid = ?',
+        variables: [Variable<String>(objectId)],
+      ).get(),
+      isEmpty,
+    );
+    expect(
+      await database.customSelect(
+        'SELECT asset_id FROM asset_references '
+        'WHERE document_id = ? AND asset_id = ?',
+        variables: [Variable<String>(documentId), Variable<String>(assetId)],
+      ).get(),
+      isEmpty,
+    );
+    expect(await store.pending(), hasLength(pendingBefore.length + 1));
+    if (deletePage) {
+      expect(
+        await database.customSelect(
+          'SELECT uid FROM page_rows WHERE uid = ?',
+          variables: [Variable<String>(targetPage)],
+        ).get(),
+        isEmpty,
+      );
+    }
+  }
+
+  test('object.delete refuses corrupt durable Quill BLOB', () async {
+    await checkCorruptQuillDeletion(deletePage: false);
+  });
+
+  test('page.delete refuses corrupt durable Quill BLOB', () async {
+    await checkCorruptQuillDeletion(deletePage: true);
+  });
 }

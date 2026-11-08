@@ -1,5 +1,14 @@
 # Dane NaNotateczki
 
+## Bezstratne usuwanie Quill v2 przy korupcji assetu (2026-11-08)
+
+Usunięcie bloku tekstowego lub całej strony najpierw weryfikuje SHA-256
+i rozmiar trwałych `sqlite-asset:` BLOB-ów używanych przez Quill.
+Brakujące lub zmienione bajty blokują transakcję, więc nie są kasowane
+referencje, tekst, journal, outbox ani actorSeq. Starsze referencje
+path-only pozostają do osobnej migracji. Nowe regresje obejmują odmowę
+usunięcia po korupcji i sukces po przywróceniu prawidłowych bajtów.
+
 ## Podgląd transformacji figury (2026-11-07)
 
 Podgląd uchwytów figury w notatniku i na tablicy jest przechowywany poza

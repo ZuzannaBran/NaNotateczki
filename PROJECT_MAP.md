@@ -509,6 +509,9 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   zdalnym `object.set`. Nie ma fizycznego kasowania plików.
   Nowe embedy Quill przechowują bajty w `operation_asset_bytes` i
   wymagają powiązanej referencji SHA-256 oraz zgodnego MIME.
+  Usunięcie bloku Quill lub całej strony odmawia commita przy uszkodzonym
+  checksumowanym BLOB; path-only legacy pozostaje granicą migracji.
+  Regresje: `test/editor_sqlite_projector_test.dart` (object/page delete).
   `localAssetReceipt` odczytuje niezmienne potwierdzenia assetu
   wyłącznie z historii wskazanego dokumentu, również po usunięciu
   ostatniego właściciela; nie zastępuje kontroli BLOB przez

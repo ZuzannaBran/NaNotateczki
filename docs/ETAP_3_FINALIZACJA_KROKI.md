@@ -1,5 +1,19 @@
 # Etap 3 — finalizacja integracji edytora v2
 
+## Kontrola integralności Quill przy usuwaniu (2026-11-08)
+
+Przebieg 42416001001 na b732b18 zakończył się sukcesem: natywna analiza,
+regresje i realny Linux E2E v2. Pozostałe platformy były pominięte.
+
+Wykryto brak weryfikacji trwałych bajtów Quill przy `object.delete`
+oraz `page.delete`: sama referencja assetu mogła istnieć mimo uszkodzonego
+BLOB-u. Teraz oba usunięcia sprawdzają SHA-256 przed commitem.
+Próba przy uszkodzonej zawartości cofa gest wraz z journalem/outboxem.
+Poprawa nie zmienia protokołu, schematu SQLite ani referencji legacy
+path-only. Dwie regresje odtwarzają korupcję i poprawne ponowienie po
+odzyskaniu oryginalnych bajtów. Wynik nowych testów i E2E wymaga CI;
+v2 nadal pozostaje opt-in, bez produkcyjnego cutover.
+
 ## Zapis wyłącznie zakończonej transformacji ramki tekstu (2026-11-07)
 
 Dla prostego HUD i bogatego Quilla podgląd pozycji, szerokości i rozmiaru

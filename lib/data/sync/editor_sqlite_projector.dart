@@ -413,7 +413,7 @@ class EditorSqliteProjector {
     final prefix = 'page:[${jsonEncode(pageId)},';
     final attached = await database
         .customSelect(
-          'SELECT object_id, asset_id FROM asset_references '
+          'SELECT object_id, asset_id, storage_path FROM asset_references '
           'WHERE document_id = ? AND substr(object_id, 1, ?) = ?',
           variables: [
             Variable<String>(op.documentId),
@@ -435,6 +435,17 @@ class EditorSqliteProjector {
       final owner = parts[1] as String;
       if (!imageIds.contains(owner) && !textIds.contains(owner)) {
         throw UnsupportedError('Page has an unowned media reference.');
+      }
+      // Operational Quill bytes must remain valid until deletion commits.
+      // Legacy path-only references are handled by the migration boundary.
+      if (textIds.contains(owner) &&
+          row.read<String>('storage_path').startsWith('sqlite-asset:')) {
+        await verifiedTextAssetBytes(
+          documentId: op.documentId,
+          pageId: pageId,
+          objectId: owner,
+          assetId: row.read<String>('asset_id'),
+        );
       }
       assetsByOwner
           .putIfAbsent(owner, () => <String>{})
@@ -802,7 +813,7 @@ class EditorSqliteProjector {
     final scopedId = 'page:${jsonEncode([op.pageId, op.objectId])}';
     final attached = await database
         .customSelect(
-          'SELECT asset_id FROM asset_references '
+          'SELECT asset_id, storage_path FROM asset_references '
           'WHERE document_id = ? AND object_id = ?',
           variables: [
             Variable<String>(op.documentId),
@@ -838,6 +849,19 @@ class EditorSqliteProjector {
             !assetIds.contains(OperationEnvelope.embedAssetId(insert))) {
           throw UnsupportedError('Quill embed is missing its asset.');
         }
+      }
+    }
+    if (text != null) {
+      for (final row in attached) {
+        if (!row.read<String>('storage_path').startsWith('sqlite-asset:')) {
+          continue;
+        }
+        await verifiedTextAssetBytes(
+          documentId: op.documentId,
+          pageId: op.pageId!,
+          objectId: op.objectId!,
+          assetId: row.read<String>('asset_id'),
+        );
       }
     }
     await database.customStatement(
