@@ -609,4 +609,127 @@ void main() {
       [local.operationId, localSet.operationId],
     );
   });
+  test('offline Quill formatting merges only disjoint atom attributes', () async {
+    final fixture = _Fixture(NativeDatabase.memory());
+    addTearDown(fixture.close);
+    expect(
+      await fixture.runtime.startForCurrentAccount(isCurrent: () => true),
+      isTrue,
+    );
+    final notebook = await fixture.repository.createNotebook();
+    await fixture.runtime.engine.syncNow();
+    final pageId = notebook.pages.single.id;
+    final actor = fixture.runtime.engine.actorIdForDocument(notebook.uid);
+    const textId = 'quill-offline-format';
+    const atomId = '00000000-0000-4000-8000-000000009901';
+    await fixture.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: notebook.uid,
+      kind: OperationKind.objectCreate,
+      pageId: pageId,
+      objectId: textId,
+      payload: const {
+        'value': {
+          'objectType': 'text',
+          'dx': 5.0,
+          'dy': 6.0,
+          'width': 160.0,
+          'fontSize': 18.0,
+          'rotation': 0.0,
+          'colorValue': 0xFF224466,
+          'sortIndex': 0,
+        },
+      },
+      apply: fixture.runtime.projector.apply,
+    );
+    await fixture.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: notebook.uid,
+      kind: OperationKind.textInsert,
+      pageId: pageId,
+      objectId: textId,
+      payload: const {
+        'afterAtomId': null,
+        'atoms': [
+          {'id': atomId, 'text': 'Hello\\n'},
+        ],
+      },
+      apply: fixture.runtime.projector.apply,
+    );
+    await fixture.runtime.engine.syncNow();
+
+    final local = await fixture.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: notebook.uid,
+      kind: OperationKind.textFormat,
+      pageId: pageId,
+      objectId: textId,
+      payload: const {
+        'atomIds': [atomId],
+        'attributes': {'bold': true},
+      },
+      apply: fixture.runtime.projector.apply,
+    );
+    fixture.rejectPosts = true;
+    final remote = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-000000009902',
+      actorId: 'quill-peer',
+      actorSeq: 1,
+      logicalClock: local.logicalClock + 1,
+      dependencies: [fixture.accepted.last['operationId'] as String],
+      documentId: notebook.uid,
+      pageId: pageId,
+      objectId: textId,
+      kind: OperationKind.textFormat,
+      payload: const {
+        'atomIds': [atomId],
+        'attributes': {'italic': true},
+      },
+    );
+    fixture.accepted.add(remote.toJson());
+    await fixture.runtime.engine.syncNow();
+    final merged = (await fixture.repository.getNotebook(notebook.uid))!
+        .pages.single.textBlocks.single;
+    expect(merged.deltaJson, contains('"bold":true'));
+    expect(merged.deltaJson, contains('"italic":true'));
+    final cursor = await fixture.runtime.store.checkpoint(
+      'account:startup-account',
+    );
+    expect(cursor, 5);
+
+    final conflict = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-000000009903',
+      actorId: 'quill-peer',
+      actorSeq: 2,
+      logicalClock: remote.logicalClock + 1,
+      dependencies: [remote.operationId],
+      documentId: notebook.uid,
+      pageId: pageId,
+      objectId: textId,
+      kind: OperationKind.textFormat,
+      payload: const {
+        'atomIds': [atomId],
+        'attributes': {'bold': null},
+      },
+    );
+    fixture.accepted.add(conflict.toJson());
+    await fixture.runtime.engine.syncNow();
+    expect(
+      await fixture.runtime.store.checkpoint('account:startup-account'),
+      cursor,
+    );
+    expect(
+      await fixture.runtime.store.operation(conflict.operationId),
+      isNull,
+    );
+    final afterConflict = (await fixture.repository.getNotebook(notebook.uid))!
+        .pages.single.textBlocks.single;
+    expect(afterConflict.deltaJson, merged.deltaJson);
+    expect(
+      (await fixture.runtime.store.pending(includeDeferred: true))
+          .map((operation) => operation.operationId),
+      [local.operationId],
+    );
+  });
+
 }

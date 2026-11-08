@@ -39,6 +39,36 @@ bool _canMergeDifferentFields(
   return remoteKeys.intersection(localKeys).isEmpty;
 }
 
+/// Formatting operations commute on different atoms or attribute names.
+bool _canMergeIndependentTextFormat(
+  OperationEnvelope remote,
+  OperationEnvelope local,
+) {
+  if (remote.kind != OperationKind.textFormat ||
+      local.kind != OperationKind.textFormat ||
+      remote.pageId != local.pageId) {
+    return false;
+  }
+  final remoteIds = remote.payload['atomIds'];
+  final localIds = local.payload['atomIds'];
+  final remoteAttributes = remote.payload['attributes'];
+  final localAttributes = local.payload['attributes'];
+  if (remoteIds is! List ||
+      localIds is! List ||
+      remoteAttributes is! Map ||
+      localAttributes is! Map) {
+    return false;
+  }
+  final commonAtoms = remoteIds.toSet().intersection(localIds.toSet());
+  if (commonAtoms.isEmpty) {
+    return true;
+  }
+  return remoteAttributes.keys
+      .toSet()
+      .intersection(localAttributes.keys.toSet())
+      .isEmpty;
+}
+
 String? _referencedAssetId(OperationEnvelope operation) {
   if (operation.kind == OperationKind.assetAttach ||
       operation.kind == OperationKind.assetDetach) {
@@ -71,7 +101,8 @@ bool _canProjectIndependentRemote(
       return false;
     }
     if (local.objectId == remote.objectId) {
-      return _canMergeDifferentFields(remote, local);
+      return _canMergeDifferentFields(remote, local) ||
+          _canMergeIndependentTextFormat(remote, local);
     }
     final localAssetId = _referencedAssetId(local);
     if (remoteAssetId == null || localAssetId == null) {

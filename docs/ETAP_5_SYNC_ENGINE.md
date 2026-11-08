@@ -13,6 +13,11 @@ Zmiany kontenera, współdzielonego pola lub assetu blokują kursor do
 pełnego rebase. Test HTTP/SQLite obejmuje offline ink, rozłączne
 zmiany koloru, szerokości, punktów kształtu i kolejności warstw,
 a także konflikt wspólnej szerokości.
+Dodatkowy przypadek Quill dopuszcza `text.format` tego samego bloku
+wyłącznie dla rozłącznych ID atomów lub rozłącznych nazw atrybutów.
+Wspólny atrybut tego samego atomu zatrzymuje kursor bez nadpisania
+lokalnego formatowania. Regresja obejmuje zachowanie bold + italic
+i odrzucenie konkurencyjnego usunięcia bold.
 Nie włączać produkcyjnego cutover na podstawie tego przyrostu.
 
 ## Regresje Dart, Android i izolacja testów iOS (2026-11-08)
