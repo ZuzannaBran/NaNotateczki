@@ -786,4 +786,60 @@ void main() {
     expect(next.dependencies, [parent]);
     expect(next.logicalClock, 261);
   });
+  test('shared Dart Python LWW undo and permanent tombstone contract', () {
+    final initial = op(
+      id: a1,
+      actor: 'A',
+      sequence: 1,
+      clock: 10,
+      payload: const {
+        'properties': {'colorValue': 17, 'sortIndex': 3},
+      },
+    );
+    final concurrent = op(
+      id: b1,
+      actor: 'B',
+      sequence: 1,
+      clock: 10,
+      payload: const {
+        'properties': {'colorValue': 34, 'sortIndex': 5},
+      },
+    );
+    final inverse = op(
+      id: a2,
+      actor: 'A',
+      sequence: 2,
+      clock: 11,
+      payload: const {
+        'properties': {'colorValue': 51},
+      },
+      dependencies: const [a1],
+    );
+    final removal = op(
+      id: b2,
+      actor: 'B',
+      sequence: 2,
+      clock: 12,
+      kind: OperationKind.objectDelete,
+      payload: const {},
+      dependencies: const [b1],
+    );
+    for (final order in [
+      [initial, concurrent],
+      [concurrent, initial],
+    ]) {
+      final register = OperationPropertyRegister();
+      for (final operation in [...order, inverse]) {
+        register.apply(operation);
+      }
+      expect(register.fieldsFor(initial), {
+        'colorValue': 51,
+        'sortIndex': 5,
+      });
+      register.apply(removal);
+      register.apply(initial);
+      expect(register.fieldsFor(initial), isNull);
+    }
+  });
+
 }
