@@ -1,5 +1,27 @@
 # Dane NaNotateczki
 
+## Przestrzenne konflikty usuwania i atomowy reducer v2 (2026-11-09)
+
+Niezależna operacja page.delete może przejść przy lokalnym outboxie
+metadanych dokumentu, page.set innej strony oraz ink/Quill na innej
+stronie. To nie zezwala na równoczesne page.create, object.move,
+inne operacje destrukcyjne, zmiany tej samej strony ani asset.attach:
+te konflikty wymagają pełnego rebase. Tombstone, outbox i cursor
+zachowują dotychczasową transakcyjność.
+
+Backend sprawdza poprawność wszystkich utrwalonych rang
+[logicalClock, actorId, actorSeq, operationId] z ograniczeniami
+liczbowymi i identyfikatorem operacji. Aktualizacja folderu,
+plannera, przeniesienie obiektu, asset attach/detach i Quill
+przygotowuje kandydata przed zmianą stanu; odmowa nie zostawia
+częściowych obiektów ani księgi assetReceipts. Nie zmieniono
+historii operacji, schematu danych ani migracji produkcyjnej.
+
+ACK paczki wymaga osobnego kursora dla każdego operationId.
+Dwa różne identyfikatory z tym samym cursor nie mogą zwolnić
+żadnej pozycji z lokalnego outboxu. Regresje obejmują klienta
+REST i sam SyncEngine przy błędnej odpowiedzi bramy.
+
 ## Rangi projekcji i kolejność stron przy offline v2 (2026-11-09)
 
 Wersje skalarne `versions` i assetów `assetVersions` w backendzie

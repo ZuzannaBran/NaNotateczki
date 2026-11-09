@@ -25,6 +25,12 @@ class V2OutboxConflictPolicy {
       if (local.kind == OperationKind.pageCreate) {
         return _independentPageCreate(local, remote);
       }
+      if (remote.kind == OperationKind.pageDelete) {
+        return _independentPageDelete(remote, local);
+      }
+      if (local.kind == OperationKind.pageDelete) {
+        return _independentPageDelete(local, remote);
+      }
       if (remote.kind == OperationKind.documentSet ||
           remote.kind == OperationKind.pageSet) {
         return _independentMetadata(remote, local);
@@ -108,6 +114,40 @@ class V2OutboxConflictPolicy {
     return other.pageId != null &&
         other.pageId != created.objectId &&
         independentObjects.contains(other.kind);
+  }
+
+  /// Removing one page leaves unrelated page IDs and document fields intact.
+  ///
+  /// Container moves, concurrent creations and media changes require a
+  /// causally ordered rebase because deleting a page may free asset bytes.
+  static bool _independentPageDelete(
+    OperationEnvelope removed,
+    OperationEnvelope other,
+  ) {
+    if (removed.objectId == null) {
+      return false;
+    }
+    if (other.kind == OperationKind.documentSet) {
+      return true;
+    }
+    if (other.kind == OperationKind.pageSet) {
+      return other.objectId != removed.objectId;
+    }
+    const independentObjects = {
+      OperationKind.strokeCreate,
+      OperationKind.objectSet,
+      OperationKind.objectTransform,
+      OperationKind.objectReorder,
+      OperationKind.textInsert,
+      OperationKind.textDelete,
+      OperationKind.textFormat,
+    };
+    final assets = _assetIds(other);
+    return other.pageId != null &&
+        other.pageId != removed.objectId &&
+        independentObjects.contains(other.kind) &&
+        assets != null &&
+        assets.isEmpty;
   }
 
   static bool _independentMetadata(

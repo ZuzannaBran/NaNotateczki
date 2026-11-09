@@ -1537,7 +1537,6 @@ void main() {
     );
   });
 
-
   test('offline metadata survives remote page create', () async {
     final f = _Fixture(NativeDatabase.memory());
     addTearDown(f.close);
@@ -1645,10 +1644,7 @@ void main() {
     await f.runtime.engine.syncNow();
     final saved = (await f.repository.getNotebook(note.uid))!;
     expect(saved.pages, hasLength(2));
-    expect(
-      saved.pages.first.inkStrokes.single.id,
-      'offline-page-create-ink',
-    );
+    expect(saved.pages.first.inkStrokes.single.id, 'offline-page-create-ink');
     expect(saved.pages.last.id, 'remote-second-page');
     expect(await f.runtime.store.checkpoint('account:startup-account'), 3);
     expect(
@@ -1658,7 +1654,6 @@ void main() {
       [local.operationId],
     );
   });
-
 
   test('remote page remains unique after SQLite restart', () async {
     final dir = await Directory.systemTemp.createTemp('nn-page-restart-');
@@ -1786,6 +1781,258 @@ void main() {
       (await f.runtime.store.pending(
         includeDeferred: true,
       )).map((operation) => operation.operationId),
+      [local.operationId],
+    );
+  });
+
+  test('remote delete preserves unrelated metadata', () async {
+    final f = _Fixture(NativeDatabase.memory());
+    addTearDown(f.close);
+    expect(
+      await f.runtime.startForCurrentAccount(isCurrent: () => true),
+      isTrue,
+    );
+    final note = await f.repository.createNotebook();
+    await f.runtime.engine.syncNow();
+    final actor = f.runtime.engine.actorIdForDocument(note.uid);
+    const removedPageId = 'peer-removed-page';
+    await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: note.uid,
+      objectId: removedPageId,
+      kind: OperationKind.pageCreate,
+      payload: const {
+        'value': {'title': 'Temporary', 'isBookmarked': false},
+      },
+      apply: f.runtime.projector.apply,
+    );
+    await f.runtime.engine.syncNow();
+    final localTitle = await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: note.uid,
+      kind: OperationKind.documentSet,
+      payload: const {
+        'properties': {'title': 'Offline document'},
+      },
+      apply: f.runtime.projector.apply,
+    );
+    final localBookmark = await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: note.uid,
+      objectId: note.pages.single.id,
+      kind: OperationKind.pageSet,
+      payload: const {
+        'properties': {'isBookmarked': true},
+      },
+      apply: f.runtime.projector.apply,
+    );
+    f.rejectPosts = true;
+    final remove = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-00000000b011',
+      actorId: 'delete-peer',
+      actorSeq: 1,
+      logicalClock: localBookmark.logicalClock + 1,
+      dependencies: [f.accepted.last['operationId'] as String],
+      documentId: note.uid,
+      objectId: removedPageId,
+      kind: OperationKind.pageDelete,
+      payload: const {},
+    );
+    f.accepted.add(remove.toJson());
+    await f.runtime.engine.syncNow();
+    final saved = (await f.repository.getNotebook(note.uid))!;
+    expect(saved.title, 'Offline document');
+    expect(saved.pages, hasLength(1));
+    expect(saved.pages.single.id, note.pages.single.id);
+    expect(saved.pages.single.isBookmarked, isTrue);
+    expect(await f.runtime.store.checkpoint('account:startup-account'), 4);
+    expect(
+      (await f.runtime.store.pending(
+        includeDeferred: true,
+      )).map((op) => op.operationId),
+      [localTitle.operationId, localBookmark.operationId],
+    );
+  });
+
+  test('remote delete preserves pending ink', () async {
+    final f = _Fixture(NativeDatabase.memory());
+    addTearDown(f.close);
+    expect(
+      await f.runtime.startForCurrentAccount(isCurrent: () => true),
+      isTrue,
+    );
+    final note = await f.repository.createNotebook();
+    await f.runtime.engine.syncNow();
+    final actor = f.runtime.engine.actorIdForDocument(note.uid);
+    const removedPageId = 'second-offline-page';
+    await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: note.uid,
+      objectId: removedPageId,
+      kind: OperationKind.pageCreate,
+      payload: const {
+        'value': {'title': 'Temporary', 'isBookmarked': false},
+      },
+      apply: f.runtime.projector.apply,
+    );
+    await f.runtime.engine.syncNow();
+    final ink = await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: note.uid,
+      pageId: note.pages.single.id,
+      objectId: 'preserved-offline-ink',
+      kind: OperationKind.strokeCreate,
+      payload: const {
+        'value': {
+          'objectType': 'stroke',
+          'colorValue': 0xFF224466,
+          'width': 2.0,
+          'toolIndex': 0,
+          'sortIndex': 0,
+          'points': [
+            [1.0, 2.0, 0.5],
+          ],
+        },
+      },
+      apply: f.runtime.projector.apply,
+    );
+    f.rejectPosts = true;
+    final remove = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-00000000b012',
+      actorId: 'delete-peer',
+      actorSeq: 1,
+      logicalClock: ink.logicalClock + 1,
+      dependencies: [f.accepted.last['operationId'] as String],
+      documentId: note.uid,
+      objectId: removedPageId,
+      kind: OperationKind.pageDelete,
+      payload: const {},
+    );
+    f.accepted.add(remove.toJson());
+    await f.runtime.engine.syncNow();
+    final saved = (await f.repository.getNotebook(note.uid))!;
+    expect(saved.pages, hasLength(1));
+    expect(saved.pages.single.inkStrokes.single.id, 'preserved-offline-ink');
+    expect(await f.runtime.store.checkpoint('account:startup-account'), 4);
+    expect(
+      (await f.runtime.store.pending(
+        includeDeferred: true,
+      )).map((op) => op.operationId),
+      [ink.operationId],
+    );
+  });
+
+  test('local delete merges remote page title', () async {
+    final f = _Fixture(NativeDatabase.memory());
+    addTearDown(f.close);
+    expect(
+      await f.runtime.startForCurrentAccount(isCurrent: () => true),
+      isTrue,
+    );
+    final note = await f.repository.createNotebook();
+    await f.runtime.engine.syncNow();
+    final actor = f.runtime.engine.actorIdForDocument(note.uid);
+    const removedPageId = 'deleted-locally-page';
+    await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: note.uid,
+      objectId: removedPageId,
+      kind: OperationKind.pageCreate,
+      payload: const {
+        'value': {'title': 'Temporary', 'isBookmarked': false},
+      },
+      apply: f.runtime.projector.apply,
+    );
+    await f.runtime.engine.syncNow();
+    final deleted = await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: note.uid,
+      objectId: removedPageId,
+      kind: OperationKind.pageDelete,
+      payload: const {},
+      apply: f.runtime.projector.apply,
+    );
+    f.rejectPosts = true;
+    final remoteTitle = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-00000000b013',
+      actorId: 'title-peer',
+      actorSeq: 1,
+      logicalClock: deleted.logicalClock + 1,
+      dependencies: [f.accepted.last['operationId'] as String],
+      documentId: note.uid,
+      objectId: note.pages.single.id,
+      kind: OperationKind.pageSet,
+      payload: const {
+        'properties': {'title': 'Surviving page'},
+      },
+    );
+    f.accepted.add(remoteTitle.toJson());
+    await f.runtime.engine.syncNow();
+    final saved = (await f.repository.getNotebook(note.uid))!;
+    expect(saved.pages, hasLength(1));
+    expect(saved.pages.single.title, 'Surviving page');
+    expect(await f.runtime.store.checkpoint('account:startup-account'), 4);
+    expect(
+      (await f.runtime.store.pending(
+        includeDeferred: true,
+      )).map((op) => op.operationId),
+      [deleted.operationId],
+    );
+  });
+
+  test('same-page delete holds pending page edits', () async {
+    final f = _Fixture(NativeDatabase.memory());
+    addTearDown(f.close);
+    expect(
+      await f.runtime.startForCurrentAccount(isCurrent: () => true),
+      isTrue,
+    );
+    final note = await f.repository.createNotebook();
+    await f.runtime.engine.syncNow();
+    final actor = f.runtime.engine.actorIdForDocument(note.uid);
+    await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: note.uid,
+      objectId: 'kept-after-conflict',
+      kind: OperationKind.pageCreate,
+      payload: const {
+        'value': {'title': 'Second', 'isBookmarked': false},
+      },
+      apply: f.runtime.projector.apply,
+    );
+    await f.runtime.engine.syncNow();
+    final local = await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: note.uid,
+      objectId: note.pages.single.id,
+      kind: OperationKind.pageSet,
+      payload: const {
+        'properties': {'title': 'Still local'},
+      },
+      apply: f.runtime.projector.apply,
+    );
+    f.rejectPosts = true;
+    final remove = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-00000000b014',
+      actorId: 'delete-peer',
+      actorSeq: 1,
+      logicalClock: local.logicalClock + 1,
+      dependencies: [f.accepted.last['operationId'] as String],
+      documentId: note.uid,
+      objectId: note.pages.single.id,
+      kind: OperationKind.pageDelete,
+      payload: const {},
+    );
+    f.accepted.add(remove.toJson());
+    await f.runtime.engine.syncNow();
+    final saved = (await f.repository.getNotebook(note.uid))!;
+    expect(saved.pages, hasLength(2));
+    expect(saved.pages.first.title, 'Still local');
+    expect(await f.runtime.store.checkpoint('account:startup-account'), 3);
+    expect(
+      (await f.runtime.store.pending(
+        includeDeferred: true,
+      )).map((op) => op.operationId),
       [local.operationId],
     );
   });

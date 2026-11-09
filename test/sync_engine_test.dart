@@ -101,6 +101,19 @@ class _RetryGateway extends _FakeGateway {
   }
 }
 
+class _DuplicateAckGateway extends _FakeGateway {
+  @override
+  Future<List<OperationReceipt>> send(
+    List<OperationEnvelope> operations,
+  ) async {
+    batches.add(operations.map((op) => op.operationId).toList());
+    return [
+      for (final operation in operations)
+        OperationReceipt(operation.operationId, 77),
+    ];
+  }
+}
+
 class _RevokedShareGateway implements OperationGateway {
   @override
   Future<List<OperationReceipt>> send(
@@ -1266,5 +1279,28 @@ void main() {
     expect(ended, 1);
     expect(engine.isStarted, isFalse);
     expect(await store.isPending(pending.operationId), isTrue);
+  });
+
+  test('duplicate ACK cursors never delete queued local intents', () async {
+    final first = await local('duplicate-ack-first');
+    final second = await local('duplicate-ack-second');
+    await engine.stop();
+    engine.dispose();
+    gateway = _DuplicateAckGateway();
+    engine = SyncEngine(
+      store: store,
+      gateway: gateway,
+      actorId: 'actor-local',
+      checkpointScope: 'user-A-v2',
+      enableRealtime: false,
+      applyRemote: (_, _) async {},
+    );
+    await engine.start();
+    expect(await store.isPending(first.operationId), isTrue);
+    expect(await store.isPending(second.operationId), isTrue);
+    expect(await store.blockedReason(first.operationId), contains('ACK'));
+    expect(await store.checkpoint('user-A-v2'), 0);
+    expect(gateway.batches, hasLength(1));
+    expect(gateway.batches.single, [first.operationId, second.operationId]);
   });
 }

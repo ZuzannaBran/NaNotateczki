@@ -548,8 +548,10 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
   ) async {
     final expected = batch.map((operation) => operation.operationId).toSet();
     final received = receipts.map((receipt) => receipt.operationId).toSet();
+    final cursors = receipts.map((receipt) => receipt.cursor).toSet();
     if (received.length != receipts.length ||
         !setEquals(expected, received) ||
+        cursors.length != receipts.length ||
         receipts.any((receipt) => receipt.cursor <= 0)) {
       throw const FormatException('Incomplete or invalid server ACK.');
     }

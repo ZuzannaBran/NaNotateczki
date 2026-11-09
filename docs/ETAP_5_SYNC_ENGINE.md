@@ -1,5 +1,39 @@
 # Etap 5 — silnik synchronizacji operacji v2
 
+## Rebase niezależnych page.delete i integralność ACK (2026-11-09)
+
+W przebiegu 42591095132 przechodziło 16/17 zadań (backend
+42591078056 zielony). Pozostała kontrola formattera dwóch
+testów; zastosowano dokładny diff CI bez zmiany logiki.
+
+Rozszerzono V2OutboxConflictPolicy o page.delete dla
+rozłącznych stron i niezależnych danych dokumentu: page.set,
+document.set, stroke.create, ink/Quill set/format/insert/delete
+na innych stronach. Nie wolno usuwać strony z równoległą zmianą
+tej samej strony, object.move, page.create, inną destrukcyjną
+operacją lub asset attach/detach. Regresje: 32 grupy testów
+polityki i cztery REST/SQLite z utrzymaniem kursora/outboxu,
+w tym lokalne i zdalne page.delete oraz konflikt tytułu.
+
+Dodatkowo w HttpOperationGateway i SyncEngine odrzucane są
+różne operationId z tą samą pozycją ACK; nie można dzięki
+sfałszowanemu lub wadliwemu potwierdzeniu usunąć dwóch
+lokalnych intentów. Testy sprawdzają brak ACK w storage
+i zachowanie oryginalnych operationId.
+
+Na backendzie reduktor v2 przygotowuje kopię zmienianego
+węzła przed walidacją: folder.create/move/set, task.create/move,
+object.move/create, asset.attach/detach i text.insert/delete/format.
+Niepowodzenie walidacji nie może pozostawić częściowych zapisów
+nawet w pamięci, a zweryfikowany sukces przechowuje właściwe
+wersje i wywołuje istniejącą atomową transakcję PostgreSQL.
+Rangi scalar/asset/move sprawdzają teraz zakresy i format UUID
+oprócz typów; testy są w obu repozytoriach.
+
+Dla production v1 nic się nie zmienia. Pełny rebase konfliktów
+tego samego obiektu oraz migracja starych danych nadal wymagają
+kolejnych etapów i przejścia całej macierzy CI.
+
 ## Etap 5: tworzenie stron obok outboxu offline (2026-11-09)
 
 W przebiegu CI 42587383593 przeszło 16 z 17 zadań, w tym Android,

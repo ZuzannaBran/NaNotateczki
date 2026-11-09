@@ -93,6 +93,7 @@ class HttpOperationGateway implements OperationGateway {
     }
     final expected = operations.map((op) => op.operationId).toSet();
     final seen = <String>{};
+    final seenCursors = <int>{};
     final result = <OperationReceipt>[];
     for (final raw in entries) {
       final ack = _object(raw);
@@ -103,6 +104,7 @@ class HttpOperationGateway implements OperationGateway {
           !seen.add(id) ||
           cursor is! int ||
           cursor <= 0 ||
+          !seenCursors.add(cursor) ||
           (ack['status'] != 'applied' && ack['status'] != 'duplicate')) {
         throw const FormatException('Invalid operation acknowledgement.');
       }

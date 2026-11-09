@@ -234,4 +234,82 @@ void main() {
       throwsArgumentError,
     );
   });
+
+  test('batch ACK rejects two operations sharing one cursor', () async {
+    final first = _operation();
+    final second = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: first.actorId,
+      actorSeq: 2,
+      documentId: first.documentId,
+      kind: OperationKind.documentSet,
+      payload: const {
+        'properties': {'title': 'Changed'},
+      },
+      dependencies: [first.operationId],
+      logicalClock: 2,
+    );
+    final client = clientFor((_) async {
+      return http.Response(
+        jsonEncode({
+          'cursor': 42,
+          'acknowledgements': [
+            {
+              'operationId': first.operationId,
+              'cursor': 42,
+              'status': 'applied',
+            },
+            {
+              'operationId': second.operationId,
+              'cursor': 42,
+              'status': 'duplicate',
+            },
+          ],
+        }),
+        200,
+      );
+    });
+    await expectLater(
+      HttpOperationGateway(client).send([first, second]),
+      throwsFormatException,
+    );
+  });
+
+  test('batch ACK accepts distinct cursors and duplicate status', () async {
+    final first = _operation();
+    final second = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: first.actorId,
+      actorSeq: 2,
+      documentId: first.documentId,
+      kind: OperationKind.documentSet,
+      payload: const {
+        'properties': {'title': 'Changed'},
+      },
+      dependencies: [first.operationId],
+      logicalClock: 2,
+    );
+    final client = clientFor((_) async {
+      return http.Response(
+        jsonEncode({
+          'cursor': 44,
+          'acknowledgements': [
+            {
+              'operationId': first.operationId,
+              'cursor': 43,
+              'status': 'duplicate',
+            },
+            {
+              'operationId': second.operationId,
+              'cursor': 44,
+              'status': 'applied',
+            },
+          ],
+        }),
+        200,
+      );
+    });
+    final ack = await HttpOperationGateway(client).send([first, second]);
+    expect(ack.map((entry) => entry.cursor), [43, 44]);
+  });
 }

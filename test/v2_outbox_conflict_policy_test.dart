@@ -900,7 +900,6 @@ void main() {
     );
   });
 
-
   test('new page and existing metadata commute in both directions', () {
     final created = _operation(
       OperationKind.pageCreate,
@@ -957,10 +956,7 @@ void main() {
       payload: const {
         'afterAtomId': null,
         'atoms': [
-          {
-            'id': '00000000-0000-4000-8000-0000000000e2',
-            'text': 'Offline',
-          },
+          {'id': '00000000-0000-4000-8000-0000000000e2', 'text': 'Offline'},
         ],
       },
     );
@@ -1049,5 +1045,187 @@ void main() {
       },
     );
     expect(_allowed(created, foreign), isFalse);
+  });
+
+  test('page delete commutes with offline document and other page fields', () {
+    final removed = _operation(
+      OperationKind.pageDelete,
+      remote: true,
+      objectId: 'page-old',
+      payload: const {},
+    );
+    final title = _operation(
+      OperationKind.documentSet,
+      payload: const {
+        'properties': {'title': 'Offline'},
+      },
+    );
+    final bookmark = _operation(
+      OperationKind.pageSet,
+      objectId: 'page-kept',
+      payload: const {
+        'properties': {'isBookmarked': true},
+      },
+    );
+    expect(_allowed(removed, title), isTrue);
+    expect(_allowed(title, removed), isTrue);
+    expect(_allowed(removed, bookmark), isTrue);
+    expect(_allowed(bookmark, removed), isTrue);
+    expect(
+      V2OutboxConflictPolicy.canApply(removed, [title, bookmark]),
+      isTrue,
+    );
+  });
+
+  test('page delete keeps ink and text intents on unaffected page', () {
+    final removed = _operation(
+      OperationKind.pageDelete,
+      remote: true,
+      objectId: 'page-old',
+      payload: const {},
+    );
+    final ink = _operation(
+      OperationKind.strokeCreate,
+      pageId: 'page-kept',
+      objectId: 'stroke-a',
+      payload: const {
+        'value': {'objectType': 'stroke'},
+      },
+    );
+    final text = _operation(
+      OperationKind.textInsert,
+      pageId: 'page-kept',
+      objectId: 'text-a',
+      payload: const {
+        'afterAtomId': null,
+        'atoms': [
+          {'id': '00000000-0000-4000-8000-0000000000f2', 'text': 'Hello'},
+        ],
+      },
+    );
+    expect(_allowed(removed, ink), isTrue);
+    expect(_allowed(ink, removed), isTrue);
+    expect(_allowed(removed, text), isTrue);
+    expect(_allowed(text, removed), isTrue);
+  });
+
+  test('page delete never skips edits on the removed page', () {
+    final removed = _operation(
+      OperationKind.pageDelete,
+      remote: true,
+      objectId: 'page-old',
+      payload: const {},
+    );
+    final pageTitle = _operation(
+      OperationKind.pageSet,
+      objectId: 'page-old',
+      payload: const {
+        'properties': {'title': 'Local'},
+      },
+    );
+    final ink = _operation(
+      OperationKind.objectSet,
+      pageId: 'page-old',
+      objectId: 'ink-a',
+      payload: const {
+        'properties': {'width': 5.0},
+      },
+    );
+    expect(_allowed(removed, pageTitle), isFalse);
+    expect(_allowed(pageTitle, removed), isFalse);
+    expect(_allowed(removed, ink), isFalse);
+    expect(_allowed(ink, removed), isFalse);
+  });
+
+  test('page delete waits for moves, creates and media changes', () {
+    final removed = _operation(
+      OperationKind.pageDelete,
+      remote: true,
+      objectId: 'page-old',
+      payload: const {},
+    );
+    final moved = _operation(
+      OperationKind.objectMove,
+      pageId: 'page-kept',
+      objectId: 'ink-a',
+      payload: const {
+        'toPageId': 'page-old',
+        'sortIndex': 0,
+      },
+    );
+    final created = _operation(
+      OperationKind.pageCreate,
+      objectId: 'page-added',
+      payload: const {
+        'value': {'title': 'Local', 'isBookmarked': false},
+      },
+    );
+    final media = _operation(
+      OperationKind.assetAttach,
+      pageId: 'page-kept',
+      objectId: 'image-a',
+      payload: {
+        'assetId': 'shared',
+        'sha256': ''.padLeft(64, 'a'),
+        'sizeBytes': 1024,
+        'mediaType': 'image/png',
+      },
+    );
+    final switchAsset = _operation(
+      OperationKind.objectSet,
+      pageId: 'page-kept',
+      objectId: 'image-a',
+      payload: const {
+        'properties': {'assetId': 'shared'},
+      },
+    );
+    final embed = _operation(
+      OperationKind.textInsert,
+      pageId: 'page-kept',
+      objectId: 'text-a',
+      payload: const {
+        'afterAtomId': null,
+        'atoms': [
+          {
+            'id': '00000000-0000-4000-8000-0000000000f3',
+            'text': '\uFFFC',
+            'embed': {'image': 'asset:shared'},
+          },
+        ],
+      },
+    );
+    expect(_allowed(removed, moved), isFalse);
+    expect(_allowed(removed, created), isFalse);
+    expect(_allowed(removed, media), isFalse);
+    expect(_allowed(removed, switchAsset), isFalse);
+    expect(_allowed(removed, embed), isFalse);
+    expect(_allowed(moved, removed), isFalse);
+  });
+
+  test('all pending edits must commute with remote page delete', () {
+    final removed = _operation(
+      OperationKind.pageDelete,
+      remote: true,
+      objectId: 'page-old',
+      payload: const {},
+    );
+    final safe = _operation(
+      OperationKind.documentSet,
+      payload: const {
+        'properties': {'title': 'Offline'},
+      },
+    );
+    final unsafe = _operation(
+      OperationKind.pageSet,
+      objectId: 'page-old',
+      payload: const {
+        'properties': {'title': 'Conflict'},
+      },
+    );
+    expect(V2OutboxConflictPolicy.canApply(removed, [safe]), isTrue);
+    expect(
+      V2OutboxConflictPolicy.canApply(removed, [safe, unsafe]),
+      isFalse,
+    );
   });
 }

@@ -637,7 +637,10 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   Nowa strona może przejść mimo offline metadanych i edycji obiektów
   innych stron; konkurencyjne page.create, move, delete i kolizje UID
   nadal blokują kursor.
-  Testy: `test/v2_outbox_conflict_policy_test.dart` (27 grup).
+  page.delete przechodzi przy niezależnych metadanych i edycjach
+  na innej stronie, ale odmawia dla tej samej strony, move,
+  nowych stron i media; nie stosuje snapshotów v1.
+  Testy: `test/v2_outbox_conflict_policy_test.dart` (32 grup).
 - `lib/data/sync/editor_v2_account_runtime.dart` tworzy izolowany
   `OperationStore`, `SyncEngine`, projektor i zweryfikowany asset gateway
   tylko dla konta z potwierdzonym protokołem v2. Zdalne operacje
@@ -710,7 +713,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 
 - `lib/data/sync/operation_gateway.dart`: `OperationGateway`,
   `HttpOperationGateway`, `OperationReceipt`, `OperationFeedPage`.
-  Waliduje payload, ACK, kursory i limit 1 MiB API v2;
+  Waliduje payload, ACK (unikalne kursory dla różnych operationId),
+  kursory feed i limit 1 MiB API v2;
   backend sprawdza też limit rozmiaru materializowanej projekcji;
   przekazuje nagłówek Share `X-Share-Id`.
 - `lib/data/sync/sync_engine.dart`: `SyncEngine` i
@@ -719,6 +723,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   WebSocket hints, najwcześniejszy retry, generation token na stop,
   odświeżenie sesji i rebase przez callback. Błąd pull nie blokuje push.
   Pakiet 409/413/422 próbuje bezpiecznego prefiksu, bez pomijania actorSeq.
+  ACK ze zduplikowanym cursor nie usuwa lokalnego outboxu;
+  regresja: `test/sync_engine_test.dart`.
   `onRemoteCommitted` powiadamia UI dopiero po commit SQLite i przed
   przesunięciem kursora; błędny patch jest ponawiany, a ACK własnego
   aktora nie odmalowuje widoku. Powtórny odczyt obcego envelope nie
@@ -773,6 +779,17 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   przed zapisem; historyczne inne obiekty także są kontrolowane.
   Regresje: `server/api/tests/test_operation_projection.py`
   i `server/api/tests/test_stage2_assets.py`.
+- `server/api/app/operation_projection.py`: operacje folder/task,
+  object.move/create, text.* i asset.* używają kandydata węzła
+  zamiast częściowej mutacji przy błędzie. Rangom wymaga się
+  dodatnich, bezpiecznych liczb i identyfikatora UUID.
+  Regresje: `server/api/tests/test_operation_projection.py`,
+  `server/api/tests/test_stage2_assets.py`.
+- `test/editor_v2_account_startup_test.dart`: lokalne i zdalne
+  usuwanie rozłącznych stron z pending outboxem oraz blokada
+  wspólnej strony; kursor bez utraty zmian.
+- `test/operation_gateway_test.dart`: dwa różne operationId
+  nie mogą otrzymać identycznego kursora ACK.
 - `.github/scripts/flutter_transient_network_retry.sh`:
   maksymalnie trzy próby tylko dla błędów pobierania sqlite3
   lub HTTP 502/503/504. Nie ignoruje błędów testów.

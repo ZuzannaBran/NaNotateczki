@@ -1,5 +1,42 @@
 # Etap 12 — weryfikacja zapisu i synchronizacji
 
+## Testy page.delete, atomowości i kursora ACK (2026-11-09)
+
+Ostatni app CI 42591095132: 16/17 zadań zielonych, jedyny
+błąd formatowania testów. Backend CI 42591078056 zielony.
+Dokładne poprawki formattera wprowadzono przed pakietem.
+
+Nowe regresje polityki v2: rozłączne page.delete podczas
+offline document.set, page.set, stroke.create i Quill oraz
+blokady tej samej strony, nowych stron, object.move, media
+i destrukcyjnych zdarzeń. REST/SQLite w
+test/editor_v2_account_startup_test.dart kontroluje, że
+usunięcie drugiej strony nie zjada lokalnego tytułu, bookmarka
+ani kreski; lokalne page.delete nie blokuje tytułu innej strony;
+kolizja zatrzymuje cursor zamiast niszczyć outbox.
+
+test/operation_gateway_test.dart i test/sync_engine_test.dart:
+dwa różne operationId ze wspólnym cursor w potwierdzeniu
+zwracają błąd, pozostawiając lokalny outbox i bez ACK.
+Poprawna paczka dwóch różnych cursor przechodzi.
+
+Python API: nieudany folder.move z cyklem, folder.create z
+sierotą, task.create/move ze złym plannerUid, obiekt przeniesiony
+przy skorumpowanych versions, odłączanie aktywnego assetu,
+Quill embed i niepoprawny image asset nie modyfikują stanu
+reducera po odmowie. Parametryczne przypadki sprawdzają
+ujemne i niepoprawne persisted ranks. Backend + mirror zawierają
+te same testy. Kontrola nie potwierdza jeszcze pełnego
+cutover ani migracji starych dokumentów.
+
+Scenariusz ręczny: dwa urządzenia z kontem v2 opt-in,
+dwie strony, pierwsze offline zmienia tylko stronę A,
+drugie usuwa stronę B. Po połączeniu ma pozostać A z edycją,
+bez B i bez podwójnych assetów, a cursor/outbox i ponowne
+otwarcie pliku muszą być spójne. Konflikt na stronie B ma
+zatrzymać synchronizację do rozstrzygnięcia, nie usuwać
+lokalnego edytowanego tekstu.
+
 ## Odporność projekcji PostgreSQL i nowych stron (2026-11-09)
 
 Przebieg 42587383593: 16/17 zielonych, jedyny błąd formatowania
