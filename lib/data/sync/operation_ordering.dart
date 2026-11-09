@@ -87,7 +87,7 @@ class OperationActorClock {
         if (!coveredIds.contains(id)) id,
       if (previousOperationId != null) previousOperationId!,
     }.toList()..sort();
-    if (causalIds.length > 256 ||
+    if (causalIds.length * 39 > OperationEnvelope.maxDependencyBytes ||
         actorSeq >= OperationEnvelope.maxSafeInteger ||
         logicalClock >= OperationEnvelope.maxSafeInteger) {
       throw const FormatException('Actor clock or dependency limit exceeded.');
