@@ -168,7 +168,7 @@ class V2OutboxConflictPolicy {
       if (remotePage && remote.objectId != local.objectId) {
         return true;
       }
-      return _disjointPropertyNames(remote, local);
+      return _rankResolvedMetadata(remote, local);
     }
     return false;
   }
@@ -185,7 +185,111 @@ class V2OutboxConflictPolicy {
     return kinds.contains(remote.kind) &&
         kinds.contains(local.kind) &&
         remote.pageId == local.pageId &&
-        _disjointPropertyNames(remote, local);
+        _supportedObjectFields(remote) &&
+        _supportedObjectFields(local) &&
+        (_disjointPropertyNames(remote, local) ||
+            _rankResolvedObjectFields(remote, local));
+  }
+
+  /// Never let snapshot-like fields masquerade as independent updates.
+  ///
+  /// Valid reducers only accept bounded ink, image or text geometry keys.
+  static bool _supportedObjectFields(OperationEnvelope operation) {
+    final accepted = switch (operation.kind) {
+      OperationKind.objectSet => const {
+        'colorValue',
+        'width',
+        'height',
+        'fontSize',
+        'rotation',
+        'dx',
+        'dy',
+        'sortIndex',
+        'toolIndex',
+        'cropLeft',
+        'cropTop',
+        'cropRight',
+        'cropBottom',
+      },
+      OperationKind.objectTransform => const {
+        'points',
+        'dx',
+        'dy',
+        'width',
+        'height',
+        'rotation',
+        'cropLeft',
+        'cropTop',
+        'cropRight',
+        'cropBottom',
+      },
+      OperationKind.objectReorder => const {'sortIndex'},
+      _ => const <String>{},
+    };
+    return _boundedScalarFields(operation, accepted);
+  }
+
+  /// Metadata field versions are durable on both projections.
+  ///
+  /// A later rank wins for the *same* field, regardless of arrival order.
+  /// Only verified page and notebook metadata are covered here.
+  static bool _rankResolvedMetadata(
+    OperationEnvelope remote,
+    OperationEnvelope local,
+  ) {
+    if (remote.kind != local.kind) {
+      return false;
+    }
+    final fields = remote.kind == OperationKind.documentSet
+        ? const {'title', 'folder'}
+        : remote.kind == OperationKind.pageSet
+        ? const {'title', 'isBookmarked'}
+        : const <String>{};
+    return _boundedScalarFields(remote, fields) &&
+        _boundedScalarFields(local, fields);
+  }
+
+  /// Overlapping object scalar writes use the same per-field LWW register.
+  ///
+  /// Exclude assetId, crops and multi-field image transforms: they can
+  /// depend on verified bytes, geometry or the current container. A stroke
+  /// points update is one immutable register, ranked like other fields.
+  static bool _rankResolvedObjectFields(
+    OperationEnvelope remote,
+    OperationEnvelope local,
+  ) {
+    if (remote.kind != local.kind) {
+      return false;
+    }
+    final fields = switch (remote.kind) {
+      OperationKind.objectSet => const {
+        'colorValue',
+        'width',
+        'height',
+        'fontSize',
+        'rotation',
+        'dx',
+        'dy',
+        'sortIndex',
+        'toolIndex',
+      },
+      OperationKind.objectReorder => const {'sortIndex'},
+      OperationKind.objectTransform => const {'points'},
+      _ => const <String>{},
+    };
+    return _boundedScalarFields(remote, fields) &&
+        _boundedScalarFields(local, fields);
+  }
+
+  static bool _boundedScalarFields(
+    OperationEnvelope operation,
+    Set<String> allowed,
+  ) {
+    final raw = operation.payload['properties'];
+    return raw is Map &&
+        raw.isNotEmpty &&
+        raw.keys.every(allowed.contains) &&
+        !raw.containsKey('assetId');
   }
 
   static bool _disjointPropertyNames(
@@ -271,9 +375,12 @@ class V2OutboxConflictPolicy {
       }
       final first = remote.payload['attributes'];
       final second = local.payload['attributes'];
+      // Same atom + attribute has an explicit rank in both CRDT reducers.
+      // Deletes and insert anchors remain subject to the stricter checks.
       return first is Map &&
           second is Map &&
-          first.keys.toSet().intersection(second.keys.toSet()).isEmpty;
+          first.isNotEmpty &&
+          second.isNotEmpty;
     }
     if (common.isNotEmpty) {
       return false;

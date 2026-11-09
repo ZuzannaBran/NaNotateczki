@@ -1,5 +1,29 @@
 # Dane NaNotateczki
 
+## Konflikty wspólnych pól i formatowania Quill (2026-11-09)
+
+Konflikty równoczesnego zapisu tego samego pola nie muszą wstrzymywać
+checkpointu v2, gdy oba reduktory już implementują deterministyczny
+rejestr LWW. Dotyczy to title/folder dokumentu, title/isBookmarked strony,
+weryfikowanych pól skalarnych object.set, sortIndex object.reorder oraz
+całego rejestru points w ink object.transform. Wygrywa większa ranga
+(logicalClock, actorId, actorSeq, operationId) niezależnie od kolejności
+dostarczenia i od tego, który klient posiada pending outbox.
+
+Dwa text.format na ten sam atom i atrybut Quill korzystają z rang
+attributeVersions i mogą zostać połączone, także gdy późniejsza zmiana
+usuwa atrybut wartością null. Nie dotyczy to text.delete tego samego
+atomu, kolizji identyfikatorów insert, assetId, snapshotowego pola text,
+OCR ani destrukcyjnych operacji. Wielopolowe transformacje obrazów oraz
+object.move dotyczący tego samego edytowanego UID nadal wymagają pełnego
+rebase z ponowną kontrolą stron i referencji. Nie przepisujemy pending
+operacji i nie zmieniamy schematu SQLite ani produkcyjnego v1.
+
+Regresje porównują oba porządki dostarczenia reduktora Python i Dart,
+REST/SQLite przy offline edycji, przegraną i wygraną zdalnego rank,
+Quill format→null i ruch z jedną atomową listą punktów. Bramka
+odrzuca nieznane pola obiektów, w tym historyczne text/ocrText.
+
 ## Historyczny ACK i niezależne object.move (2026-11-09)
 
 Trwały outbox v2 odrzuca nie tylko duplikaty kursora wewnątrz

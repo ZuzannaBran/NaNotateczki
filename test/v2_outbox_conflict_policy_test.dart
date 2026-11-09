@@ -60,7 +60,7 @@ void main() {
     );
     expect(_allowed(title, folder), isTrue);
     expect(_allowed(title, pageTitle), isTrue);
-    expect(_allowed(title, competingTitle), isFalse);
+    expect(_allowed(title, competingTitle), isTrue);
     expect(_allowed(pageTitle, folder), isTrue);
   });
 
@@ -96,7 +96,7 @@ void main() {
     );
     expect(_allowed(bookmark, localTitle), isTrue);
     expect(_allowed(bookmark, otherPage), isTrue);
-    expect(_allowed(bookmark, competing), isFalse);
+    expect(_allowed(bookmark, competing), isTrue);
   });
 
   test('metadata cannot bypass destructive edits or foreign namespace', () {
@@ -131,7 +131,7 @@ void main() {
     expect(V2OutboxConflictPolicy.canApply(title, [ink, removed]), isFalse);
   });
 
-  test('object field updates merge only across disjoint property names', () {
+  test('object field updates use per-field ranks and guard moves', () {
     final color = _operation(
       OperationKind.objectSet,
       remote: true,
@@ -164,7 +164,7 @@ void main() {
       payload: const {'toPageId': 'page-b', 'sortIndex': 0},
     );
     expect(_allowed(color, width), isTrue);
-    expect(_allowed(color, sameColor), isFalse);
+    expect(_allowed(color, sameColor), isTrue);
     expect(_allowed(color, moving), isFalse);
   });
 
@@ -300,7 +300,7 @@ void main() {
       },
     );
     expect(_allowed(bold, italic), isTrue);
-    expect(_allowed(bold, sameAttribute), isFalse);
+    expect(_allowed(bold, sameAttribute), isTrue);
     expect(_allowed(bold, deleted), isTrue);
     expect(_allowed(bold, overlappingDelete), isFalse);
   });
@@ -1328,5 +1328,333 @@ void main() {
     expect(_allowed(metadata, move), isTrue);
     expect(_allowed(move, title), isTrue);
     expect(_allowed(title, move), isTrue);
+  });
+
+  test('same-field metadata uses LWW, but deletes still block', () {
+    final title = _operation(
+      OperationKind.documentSet,
+      remote: true,
+      payload: const {
+        'properties': {'title': 'Remote wins'},
+      },
+    );
+    final pendingTitle = _operation(
+      OperationKind.documentSet,
+      payload: const {
+        'properties': {'title': 'Offline title'},
+      },
+    );
+    final pageTitle = _operation(
+      OperationKind.pageSet,
+      objectId: 'page-x',
+      remote: true,
+      payload: const {
+        'properties': {'title': 'Remote page'},
+      },
+    );
+    final pendingPageTitle = _operation(
+      OperationKind.pageSet,
+      objectId: 'page-x',
+      payload: const {
+        'properties': {'title': 'Offline page'},
+      },
+    );
+    final deletePage = _operation(
+      OperationKind.pageDelete,
+      objectId: 'page-x',
+      payload: const {},
+    );
+    expect(_allowed(title, pendingTitle), isTrue);
+    expect(_allowed(pendingTitle, title), isTrue);
+    expect(_allowed(pageTitle, pendingPageTitle), isTrue);
+    expect(_allowed(pendingPageTitle, pageTitle), isTrue);
+    expect(_allowed(pageTitle, deletePage), isFalse);
+  });
+
+  test('same-object scalar collision converges but assets do not', () {
+    final width = _operation(
+      OperationKind.objectSet,
+      remote: true,
+      pageId: 'page-x',
+      objectId: 'image-x',
+      payload: const {
+        'properties': {'width': 230.0},
+      },
+    );
+    final pendingWidth = _operation(
+      OperationKind.objectSet,
+      pageId: 'page-x',
+      objectId: 'image-x',
+      payload: const {
+        'properties': {'width': 160.0},
+      },
+    );
+    final pendingCrop = _operation(
+      OperationKind.objectSet,
+      pageId: 'page-x',
+      objectId: 'image-x',
+      payload: const {
+        'properties': {'cropLeft': 0.2},
+      },
+    );
+    final pendingAsset = _operation(
+      OperationKind.objectSet,
+      pageId: 'page-x',
+      objectId: 'image-x',
+      payload: const {
+        'properties': {'assetId': 'replacement'},
+      },
+    );
+    final pendingMove = _operation(
+      OperationKind.objectMove,
+      pageId: 'page-x',
+      objectId: 'image-x',
+      payload: const {'toPageId': 'another', 'sortIndex': 0},
+    );
+    expect(_allowed(width, pendingWidth), isTrue);
+    expect(_allowed(pendingWidth, width), isTrue);
+    expect(_allowed(width, pendingCrop), isTrue);
+    expect(_allowed(pendingCrop, width), isTrue);
+    expect(_allowed(width, pendingAsset), isFalse);
+    expect(_allowed(width, pendingMove), isFalse);
+  });
+
+  test('same-atom formatting resolves identical attribute by rank', () {
+    const atom = '00000000-0000-4000-8000-0000000000e1';
+    final bold = _operation(
+      OperationKind.textFormat,
+      remote: true,
+      pageId: 'page-x',
+      objectId: 'text-x',
+      payload: const {
+        'atomIds': [atom],
+        'attributes': {'bold': true},
+      },
+    );
+    final removeBold = _operation(
+      OperationKind.textFormat,
+      pageId: 'page-x',
+      objectId: 'text-x',
+      payload: const {
+        'atomIds': [atom],
+        'attributes': {'bold': null},
+      },
+    );
+    final deleteAtom = _operation(
+      OperationKind.textDelete,
+      pageId: 'page-x',
+      objectId: 'text-x',
+      payload: const {
+        'atomIds': [atom],
+      },
+    );
+    expect(_allowed(bold, removeBold), isTrue);
+    expect(_allowed(removeBold, bold), isTrue);
+    expect(_allowed(bold, deleteAtom), isFalse);
+    expect(_allowed(deleteAtom, bold), isFalse);
+  });
+
+  test('scalar LWW never crosses pages or target operation kinds', () {
+    final inFirst = _operation(
+      OperationKind.objectSet,
+      pageId: 'page-a',
+      objectId: 'shared-identity',
+      remote: true,
+      payload: const {
+        'properties': {'width': 5.0},
+      },
+    );
+    final inSecond = _operation(
+      OperationKind.objectSet,
+      pageId: 'page-b',
+      objectId: 'shared-identity',
+      payload: const {
+        'properties': {'width': 6.0},
+      },
+    );
+    final unsafeSnapshot = _operation(
+      OperationKind.objectSet,
+      pageId: 'page-a',
+      objectId: 'shared-identity',
+      payload: const {
+        'properties': {'text': 'replace entire snapshot'},
+      },
+    );
+    final transform = _operation(
+      OperationKind.objectTransform,
+      pageId: 'page-a',
+      objectId: 'shared-identity',
+      payload: const {
+        'properties': {'width': 6.0},
+      },
+    );
+    expect(_allowed(inFirst, inSecond), isFalse);
+    expect(_allowed(inFirst, unsafeSnapshot), isFalse);
+    expect(_allowed(inFirst, transform), isFalse);
+  });
+
+  test('same-object reorder uses LWW, other operation kinds stay strict', () {
+    final reorder = _operation(
+      OperationKind.objectReorder,
+      remote: true,
+      pageId: 'page-a',
+      objectId: 'stroke-a',
+      payload: const {
+        'properties': {'sortIndex': 6},
+      },
+    );
+    final queued = _operation(
+      OperationKind.objectReorder,
+      pageId: 'page-a',
+      objectId: 'stroke-a',
+      payload: const {
+        'properties': {'sortIndex': 3},
+      },
+    );
+    final transform = _operation(
+      OperationKind.objectTransform,
+      pageId: 'page-a',
+      objectId: 'stroke-a',
+      payload: const {
+        'properties': {
+          'points': [
+            [1.0, 2.0, 0.6],
+          ],
+        },
+      },
+    );
+    expect(_allowed(reorder, queued), isTrue);
+    expect(_allowed(queued, reorder), isTrue);
+    expect(_allowed(reorder, transform), isTrue);
+    expect(_allowed(transform, reorder), isTrue);
+  });
+
+  test('snapshot and OCR-like keys cannot bypass scalar gate', () {
+    final geometry = _operation(
+      OperationKind.objectSet,
+      remote: true,
+      pageId: 'page-a',
+      objectId: 'text-a',
+      payload: const {
+        'properties': {'width': 220.0},
+      },
+    );
+    final replaceWholeText = _operation(
+      OperationKind.objectSet,
+      pageId: 'page-a',
+      objectId: 'text-a',
+      payload: const {
+        'properties': {'text': 'Legacy snapshot'},
+      },
+    );
+    final unverifiedOcr = _operation(
+      OperationKind.objectSet,
+      pageId: 'page-a',
+      objectId: 'text-a',
+      payload: const {
+        'properties': {'ocrText': 'Not an editor scalar'},
+      },
+    );
+    expect(_allowed(geometry, replaceWholeText), isFalse);
+    expect(_allowed(geometry, unverifiedOcr), isFalse);
+  });
+
+  test('concurrent ink transforms use deterministic point-register rank', () {
+    final movedPoints = _operation(
+      OperationKind.objectTransform,
+      remote: true,
+      pageId: 'page-a',
+      objectId: 'ink-a',
+      payload: const {
+        'properties': {
+          'points': [
+            [3.0, 4.0, 0.6],
+          ],
+        },
+      },
+    );
+    final pendingPoints = _operation(
+      OperationKind.objectTransform,
+      pageId: 'page-a',
+      objectId: 'ink-a',
+      payload: const {
+        'properties': {
+          'points': [
+            [1.0, 2.0, 0.5],
+          ],
+        },
+      },
+    );
+    final differentPage = _operation(
+      OperationKind.objectTransform,
+      pageId: 'page-b',
+      objectId: 'ink-a',
+      payload: const {
+        'properties': {
+          'points': [
+            [1.0, 2.0, 0.5],
+          ],
+        },
+      },
+    );
+    expect(_allowed(movedPoints, pendingPoints), isTrue);
+    expect(_allowed(pendingPoints, movedPoints), isTrue);
+    expect(_allowed(movedPoints, differentPage), isFalse);
+  });
+
+  test('multi-field image transforms are not incorrectly ranked as ink', () {
+    final geometry = _operation(
+      OperationKind.objectTransform,
+      remote: true,
+      pageId: 'page-a',
+      objectId: 'image-a',
+      payload: const {
+        'properties': {'width': 320.0},
+      },
+    );
+    final pending = _operation(
+      OperationKind.objectTransform,
+      pageId: 'page-a',
+      objectId: 'image-a',
+      payload: const {
+        'properties': {'width': 220.0},
+      },
+    );
+    expect(_allowed(geometry, pending), isFalse);
+  });
+
+  test('unknown notebook and page snapshot keys stay blocked', () {
+    final title = _operation(
+      OperationKind.documentSet,
+      remote: true,
+      payload: const {
+        'properties': {'title': 'Remote'},
+      },
+    );
+    final snapshot = _operation(
+      OperationKind.documentSet,
+      payload: const {
+        'properties': {'pages': 'replace all'},
+      },
+    );
+    final pageTitle = _operation(
+      OperationKind.pageSet,
+      objectId: 'page-a',
+      remote: true,
+      payload: const {
+        'properties': {'title': 'Remote'},
+      },
+    );
+    final oldSnapshot = _operation(
+      OperationKind.pageSet,
+      objectId: 'page-a',
+      payload: const {
+        'properties': {'objects': 'replace all'},
+      },
+    );
+    expect(_allowed(title, snapshot), isFalse);
+    expect(_allowed(snapshot, title), isFalse);
+    expect(_allowed(pageTitle, oldSnapshot), isFalse);
+    expect(_allowed(oldSnapshot, pageTitle), isFalse);
   });
 }

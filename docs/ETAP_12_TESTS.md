@@ -1,5 +1,46 @@
 # Etap 12 — weryfikacja zapisu i synchronizacji
 
+## Walidacja ranków wspólnych pól i Quill (2026-11-09)
+
+Ostatni app CI 42617311998: 16/17 zadań zielonych,
+w tym iPad, iPhone, Linux real v2, Android i pozostałe platformy.
+Jedyna porażka: format testu, poprawiony dokładnym patchem CI.
+Backend 42617279446 zielony. Testy NOWYCH zmian pozostają
+niepotwierdzone do kolejnego przebiegu Actions.
+
+test/v2_outbox_conflict_policy_test.dart (45 grupy): wspólny
+document/page title, width, sortIndex i ink points mogą przejść
+na podstawie LWW. Quill text.format tych samych atomów i atrybutów
+rozstrzyga per-attributeVersions; text.delete/insert i assetId
+pozostają chronione. Dodatkowe blokady nie dopuszczają
+snapshotowego text, ocrText, image multi-field transforms i
+zmian zawartości jednocześnie z move tego samego UID.
+
+test/editor_v2_account_startup_test.dart (33 scenariusze): realne
+REST mock + SQLite, porównanie lokalnego i zdalnego rank tytułu
+oraz stroke width, przyjęcie powtórnego format Quill i
+przeniesienie zbioru points jako jednej jednostki. Niezależnie
+od wyniku rank przegrane operacje nie znikają z lokalnego outboxu,
+a checkpoint odnotowuje zdalny event. Test tekstu weryfikuje
+usunięcie bold przez nowszy format, bez utraty italic.
+
+test/editor_sqlite_projector_test.dart: dwa odwrócone porządki
+dostarczenia dla notebook/page title, ink object.set width
+oraz object.transform points.
+Każdy wynik ma identyczne strony, geometry, checkpoint,
+bez ponownego zapisu lub kasowania lokalnego intentu.
+
+test/operation_text_sequence_test.dart: formatowanie tego samego
+atrybutu w obu kolejnościach z null, potwierdzenie niezmienności
+wcześniejszego grafu atomów. Python test_operation_projection.py:
+oba porządki dla metadata, stroke scalar, Quill null oraz points.
+
+Test ręczny po dopuszczeniu v2 na dwóch urządzeniach: obie
+osoby offline zmieniają title/width/format tego samego elementu;
+po reconnect i restarcie obie widzą wynik zwycięskiej rangi,
+bez dubli i bez zgubionych operacji. Ruch i zmiana zawartości
+tego samego UID nadal muszą blokować automatyczne scalenie.
+
 ## Historia ACK, przenoszenie i flake iPad (2026-11-09)
 
 Ostatni app CI 42602433069: 15/17 poprawnych.

@@ -646,22 +646,28 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   page.delete przechodzi przy niezależnych metadanych i edycjach
   na innej stronie, ale odmawia dla tej samej strony, move,
   nowych stron i media; nie stosuje snapshotów v1.
-  Testy: `test/v2_outbox_conflict_policy_test.dart` (36 grup),
-  w tym niezależne object.move, source/destination page.delete
-  i zablokowane edycje tego samego UID.
+  Dodatkowo ten sam scalar/metadata i Quill attributeVersions
+  mogą scalić się przez LWW rank w obu reduktorach; ink.points
+  object.transform i object.reorder używają atomowego rejestru.
+  Nie przepuszcza snapshotowych text/ocrText, nieznanych pól
+  document/page, assetId, image
+  multi-field transforms ani ruchu tego samego edytowanego UID.
+  Testy: `test/v2_outbox_conflict_policy_test.dart` (45 grupy).
 - `lib/data/sync/editor_v2_account_runtime.dart` tworzy izolowany
   `OperationStore`, `SyncEngine`, projektor i zweryfikowany asset gateway
   tylko dla konta z potwierdzonym protokołem v2. Zdalne operacje
   różnych UID, rozłączne metadane i właściwości obiektów oraz Quill
   insert/delete/format i geometria tego samego bloku tekstowego
   mogą przejść mimo lokalnego outboxu. Kolizje atomów, assetId,
-  wspólnych pól, usunięcia i zmiany kontenera blokują kursor.
+  niebezpiecznych wspólnych pól, usunięcia i zmiany
+  kontenera blokują kursor; wspólne pola z LWW rank przechodzą.
   101: `attachEditor`; 110: `detachEditor`; 117: `editorForDocument`;
   144: `startForCurrentAccount` wiąże i waliduje repozytorium oraz
   sprawdza właściciela przed startem i po każdym await. Anulowanie
   zatrzymuje transport, zachowując blokadę snapshotów v1. Przekazuje
   `isCurrent` do silnika, aby ponowił kontrolę po drenażu starej generacji.
-  Regresje: `test/editor_v2_account_startup_test.dart` obejmują
+  Regresje: `test/editor_v2_account_startup_test.dart` (33 scenariusze)
+  obejmują
   izolowany HTTP, outbox offline, niezależną zdalną kreskę, rozłączne
   kolor, szerokość, transformację, kolejność warstw oraz rozłączne
   formatowanie Quill i konflikt wspólnego atrybutu/atomu;
@@ -811,6 +817,13 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `server/api/tests/test_operation_projection.py`: niezależne
   object.move z identycznym sortIndex mają trwały z-order
   niezależnie od kolejności nadejścia; UID bez duplikatów.
+- `server/api/tests/test_operation_projection.py`: oba
+  porządki same-field document/page metadata, stroke width,
+  Quill attribute null i stroke points object.transform
+  zachowują ten sam zwycięski rank i finalny stan.
+- `test/editor_sqlite_projector_test.dart`: permutacje odbioru
+  document/page title, object.set width i object.transform points,
+  z zapisem rank, checkpointu i zachowaniem outboxu.
 - `.github/scripts/flutter_transient_network_retry.sh`:
   maksymalnie trzy próby tylko dla błędów pobierania sqlite3
   lub HTTP 502/503/504. Nie ignoruje błędów testów.
@@ -851,6 +864,9 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `lib/data/sync/operation_text_sequence.dart`:
   `OperationTextSequence` — RGA/CRDT atomów z deterministycznym
   porządkiem, kotwicami i usunięciami zachowanymi do replay;
+  same-atom Quill format/format rozwiązuje wspólny atrybut
+  przez attributeVersions niezależnie od kolejności dostarczenia;
+  regresja: `test/operation_text_sequence_test.dart` (null/removal);
   nowe sprawdzanie utrwalonych rang attributeVersions przed edycją
   i przy odczycie Delta, bez możliwości zamaskowania korupcji;
   `operation_protocol.dart` waliduje `text.insert/delete` i blokuje

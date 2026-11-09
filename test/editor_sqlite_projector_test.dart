@@ -1108,6 +1108,195 @@ void main() {
     expect(result.pages.single.textBlocks.single.deltaJson, contains('bold'));
   });
 
+  for (final reverseOrder in [false, true]) {
+    test('SQLite document title converges, reverse=$reverseOrder', () async {
+      OperationEnvelope setTitle({
+        required String actor,
+        required String title,
+      }) => OperationEnvelope(
+        operationId: const Uuid().v4(),
+        actorId: actor,
+        actorSeq: 1,
+        logicalClock: 70,
+        dependencies: const [],
+        documentId: documentId,
+        kind: OperationKind.documentSet,
+        payload: {
+          'properties': {'title': title},
+        },
+      );
+      final lower = setTitle(actor: 'a-peer', title: 'Earlier');
+      final higher = setTitle(actor: 'z-peer', title: 'Winner');
+      final order = reverseOrder ? [higher, lower] : [lower, higher];
+      for (var i = 0; i < order.length; i++) {
+        final remote = order[i];
+        expect(
+          await store.applyRemote(
+            remote,
+            serverSequence: i + 1,
+            checkpointScope: 'document-title-rank',
+            apply: () => projector.apply(remote),
+          ),
+          isTrue,
+        );
+      }
+      final saved = (await notebooks.getNotebook(documentId))!;
+      expect(saved.title, 'Winner');
+      expect(await store.checkpoint('document-title-rank'), 2);
+    });
+
+    test('SQLite page title converges, reverse=$reverseOrder', () async {
+      OperationEnvelope setPageTitle({
+        required String actor,
+        required String title,
+      }) => OperationEnvelope(
+        operationId: const Uuid().v4(),
+        actorId: actor,
+        actorSeq: 1,
+        logicalClock: 70,
+        dependencies: const [],
+        documentId: documentId,
+        objectId: pageId,
+        kind: OperationKind.pageSet,
+        payload: {
+          'properties': {'title': title},
+        },
+      );
+      final lower = setPageTitle(actor: 'a-peer', title: 'Earlier');
+      final higher = setPageTitle(actor: 'z-peer', title: 'Winner');
+      final order = reverseOrder ? [higher, lower] : [lower, higher];
+      for (var i = 0; i < order.length; i++) {
+        final remote = order[i];
+        expect(
+          await store.applyRemote(
+            remote,
+            serverSequence: i + 1,
+            checkpointScope: 'page-title-rank',
+            apply: () => projector.apply(remote),
+          ),
+          isTrue,
+        );
+      }
+      final saved = (await notebooks.getNotebook(documentId))!;
+      expect(saved.pages.single.title, 'Winner');
+      expect(await store.checkpoint('page-title-rank'), 2);
+    });
+
+    test('SQLite ink LWW converges, reverse=$reverseOrder', () async {
+      final created = await write([
+        LocalOperationDraft(
+          kind: OperationKind.strokeCreate,
+          pageId: pageId,
+          objectId: 'same-ink-field',
+          payload: {'value': _stroke()},
+        ),
+      ]);
+      OperationEnvelope setWidth({
+        required String actor,
+        required double width,
+        required int clock,
+      }) => OperationEnvelope(
+        operationId: const Uuid().v4(),
+        actorId: actor,
+        actorSeq: 1,
+        logicalClock: clock,
+        dependencies: [created.single.operationId],
+        documentId: documentId,
+        pageId: pageId,
+        objectId: 'same-ink-field',
+        kind: OperationKind.objectSet,
+        payload: {
+          'properties': {'width': width},
+        },
+      );
+      final lower = setWidth(actor: 'a-peer', width: 3.0, clock: 40);
+      final higher = setWidth(actor: 'z-peer', width: 7.0, clock: 40);
+      final order = reverseOrder ? [higher, lower] : [lower, higher];
+      for (var i = 0; i < order.length; i++) {
+        final remote = order[i];
+        expect(
+          await store.applyRemote(
+            remote,
+            serverSequence: i + 1,
+            checkpointScope: 'ink-scalar-rank',
+            apply: () => projector.apply(remote),
+          ),
+          isTrue,
+        );
+      }
+      final saved = (await notebooks.getNotebook(documentId))!;
+      expect(saved.pages.single.inkStrokes.single.width, 7.0);
+      expect(await store.checkpoint('ink-scalar-rank'), 2);
+      expect(
+        (await store.pending()).map((op) => op.operationId),
+        [created.single.operationId],
+      );
+    });
+
+    test('SQLite stroke points converge, reverse=$reverseOrder', () async {
+      final created = await write([
+        LocalOperationDraft(
+          kind: OperationKind.strokeCreate,
+          pageId: pageId,
+          objectId: 'ranked-points',
+          payload: {'value': _stroke()},
+        ),
+      ]);
+      OperationEnvelope transform({
+        required String actor,
+        required int clock,
+        required List<List<double>> points,
+      }) => OperationEnvelope(
+        operationId: const Uuid().v4(),
+        actorId: actor,
+        actorSeq: 1,
+        logicalClock: clock,
+        dependencies: [created.single.operationId],
+        documentId: documentId,
+        pageId: pageId,
+        objectId: 'ranked-points',
+        kind: OperationKind.objectTransform,
+        payload: {
+          'properties': {'points': points},
+        },
+      );
+      final lower = transform(
+        actor: 'tablet-a',
+        clock: 50,
+        points: [
+          [11.0, 12.0, 0.5],
+        ],
+      );
+      final higher = transform(
+        actor: 'tablet-z',
+        clock: 50,
+        points: [
+          [31.0, 32.0, 0.7],
+          [33.0, 34.0, 0.8],
+        ],
+      );
+      final order = reverseOrder ? [higher, lower] : [lower, higher];
+      for (var i = 0; i < order.length; i++) {
+        final remote = order[i];
+        expect(
+          await store.applyRemote(
+            remote,
+            serverSequence: i + 1,
+            checkpointScope: 'ink-point-rank',
+            apply: () => projector.apply(remote),
+          ),
+          isTrue,
+        );
+      }
+      final saved = (await notebooks.getNotebook(documentId))!;
+      final points = saved.pages.single.inkStrokes.single.points;
+      expect(points, hasLength(2));
+      expect(points.first.dx, 31.0);
+      expect(points.last.dy, 34.0);
+      expect(await store.checkpoint('ink-point-rank'), 2);
+    });
+  }
+
   test('image move relocates the durable asset reference atomically', () async {
     const target = 'media-destination';
     const imageId = 'existing-image';

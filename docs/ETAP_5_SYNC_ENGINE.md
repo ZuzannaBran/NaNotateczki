@@ -1,5 +1,37 @@
 # Etap 5 — silnik synchronizacji operacji v2
 
+## Rebase wspólnych rejestrów LWW i Quill (2026-11-09)
+
+Ostatni app CI 42617311998: 16/17 sukcesów, w tym iPad i
+realny Linux v2. Jedyny błąd: formatowanie dwóch fragmentów
+test/editor_v2_account_startup_test.dart; zastosowano dokładny diff.
+Backend CI 42617279446 był zielony. Nowa macierz po pushu
+musi zweryfikować rozszerzenie rebase.
+
+V2OutboxConflictPolicy pozwala teraz na równoległe document.set
+i page.set tego samego pola, object.set skalarnego pola tego samego
+UID/strony, object.reorder sortIndex, jednoatomowy rejestr punktów
+stroke object.transform oraz text.format tego samego atrybutu
+na tym samym atomie. Rozstrzygnięcie wykonuje istniejący
+deterministyczny rank w EditorSqliteProjector, OperationTextSequence
+i backendowym Python reducer. Żadna operacja nie jest przepisywana,
+a outbox zachowuje oryginalne intenty.
+
+Bramka stricte odrzuca snapshotowe text, OCR, niezweryfikowane
+assetId, text.delete w konflikcie z formatem tego samego atomu,
+page.delete tej samej strony, object.move tego samego edytowanego
+obiektu, jak też wielopolowe transformacje obrazów. Dla nich
+causal rebase nadal wymaga nowego mechanizmu ponownego przypisania
+kontenera i kontroli refów. To NIE stanowi produkcyjnego cutover.
+
+Testy: 45 grupy V2OutboxConflictPolicy; 33 testy startup REST/SQLite,
+w tym ten sam tytuł, ten sam width stroke, format Quill i punkty ink;
+test/editor_sqlite_projector_test.dart sprawdza w obu kolejnościach
+dostarczenia notebook/page title, skalarne width oraz
+ink.points, z trwałym checkpointem i nienaruszonym outboxem.
+OperationTextSequence sprawdza deterministyczne format→null;
+testy Python analizują oba porządki scalar/metadata/Quill/points.
+
 ## Historia potwierdzeń i równoległe przenoszenie (2026-11-09)
 
 Ostatnia sprawdzona macierz aplikacji 42602433069:

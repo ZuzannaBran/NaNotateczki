@@ -609,7 +609,7 @@ void main() {
       [local.operationId, localSet.operationId],
     );
   });
-  test('offline Quill formatting merges distinct attributes', () async {
+  test('offline Quill attributes use deterministic precedence', () async {
     final fixture = _Fixture(NativeDatabase.memory());
     addTearDown(fixture.close);
     expect(
@@ -717,13 +717,17 @@ void main() {
     await fixture.runtime.engine.syncNow();
     expect(
       await fixture.runtime.store.checkpoint('account:startup-account'),
-      cursor,
+      cursor + 1,
     );
-    expect(await fixture.runtime.store.operation(conflict.operationId), isNull);
+    expect(
+      await fixture.runtime.store.operation(conflict.operationId),
+      isNotNull,
+    );
     final afterConflict = (await fixture.repository.getNotebook(
       notebook.uid,
     ))!.pages.single.textBlocks.single;
-    expect(afterConflict.deltaJson, merged.deltaJson);
+    expect(afterConflict.deltaJson, isNot(contains('"bold":true')));
+    expect(afterConflict.deltaJson, contains('"italic":true'));
     expect(
       (await fixture.runtime.store.pending(
         includeDeferred: true,
@@ -975,10 +979,16 @@ void main() {
     );
     f.accepted.add(conflicting.toJson());
     await f.runtime.engine.syncNow();
-    expect(await f.runtime.store.checkpoint('account:startup-account'), cursor);
-    expect(await f.runtime.store.operation(conflicting.operationId), isNull);
-    final unchanged = (await f.repository.getNotebook(note.uid))!;
-    expect(unchanged.pages.single.title, 'Offline page title');
+    expect(
+      await f.runtime.store.checkpoint('account:startup-account'),
+      cursor + 1,
+    );
+    expect(
+      await f.runtime.store.operation(conflicting.operationId),
+      isNotNull,
+    );
+    final resolved = (await f.repository.getNotebook(note.uid))!;
+    expect(resolved.pages.single.title, 'Conflicting title');
     expect(
       (await f.runtime.store.pending(
         includeDeferred: true,
@@ -2115,8 +2125,9 @@ void main() {
       expectedCursor,
     );
     expect(
-      (await f.runtime.store.pending(includeDeferred: true))
-          .map((op) => op.operationId),
+      (await f.runtime.store.pending(
+        includeDeferred: true,
+      )).map((op) => op.operationId),
       [local.operationId],
     );
   });
@@ -2199,8 +2210,235 @@ void main() {
       expectedCursor,
     );
     expect(
-      (await f.runtime.store.pending(includeDeferred: true))
-          .map((op) => op.operationId),
+      (await f.runtime.store.pending(
+        includeDeferred: true,
+      )).map((op) => op.operationId),
+      [local.operationId],
+    );
+  });
+
+  test('offline notebook title survives older remote rank', () async {
+    final f = _Fixture(NativeDatabase.memory());
+    addTearDown(f.close);
+    expect(
+      await f.runtime.startForCurrentAccount(isCurrent: () => true),
+      isTrue,
+    );
+    final notebook = await f.repository.createNotebook();
+    await f.runtime.engine.syncNow();
+    final local = await f.runtime.store.writeLocal(
+      actorId: f.runtime.engine.actorIdForDocument(notebook.uid),
+      documentId: notebook.uid,
+      kind: OperationKind.documentSet,
+      payload: const {
+        'properties': {'title': 'Offline wins'},
+      },
+      apply: f.runtime.projector.apply,
+    );
+    f.rejectPosts = true;
+    final older = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-00000000d201',
+      actorId: 'title-peer',
+      actorSeq: 1,
+      logicalClock: local.logicalClock - 1,
+      dependencies: [f.accepted.first['operationId'] as String],
+      documentId: notebook.uid,
+      kind: OperationKind.documentSet,
+      payload: const {
+        'properties': {'title': 'Older remote'},
+      },
+    );
+    f.accepted.add(older.toJson());
+    await f.runtime.engine.syncNow();
+    expect(
+      (await f.repository.getNotebook(notebook.uid))!.title,
+      'Offline wins',
+    );
+    expect(await f.runtime.store.checkpoint('account:startup-account'), 3);
+    expect(
+      (await f.runtime.store.pending(
+        includeDeferred: true,
+      )).map((op) => op.operationId),
+      [local.operationId],
+    );
+
+    final newer = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-00000000d202',
+      actorId: 'title-peer',
+      actorSeq: 2,
+      logicalClock: local.logicalClock + 1,
+      dependencies: [older.operationId],
+      documentId: notebook.uid,
+      kind: OperationKind.documentSet,
+      payload: const {
+        'properties': {'title': 'Newer remote'},
+      },
+    );
+    f.accepted.add(newer.toJson());
+    await f.runtime.engine.syncNow();
+    expect(
+      (await f.repository.getNotebook(notebook.uid))!.title,
+      'Newer remote',
+    );
+    expect(await f.runtime.store.checkpoint('account:startup-account'), 4);
+    expect(
+      (await f.runtime.store.pending(
+        includeDeferred: true,
+      )).map((op) => op.operationId),
+      [local.operationId],
+    );
+  });
+
+  test('offline stroke width and remote width converge by rank', () async {
+    final f = _Fixture(NativeDatabase.memory());
+    addTearDown(f.close);
+    expect(
+      await f.runtime.startForCurrentAccount(isCurrent: () => true),
+      isTrue,
+    );
+    final notebook = await f.repository.createNotebook();
+    await f.runtime.engine.syncNow();
+    final page = notebook.pages.single.id;
+    final actor = f.runtime.engine.actorIdForDocument(notebook.uid);
+    await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: notebook.uid,
+      pageId: page,
+      objectId: 'ranked-ink',
+      kind: OperationKind.strokeCreate,
+      payload: const {
+        'value': {
+          'objectType': 'stroke',
+          'colorValue': 0xFF123456,
+          'width': 2.0,
+          'toolIndex': 0,
+          'sortIndex': 0,
+          'points': [
+            [1.0, 2.0, 0.5],
+          ],
+        },
+      },
+      apply: f.runtime.projector.apply,
+    );
+    await f.runtime.engine.syncNow();
+    final local = await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: notebook.uid,
+      pageId: page,
+      objectId: 'ranked-ink',
+      kind: OperationKind.objectSet,
+      payload: const {
+        'properties': {'width': 3.0},
+      },
+      apply: f.runtime.projector.apply,
+    );
+    f.rejectPosts = true;
+    final remote = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-00000000d203',
+      actorId: 'stroke-width-peer',
+      actorSeq: 1,
+      logicalClock: local.logicalClock + 1,
+      dependencies: [f.accepted.last['operationId'] as String],
+      documentId: notebook.uid,
+      pageId: page,
+      objectId: 'ranked-ink',
+      kind: OperationKind.objectSet,
+      payload: const {
+        'properties': {'width': 5.0},
+      },
+    );
+    f.accepted.add(remote.toJson());
+    await f.runtime.engine.syncNow();
+    final saved = (await f.repository.getNotebook(notebook.uid))!;
+    expect(saved.pages.single.inkStrokes.single.width, 5.0);
+    expect(await f.runtime.store.checkpoint('account:startup-account'), 4);
+    expect(
+      (await f.runtime.store.pending(
+        includeDeferred: true,
+      )).map((op) => op.operationId),
+      [local.operationId],
+    );
+  });
+
+  test('concurrent ink point changes keep one ranked geometry', () async {
+    final f = _Fixture(NativeDatabase.memory());
+    addTearDown(f.close);
+    expect(
+      await f.runtime.startForCurrentAccount(isCurrent: () => true),
+      isTrue,
+    );
+    final notebook = await f.repository.createNotebook();
+    await f.runtime.engine.syncNow();
+    final page = notebook.pages.single.id;
+    final actor = f.runtime.engine.actorIdForDocument(notebook.uid);
+    await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: notebook.uid,
+      pageId: page,
+      objectId: 'point-register-stroke',
+      kind: OperationKind.strokeCreate,
+      payload: const {
+        'value': {
+          'objectType': 'stroke',
+          'colorValue': 0xFF223344,
+          'width': 2.0,
+          'toolIndex': 0,
+          'sortIndex': 0,
+          'points': [
+            [1.0, 2.0, 0.5],
+          ],
+        },
+      },
+      apply: f.runtime.projector.apply,
+    );
+    await f.runtime.engine.syncNow();
+    final local = await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: notebook.uid,
+      pageId: page,
+      objectId: 'point-register-stroke',
+      kind: OperationKind.objectTransform,
+      payload: const {
+        'properties': {
+          'points': [
+            [10.0, 20.0, 0.5],
+          ],
+        },
+      },
+      apply: f.runtime.projector.apply,
+    );
+    f.rejectPosts = true;
+    final remote = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-00000000d204',
+      actorId: 'point-peer',
+      actorSeq: 1,
+      logicalClock: local.logicalClock + 1,
+      dependencies: [f.accepted.last['operationId'] as String],
+      documentId: notebook.uid,
+      pageId: page,
+      objectId: 'point-register-stroke',
+      kind: OperationKind.objectTransform,
+      payload: const {
+        'properties': {
+          'points': [
+            [30.0, 40.0, 0.8],
+            [31.0, 41.0, 0.9],
+          ],
+        },
+      },
+    );
+    f.accepted.add(remote.toJson());
+    await f.runtime.engine.syncNow();
+    final saved = (await f.repository.getNotebook(notebook.uid))!;
+    final points = saved.pages.single.inkStrokes.single.points;
+    expect(points, hasLength(2));
+    expect(points.first.dx, 30.0);
+    expect(points.last.dy, 41.0);
+    expect(await f.runtime.store.checkpoint('account:startup-account'), 4);
+    expect(
+      (await f.runtime.store.pending(
+        includeDeferred: true,
+      )).map((op) => op.operationId),
       [local.operationId],
     );
   });

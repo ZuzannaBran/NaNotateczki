@@ -427,4 +427,99 @@ void main() {
     );
     expect(OperationTextSequence.render(state), 'A');
   });
+
+  test('overlapping format removal converges despite delivery order', () {
+    final insertion = textOperation(
+      operationId: firstId,
+      actorId: 'source',
+      kind: OperationKind.textInsert,
+      logicalClock: 3,
+      payload: {
+        'afterAtomId': null,
+        'atoms': [
+          {
+            'id': firstId,
+            'text': 'A',
+            'attributes': {'bold': true, 'italic': true},
+          },
+        ],
+      },
+    );
+    final initial = OperationTextSequence.apply({}, insertion);
+    final lower = textOperation(
+      operationId: secondId,
+      actorId: 'alice',
+      kind: OperationKind.textFormat,
+      logicalClock: 5,
+      payload: {
+        'atomIds': [firstId],
+        'attributes': {'bold': true},
+      },
+    );
+    final higher = textOperation(
+      operationId: thirdId,
+      actorId: 'bob',
+      kind: OperationKind.textFormat,
+      logicalClock: 6,
+      payload: {
+        'atomIds': [firstId],
+        'attributes': {'bold': null},
+      },
+    );
+    final firstOrder = OperationTextSequence.apply(
+      OperationTextSequence.apply(initial, lower),
+      higher,
+    );
+    final reversed = OperationTextSequence.apply(
+      OperationTextSequence.apply(initial, higher),
+      lower,
+    );
+    expect(firstOrder, reversed);
+    expect(OperationTextSequence.renderDelta(firstOrder), [
+      {
+        'insert': 'A',
+        'attributes': {'italic': true},
+      },
+    ]);
+    expect(OperationTextSequence.renderDelta(initial), [
+      {
+        'insert': 'A',
+        'attributes': {'bold': true, 'italic': true},
+      },
+    ]);
+  });
+
+  test('concurrent same-atom format cannot alter prior atom map', () {
+    final insert = textOperation(
+      operationId: firstId,
+      actorId: 'origin',
+      kind: OperationKind.textInsert,
+      payload: {
+        'afterAtomId': null,
+        'atoms': [
+          {'id': firstId, 'text': 'A'},
+        ],
+      },
+    );
+    final initial = OperationTextSequence.apply({}, insert);
+    final update = textOperation(
+      operationId: secondId,
+      actorId: 'newer',
+      kind: OperationKind.textFormat,
+      logicalClock: 30,
+      payload: {
+        'atomIds': [firstId],
+        'attributes': {'color': 'blue'},
+      },
+    );
+    final result = OperationTextSequence.apply(initial, update);
+    expect(OperationTextSequence.render(initial), 'A');
+    expect((initial[firstId] as Map)['attributes'], isEmpty);
+    expect(OperationTextSequence.renderDelta(result), [
+      {
+        'insert': 'A',
+        'attributes': {'color': 'blue'},
+      },
+    ]);
+  });
 }
