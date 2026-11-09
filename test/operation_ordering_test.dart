@@ -560,9 +560,39 @@ void main() {
       containsAll([remote.operationId, first.operationId]),
     );
   });
-  test('actor dependency cap cannot advance its sequence', () {
+  test('more than 256 independent causal parents survive restart', () {
     final clock = OperationActorClock(actorId: 'local');
-    for (var i = 0; i < 257; i++) {
+    final ids = <String>[];
+    for (var i = 0; i < 300; i++) {
+      final id =
+          '${i.toRadixString(16).padLeft(8, '0')}'
+          '-1111-4111-8111-111111111111';
+      ids.add(id);
+      clock.observe(op(id: id, actor: 'remote-$i', sequence: 1, clock: 2));
+    }
+    final restored = OperationActorClock.fromCheckpoint(clock.toCheckpoint());
+    final next = restored.next(
+      documentId: 'notebook',
+      pageId: 'page',
+      objectId: 'stroke',
+      kind: OperationKind.objectSet,
+      payload: const {
+        'properties': {'x': 1},
+      },
+    );
+    expect(next.dependencies.length, ids.length);
+    expect(next.dependencies.toSet(), ids.toSet());
+    expect(
+      OperationEnvelope.fromJson(next.toJson()).dependencies,
+      next.dependencies,
+    );
+    expect(restored.actorSeq, 1);
+  });
+
+  test('oversized causal frontier cannot advance actor sequence', () {
+    final clock = OperationActorClock(actorId: 'local');
+    final count = OperationEnvelope.maxDependencyBytes ~/ 39 + 1;
+    for (var i = 0; i < count; i++) {
       final id =
           '${i.toRadixString(16).padLeft(8, '0')}'
           '-1111-4111-8111-111111111111';
@@ -575,7 +605,7 @@ void main() {
         pageId: 'page',
         objectId: 'stroke',
         kind: OperationKind.objectSet,
-        payload: {
+        payload: const {
           'properties': {'x': 1},
         },
       ),
