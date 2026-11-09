@@ -101,6 +101,47 @@ class _RetryGateway extends _FakeGateway {
   }
 }
 
+class _QuietFeedGateway extends _FakeGateway {
+  @override
+  Future<OperationFeedPage> readAfter(int cursor) async {
+    reads++;
+    return OperationFeedPage(
+      cursor: cursor,
+      hasMore: false,
+      operations: const [],
+    );
+  }
+}
+
+class _ReversedAckGateway extends _QuietFeedGateway {
+  @override
+  Future<List<OperationReceipt>> send(
+    List<OperationEnvelope> operations,
+  ) async {
+    batches.add(operations.map((op) => op.operationId).toList());
+    return [
+      for (var index = 0; index < operations.length; index++)
+        OperationReceipt(operations[index].operationId, 92 - index),
+    ];
+  }
+}
+
+class _OversizedAckGateway extends _QuietFeedGateway {
+  @override
+  Future<List<OperationReceipt>> send(
+    List<OperationEnvelope> operations,
+  ) async {
+    batches.add(operations.map((op) => op.operationId).toList());
+    return [
+      for (final operation in operations)
+        OperationReceipt(
+          operation.operationId,
+          OperationEnvelope.maxSafeInteger + 1,
+        ),
+    ];
+  }
+}
+
 class _DuplicateAckGateway extends _FakeGateway {
   @override
   Future<List<OperationReceipt>> send(
@@ -1279,6 +1320,101 @@ void main() {
     expect(ended, 1);
     expect(engine.isStarted, isFalse);
     expect(await store.isPending(pending.operationId), isTrue);
+  });
+
+  test('failed later ACK rolls back the full pushed batch', () async {
+    final first = await local('atomic-ack-first');
+    final second = await local('atomic-ack-second');
+    await database.customStatement(
+      'CREATE TRIGGER fail_second_ack '
+      'BEFORE INSERT ON operation_ack '
+      "WHEN NEW.operation_id = '${second.operationId}' "
+      "BEGIN SELECT RAISE(ABORT, 'injected ACK failure'); END",
+    );
+    engine.dispose();
+    gateway = _QuietFeedGateway();
+    engine = SyncEngine(
+      store: store,
+      gateway: gateway,
+      actorId: 'actor-local',
+      checkpointScope: 'user-A-v2',
+      enableRealtime: false,
+      applyRemote: (_, _) async {},
+    );
+    await engine.start();
+    expect(
+      (await store.pending(includeDeferred: true)).map((op) => op.operationId),
+      [first.operationId, second.operationId],
+    );
+    expect(
+      (await database.customSelect('SELECT * FROM operation_ack').get()),
+      isEmpty,
+    );
+    expect(gateway.batches, hasLength(1));
+
+    await database.customStatement('DROP TRIGGER fail_second_ack');
+    await database.customStatement(
+      'UPDATE operation_outbox '
+      'SET retry_after = 0',
+    );
+    await engine.syncNow();
+    expect(await store.pending(includeDeferred: true), isEmpty);
+    expect(
+      (await database.customSelect('SELECT * FROM operation_ack').get()),
+      hasLength(2),
+    );
+    expect(gateway.batches, hasLength(2));
+  });
+
+  test('reversed actor ACK cursors preserve the complete outbox', () async {
+    final first = await local('reversed-ack-first');
+    final second = await local('reversed-ack-second');
+    engine.dispose();
+    gateway = _ReversedAckGateway();
+    engine = SyncEngine(
+      store: store,
+      gateway: gateway,
+      actorId: 'actor-local',
+      checkpointScope: 'user-A-v2',
+      enableRealtime: false,
+      applyRemote: (_, _) async {},
+    );
+    await engine.start();
+    expect(
+      (await store.pending(includeDeferred: true)).map((op) => op.operationId),
+      [first.operationId, second.operationId],
+    );
+    expect(
+      (await database.customSelect('SELECT * FROM operation_ack').get()),
+      isEmpty,
+    );
+    expect(await store.blockedReason(first.operationId), contains('ACK'));
+    expect(gateway.batches, hasLength(1));
+  });
+
+  test('unsafe server ACK cursor leaves queued intent untouched', () async {
+    final localOperation = await local('unsafe-server-cursor');
+    engine.dispose();
+    gateway = _OversizedAckGateway();
+    engine = SyncEngine(
+      store: store,
+      gateway: gateway,
+      actorId: 'actor-local',
+      checkpointScope: 'user-A-v2',
+      enableRealtime: false,
+      applyRemote: (_, _) async {},
+    );
+    await engine.start();
+    expect(await store.isPending(localOperation.operationId), isTrue);
+    expect(
+      await store.blockedReason(localOperation.operationId),
+      contains('ACK'),
+    );
+    expect(
+      (await database.customSelect('SELECT * FROM operation_ack').get()),
+      isEmpty,
+    );
+    expect(await store.checkpoint('user-A-v2'), 0);
   });
 
   test('duplicate ACK cursors never delete queued local intents', () async {

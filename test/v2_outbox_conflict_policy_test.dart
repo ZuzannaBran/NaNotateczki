@@ -1071,10 +1071,7 @@ void main() {
     expect(_allowed(title, removed), isTrue);
     expect(_allowed(removed, bookmark), isTrue);
     expect(_allowed(bookmark, removed), isTrue);
-    expect(
-      V2OutboxConflictPolicy.canApply(removed, [title, bookmark]),
-      isTrue,
-    );
+    expect(V2OutboxConflictPolicy.canApply(removed, [title, bookmark]), isTrue);
   });
 
   test('page delete keeps ink and text intents on unaffected page', () {
@@ -1148,10 +1145,7 @@ void main() {
       OperationKind.objectMove,
       pageId: 'page-kept',
       objectId: 'ink-a',
-      payload: const {
-        'toPageId': 'page-old',
-        'sortIndex': 0,
-      },
+      payload: const {'toPageId': 'page-old', 'sortIndex': 0},
     );
     final created = _operation(
       OperationKind.pageCreate,
@@ -1223,9 +1217,6 @@ void main() {
       },
     );
     expect(V2OutboxConflictPolicy.canApply(removed, [safe]), isTrue);
-    expect(
-      V2OutboxConflictPolicy.canApply(removed, [safe, unsafe]),
-      isFalse,
-    );
+    expect(V2OutboxConflictPolicy.canApply(removed, [safe, unsafe]), isFalse);
   });
 }

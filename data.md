@@ -1,5 +1,31 @@
 # Dane NaNotateczki
 
+## Atomowe ACK całej paczki i bezpieczny kursor v2 (2026-11-09)
+
+Dawny SyncEngine wykonywał ACK każdego operationId osobną
+transakcją SQLite. Awaria drugiego ACK mogła usunąć pierwszy
+intent z outboxu, mimo że wywołanie paczki zakończyło się
+błędem. OperationStore.acknowledgeBatch zapisuje teraz wszystkie
+potwierdzenia i usuwa wpisy outboxu w JEDNEJ transakcji. Przy
+złej tożsamości, statusie, kolejności lub awarii SQL cała paczka
+pozostaje bez zmiany. Retry zaakceptowanego ACK jest idempotentny
+i wymaga identycznego wcześniej przydzielonego kursora.
+
+Wszystkie potwierdzenia muszą odpowiadać lokalnym operacjom,
+mieć niepowtarzalne kursory i zachowywać rosnący cursor dla
+rosnącego actorSeq. Klient HTTP, SyncEngine oraz lokalny store
+odrzucają wartości powyżej 2^53-1. Ta sama granica dotyczy
+odczytu feed, checkpointów i snapshotów. Backend przed commit
+PostgreSQL sprawdza te same własności kompletnej paczki ACK,
+zwracając błąd 500 przy naruszeniu kontraktu, zamiast
+zapisywać niespójną odpowiedź.
+
+Regresje obejmują awarię drugiego INSERT operacji ACK,
+restart plikowego SQLite i skuteczne ponowienie, błędną
+kolejność aktora, nieznane i zdalne-only operationId oraz
+kursory spoza bezpiecznego zakresu. Protokół v1 nie został
+zmieniony, migracja pozostaje wyłączona.
+
 ## Przestrzenne konflikty usuwania i atomowy reducer v2 (2026-11-09)
 
 Niezależna operacja page.delete może przejść przy lokalnym outboxie

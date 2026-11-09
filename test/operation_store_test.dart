@@ -365,6 +365,238 @@ void main() {
     );
   });
 
+  test('batch ACK is all-or-nothing on an unknown operation', () async {
+    final first = await add('batch-ack-first');
+    final second = await add('batch-ack-second');
+    await expectLater(
+      store.acknowledgeBatch({
+        first.operationId: 51,
+        const Uuid().v4(): 52,
+      }),
+      throwsStateError,
+    );
+    expect(
+      (await store.pending()).map((op) => op.operationId),
+      [first.operationId, second.operationId],
+    );
+    expect(
+      (await database.customSelect('SELECT * FROM operation_ack').get()),
+      isEmpty,
+    );
+    await store.acknowledgeBatch({
+      first.operationId: 51,
+      second.operationId: 52,
+    });
+    expect(await store.pending(), isEmpty);
+    await store.acknowledgeBatch({
+      first.operationId: 51,
+      second.operationId: 52,
+    });
+    expect(
+      (await database.customSelect('SELECT * FROM operation_ack').get()),
+      hasLength(2),
+    );
+  });
+
+  test('batch ACK conflict keeps unacknowledged entries', () async {
+    final first = await add('batch-acked-first');
+    final second = await add('batch-pending-second');
+    final third = await add('batch-pending-third');
+    await store.acknowledge(first.operationId, serverSequence: 61);
+    await expectLater(
+      store.acknowledgeBatch({
+        second.operationId: 62,
+        first.operationId: 999,
+      }),
+      throwsStateError,
+    );
+    expect(await store.isPending(second.operationId), isTrue);
+    expect(await store.isPending(third.operationId), isTrue);
+    expect(
+      (await database.customSelect('SELECT * FROM operation_ack').get()),
+      hasLength(1),
+    );
+    await store.acknowledgeBatch({
+      first.operationId: 61,
+      second.operationId: 62,
+      third.operationId: 63,
+    });
+    expect(await store.pending(), isEmpty);
+  });
+
+  test('duplicate cursor ACK cannot remove either outbox entry', () async {
+    final first = await add('duplicate-first');
+    final second = await add('duplicate-second');
+    await expectLater(
+      store.acknowledgeBatch({
+        first.operationId: 71,
+        second.operationId: 71,
+      }),
+      throwsArgumentError,
+    );
+    expect(await store.pending(), hasLength(2));
+    expect(
+      (await database.customSelect('SELECT * FROM operation_ack').get()),
+      isEmpty,
+    );
+  });
+
+  test('stored batch rejects reversed actor cursors', () async {
+    final first = await add('actor-sequence-first');
+    final second = await add('actor-sequence-second');
+    await expectLater(
+      store.acknowledgeBatch({
+        first.operationId: 95,
+        second.operationId: 94,
+      }),
+      throwsStateError,
+    );
+    expect(await store.pending(), hasLength(2));
+    expect(
+      (await database.customSelect('SELECT * FROM operation_ack').get()),
+      isEmpty,
+    );
+    await store.acknowledgeBatch({
+      second.operationId: 96,
+      first.operationId: 95,
+    });
+    expect(await store.pending(), isEmpty);
+  });
+
+  test('unsafe cursor cannot ACK, checkpoint or snapshot', () async {
+    final operation = await add('unsafe-cursor');
+    final invalid = OperationEnvelope.maxSafeInteger + 1;
+    await expectLater(
+      store.acknowledgeBatch({operation.operationId: invalid}),
+      throwsArgumentError,
+    );
+    await expectLater(
+      store.advanceCheckpoint('test-unsafe-cursor', invalid),
+      throwsArgumentError,
+    );
+    await expectLater(
+      store.saveSnapshot(
+        documentId: 'document-one',
+        serverSequence: invalid,
+        snapshotJson: '{}',
+      ),
+      throwsArgumentError,
+    );
+    expect(await store.isPending(operation.operationId), isTrue);
+    expect(await store.checkpoint('test-unsafe-cursor'), 0);
+    expect(
+      (await database.customSelect('SELECT * FROM operation_ack').get()),
+      isEmpty,
+    );
+  });
+
+  test('remote-only operation cannot be acknowledged as local', () async {
+    final remote = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'remote-actor',
+      actorSeq: 1,
+      documentId: 'document-one',
+      pageId: 'page-one',
+      objectId: 'remote-object',
+      kind: OperationKind.objectCreate,
+      payload: const {
+        'value': {'label': 'remote'},
+      },
+      dependencies: const [],
+      logicalClock: 1,
+    );
+    await store.applyRemote(
+      remote,
+      serverSequence: 1,
+      apply: () async {},
+    );
+    final local = await add('real-local');
+    await expectLater(
+      store.acknowledgeBatch({
+        local.operationId: 81,
+        remote.operationId: 82,
+      }),
+      throwsStateError,
+    );
+    expect(await store.isPending(local.operationId), isTrue);
+    expect(
+      (await database.customSelect('SELECT * FROM operation_ack').get()),
+      isEmpty,
+    );
+  });
+
+  test('failed file-backed batch ACK survives restart intact', () async {
+    final directory = await Directory.systemTemp.createTemp('nn-v2-ack-');
+    addTearDown(() => directory.delete(recursive: true));
+    final file = File('${directory.path}/notes.sqlite');
+    final original = NotesDatabase(NativeDatabase(file));
+    late String firstId;
+    late String secondId;
+    try {
+      final journal = OperationStore(original);
+      final first = await journal.writeLocal(
+        actorId: 'restart-ack-actor',
+        documentId: 'restart-ack-document',
+        pageId: 'page',
+        objectId: 'first',
+        kind: OperationKind.objectCreate,
+        payload: const {
+          'value': {'label': 'first'},
+        },
+        apply: (_) async {},
+      );
+      final second = await journal.writeLocal(
+        actorId: 'restart-ack-actor',
+        documentId: 'restart-ack-document',
+        pageId: 'page',
+        objectId: 'second',
+        kind: OperationKind.objectCreate,
+        payload: const {
+          'value': {'label': 'second'},
+        },
+        apply: (_) async {},
+      );
+      firstId = first.operationId;
+      secondId = second.operationId;
+      await original.customStatement(
+        'CREATE TRIGGER interrupt_second_ack '
+        'BEFORE INSERT ON operation_ack '
+        "WHEN NEW.operation_id = '${second.operationId}' "
+        "BEGIN SELECT RAISE(ABORT, 'injected rollback'); END",
+      );
+      await expectLater(
+        journal.acknowledgeBatch({
+          firstId: 101,
+          secondId: 102,
+        }),
+        throwsException,
+      );
+    } finally {
+      await original.close();
+    }
+    final restarted = NotesDatabase(NativeDatabase(file));
+    try {
+      final journal = OperationStore(restarted);
+      expect(
+        (await journal.pending()).map((op) => op.operationId),
+        [firstId, secondId],
+      );
+      expect(
+        (await restarted.customSelect('SELECT * FROM operation_ack').get()),
+        isEmpty,
+      );
+      await restarted.customStatement('DROP TRIGGER interrupt_second_ack');
+      await journal.acknowledgeBatch({firstId: 101, secondId: 102});
+      expect(await journal.pending(), isEmpty);
+      expect(
+        (await restarted.customSelect('SELECT * FROM operation_ack').get()),
+        hasLength(2),
+      );
+    } finally {
+      await restarted.close();
+    }
+  });
+
   test('tombstones block reusing a deleted object ID', () async {
     await add('deleted-object');
     await store.writeLocal(

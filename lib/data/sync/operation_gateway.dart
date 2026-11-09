@@ -87,6 +87,7 @@ class HttpOperationGateway implements OperationGateway {
     final batchCursor = body['cursor'];
     if (batchCursor is! int ||
         batchCursor <= 0 ||
+        batchCursor > OperationEnvelope.maxSafeInteger ||
         entries is! List ||
         entries.length != operations.length) {
       throw const FormatException('Incomplete operation ACK batch.');
@@ -104,6 +105,7 @@ class HttpOperationGateway implements OperationGateway {
           !seen.add(id) ||
           cursor is! int ||
           cursor <= 0 ||
+          cursor > OperationEnvelope.maxSafeInteger ||
           !seenCursors.add(cursor) ||
           (ack['status'] != 'applied' && ack['status'] != 'duplicate')) {
         throw const FormatException('Invalid operation acknowledgement.');
@@ -116,12 +118,32 @@ class HttpOperationGateway implements OperationGateway {
         batchCursor) {
       throw const FormatException('Inconsistent operation batch cursor.');
     }
+    final cursorsById = {
+      for (final receipt in result) receipt.operationId: receipt.cursor,
+    };
+    final sorted = [...operations]
+      ..sort((left, right) {
+        final actor = left.actorId.compareTo(right.actorId);
+        if (actor != 0) {
+          return actor;
+        }
+        return left.actorSeq.compareTo(right.actorSeq);
+      });
+    final previousByActor = <String, int>{};
+    for (final operation in sorted) {
+      final current = cursorsById[operation.operationId]!;
+      final previous = previousByActor[operation.actorId];
+      if (previous != null && current <= previous) {
+        throw const FormatException('Non-monotonic actor ACK cursor.');
+      }
+      previousByActor[operation.actorId] = current;
+    }
     return result;
   }
 
   @override
   Future<OperationFeedPage> readAfter(int cursor) async {
-    if (cursor < 0) {
+    if (cursor < 0 || cursor > OperationEnvelope.maxSafeInteger) {
       throw ArgumentError.value(cursor, 'cursor');
     }
     final response = await apiClient.request(
@@ -137,6 +159,7 @@ class HttpOperationGateway implements OperationGateway {
     final rows = body['operations'];
     if (pageCursor is! int ||
         pageCursor < cursor ||
+        pageCursor > OperationEnvelope.maxSafeInteger ||
         hasMore is! bool ||
         rows is! List) {
       throw const FormatException('Invalid operations feed.');
@@ -146,7 +169,9 @@ class HttpOperationGateway implements OperationGateway {
     for (final raw in rows) {
       final row = _object(raw);
       final sequence = row['cursor'];
-      if (sequence is! int || sequence <= lastCursor) {
+      if (sequence is! int ||
+          sequence <= lastCursor ||
+          sequence > OperationEnvelope.maxSafeInteger) {
         throw const FormatException('Non-monotonic feed cursor.');
       }
       final envelope = OperationEnvelope.fromJson(_object(row['operation']));

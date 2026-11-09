@@ -1,5 +1,34 @@
 # Etap 5 — silnik synchronizacji operacji v2
 
+## Atomowa odpowiedź ACK i kontrola aktora (2026-11-09)
+
+W przebiegu 42595806151 aplikacji przeszło 16/17 zadań;
+pozostała wyłącznie poprawka formatowania jednego testu.
+Backend 42595781685 przeszedł w całości. Wprowadzono
+dokładny diff formattera przed nową serią zmian.
+
+SyncEngine przekazuje cały zestaw receiptów do jednej
+transakcji SQLite przez OperationStore.acknowledgeBatch.
+Przy awarii zapisu potwierdzenia, rozbieżnym powtórnym
+ACK, nieznanym lub zdalnym-only operationId, duplikacie
+kursora, błędnej kolejności actorSeq czy przekroczeniu
+2^53-1 nie wolno usunąć żadnej operacji z paczki.
+Weryfikacja działa również dla alternatywnych gatewayów
+i lokalnego store, a nie tylko dla klienta HTTP.
+
+Po stronie serwera validate_batch_receipts kontroluje
+wszystkie receipt przed session.commit(): kompletność,
+operationId, poprawny status, unikalny numer globalnego
+kursora, bezpieczny zakres liczbowy i monotoniczne kursory
+wewnątrz aktora. Niewłaściwe ACK kończy transakcję błędem
+bez emisji potwierdzenia. Backend i mirrory app/dev mają
+taką samą implementację i testy kontraktu.
+
+Nie zmieniono zapisu v1, schematu SQLite/Drift ani
+komunikacji legacy. Pełny rebase zmian tego samego obiektu
+wraz z object.move oraz migracja stage-11 nadal
+wymagają osobnego wdrożenia.
+
 ## Rebase niezależnych page.delete i integralność ACK (2026-11-09)
 
 W przebiegu 42591095132 przechodziło 16/17 zadań (backend

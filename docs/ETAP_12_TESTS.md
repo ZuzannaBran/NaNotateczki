@@ -1,5 +1,38 @@
 # Etap 12 — weryfikacja zapisu i synchronizacji
 
+## Regresje transakcji ACK i granic feed (2026-11-09)
+
+CI 42595806151: 16/17 zielonych, formatter zgłosił
+jedyny błąd; jego dokładny diff wprowadzono.
+
+test/operation_store_test.dart: obie operacje zachowane,
+gdy drugi ACK jest niepoprawny albo zapis SQL zostaje
+przerwany; po zamknięciu SQLite i restarcie dalej są
+w outboxie z oryginalnym ID. Następny poprawny ACK
+zwalnia je jednocześnie. Ponowne potwierdzenie nie
+tworzy duplikatów. Walidacja odrzuca remote-only ID,
+przestawioną kolejność actorSeq, duplikat kursora
+i wartości poza 2^53-1.
+
+test/sync_engine_test.dart: transport ze zduplikowanym,
+malejącym lub zbyt dużym kursorem nie opróżnia outboxu.
+Triggery SQLite wymuszają awarię drugiego INSERT ACK
+w ramach realnego syncNow; cała paczka pozostaje dostępna
+i jest wysyłana ponownie po usunięciu błędu.
+test/operation_gateway_test.dart: fałszywy ACK oraz
+przepełniony cursor feed zatrzymują parsowanie przed
+zmianą checkpointu.
+
+api/tests/test_operation_stage4.py po stronie backendu
+weryfikuje unikalność i kolejność ACK, osobne aktory,
+błędny status, brak wpisu, fałszywy operationId i
+wartość większą od 2^53-1. Kontrola następuje
+przed session.commit i jest lustrzana w repo aplikacji.
+
+Nie uruchamiano lokalnie dart format/analyze/flutter test
+(brak narzędzi Dart i Flutter w dostępnym środowisku).
+Walidację nowych regresji należy potwierdzić w CI.
+
 ## Testy page.delete, atomowości i kursora ACK (2026-11-09)
 
 Ostatni app CI 42591095132: 16/17 zadań zielonych, jedyny

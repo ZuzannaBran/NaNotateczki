@@ -464,6 +464,10 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   `OperationEnvelope`, rosnący `actorSeq`, idempotencja, lokalny outbox,
   atomowe wieloobiektowe gesty przez `writeLocalBatch` (jeden commit
   projekcji, aktora i outboxu), ACK, tombstones oraz checkpointy i snapshoty.
+  `acknowledgeBatch` potwierdza i usuwa całą paczkę w jednej
+  transakcji, waliduje tylko lokalne ID, zakres 2^53-1, unikalność
+  i kolejność kursorów actorSeq. Regresje: `test/operation_store_test.dart`
+  obejmują rollback i restart plikowej SQLite.
   190: `writeLocalBatch(onCommittedInTransaction:)` zapisuje dodatkowe
   metadane wewnątrz transakcji po wszystkich intentach. Błąd callbacku
   cofa cały gest; pusty wsad dozwolony wyłącznie z callbackiem. Lista
@@ -713,8 +717,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 
 - `lib/data/sync/operation_gateway.dart`: `OperationGateway`,
   `HttpOperationGateway`, `OperationReceipt`, `OperationFeedPage`.
-  Waliduje payload, ACK (unikalne kursory dla różnych operationId),
-  kursory feed i limit 1 MiB API v2;
+  Waliduje payload, ACK (unikalne i rosnące per aktor kursory
+  w zakresie 2^53-1), kursory feed i limit 1 MiB API v2;
   backend sprawdza też limit rozmiaru materializowanej projekcji;
   przekazuje nagłówek Share `X-Share-Id`.
 - `lib/data/sync/sync_engine.dart`: `SyncEngine` i
@@ -723,8 +727,11 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   WebSocket hints, najwcześniejszy retry, generation token na stop,
   odświeżenie sesji i rebase przez callback. Błąd pull nie blokuje push.
   Pakiet 409/413/422 próbuje bezpiecznego prefiksu, bez pomijania actorSeq.
-  ACK ze zduplikowanym cursor nie usuwa lokalnego outboxu;
-  regresja: `test/sync_engine_test.dart`.
+  Cała paczka ACK przechodzi jedną transakcją SQLite albo
+  zostaje w outboxie; zduplikowany, malejący lub zbyt duży
+  cursor nie może zwolnić żadnej operacji.
+  Regresje: `test/sync_engine_test.dart` (drugi INSERT fail,
+  retry, pusty feed i wadliwe receipty).
   `onRemoteCommitted` powiadamia UI dopiero po commit SQLite i przed
   przesunięciem kursora; błędny patch jest ponawiany, a ACK własnego
   aktora nie odmalowuje widoku. Powtórny odczyt obcego envelope nie
@@ -790,6 +797,10 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   wspólnej strony; kursor bez utraty zmian.
 - `test/operation_gateway_test.dart`: dwa różne operationId
   nie mogą otrzymać identycznego kursora ACK.
+- `server/api/app/routers/operations.py`:
+  `validate_batch_receipts` sprawdza kompletność ACK, unikalność
+  cursor i monotoniczne actorSeq przed session.commit().
+  Test: `server/api/tests/test_operation_stage4.py`, mirror backendu.
 - `.github/scripts/flutter_transient_network_retry.sh`:
   maksymalnie trzy próby tylko dla błędów pobierania sqlite3
   lub HTTP 502/503/504. Nie ignoruje błędów testów.

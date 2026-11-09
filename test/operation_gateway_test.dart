@@ -213,6 +213,135 @@ void main() {
     expect((await guest.send([operation])).single.cursor, 1);
   });
 
+  test('actor ACK cursors cannot run opposite to local sequence', () async {
+    final first = _operation();
+    final second = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: first.actorId,
+      actorSeq: first.actorSeq + 1,
+      documentId: first.documentId,
+      kind: OperationKind.documentSet,
+      payload: const {
+        'properties': {'title': 'Next'},
+      },
+      dependencies: [first.operationId],
+      logicalClock: first.logicalClock + 1,
+    );
+    final client = clientFor((_) async {
+      return http.Response(
+        jsonEncode({
+          'cursor': 90,
+          'acknowledgements': [
+            {
+              'operationId': first.operationId,
+              'cursor': 90,
+              'status': 'applied',
+            },
+            {
+              'operationId': second.operationId,
+              'cursor': 89,
+              'status': 'applied',
+            },
+          ],
+        }),
+        200,
+      );
+    });
+    await expectLater(
+      HttpOperationGateway(client).send([first, second]),
+      throwsFormatException,
+    );
+  });
+
+  test('valid actor ACK may arrive in reverse request order', () async {
+    final first = _operation();
+    final second = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: first.actorId,
+      actorSeq: 2,
+      documentId: first.documentId,
+      kind: OperationKind.documentSet,
+      payload: const {
+        'properties': {'title': 'Next'},
+      },
+      dependencies: [first.operationId],
+      logicalClock: 2,
+    );
+    final client = clientFor((_) async {
+      return http.Response(
+        jsonEncode({
+          'cursor': 92,
+          'acknowledgements': [
+            {
+              'operationId': second.operationId,
+              'cursor': 92,
+              'status': 'applied',
+            },
+            {
+              'operationId': first.operationId,
+              'cursor': 91,
+              'status': 'duplicate',
+            },
+          ],
+        }),
+        200,
+      );
+    });
+    final result = await HttpOperationGateway(client).send([second, first]);
+    expect(result.map((ack) => ack.operationId), [
+      second.operationId,
+      first.operationId,
+    ]);
+  });
+
+  test('ACK rejects server cursor beyond safe protocol integer', () async {
+    final operation = _operation();
+    final client = clientFor((_) async {
+      return http.Response(
+        jsonEncode({
+          'cursor': OperationEnvelope.maxSafeInteger + 1,
+          'acknowledgements': [
+            {
+              'operationId': operation.operationId,
+              'cursor': OperationEnvelope.maxSafeInteger + 1,
+              'status': 'applied',
+            },
+          ],
+        }),
+        200,
+      );
+    });
+    await expectLater(
+      HttpOperationGateway(client).send([operation]),
+      throwsFormatException,
+    );
+  });
+
+  test('feed rejects cursor beyond safe protocol integer', () async {
+    final operation = _operation();
+    final client = clientFor((_) async {
+      return http.Response(
+        jsonEncode({
+          'cursor': OperationEnvelope.maxSafeInteger + 1,
+          'hasMore': false,
+          'operations': [
+            {
+              'cursor': OperationEnvelope.maxSafeInteger + 1,
+              'operation': operation.toJson(),
+            },
+          ],
+        }),
+        200,
+      );
+    });
+    final gateway = HttpOperationGateway(client);
+    await expectLater(gateway.readAfter(0), throwsFormatException);
+    await expectLater(
+      gateway.readAfter(OperationEnvelope.maxSafeInteger + 1),
+      throwsArgumentError,
+    );
+  });
+
   test('invalid or missing Share credentials are rejected before HTTP', () {
     final client = clientFor((_) async => http.Response('{}', 200));
     const shareId = '11111111-1111-4111-8111-111111111111';

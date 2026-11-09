@@ -641,38 +641,76 @@ class OperationStore {
   Future<void> acknowledge(
     String operationId, {
     required int serverSequence,
-  }) async {
-    if (serverSequence <= 0) {
-      throw ArgumentError.value(serverSequence, 'serverSequence');
+  }) => acknowledgeBatch({operationId: serverSequence});
+
+  /// Accept a full server receipt batch or retain every pending intent.
+  ///
+  /// One invalid receipt, a reused cursor or an interrupted write rolls back
+  /// the entire batch. Already-acknowledged retries must keep their original
+  /// server cursor. A receipt cannot acknowledge a remote-only operation.
+  Future<void> acknowledgeBatch(Map<String, int> cursors) async {
+    if (cursors.isEmpty ||
+        cursors.keys.any((id) => id.isEmpty) ||
+        cursors.values.any(
+          (cursor) => cursor <= 0 || cursor > OperationEnvelope.maxSafeInteger,
+        ) ||
+        cursors.values.toSet().length != cursors.length) {
+      throw ArgumentError('Invalid operation acknowledgement batch.');
     }
     await database.transaction(() async {
-      final existing = await _row(
-        'SELECT server_sequence FROM operation_ack WHERE operation_id = ?',
-        [operationId],
-      );
-      if (existing != null) {
-        if (existing['server_sequence'] != serverSequence) {
-          throw StateError('Conflicting server acknowledgement.');
+      final actorReceipts = <String, List<(int, int)>>{};
+      for (final entry in cursors.entries) {
+        final id = entry.key;
+        final sequence = entry.value;
+        final local = await _row(
+          'SELECT source, actor_id, actor_seq '
+          'FROM operations WHERE operation_id = ?',
+          [id],
+        );
+        if (local == null || local['source'] != 'local') {
+          throw StateError('Cannot acknowledge a nonlocal operation.');
         }
-        return;
+        final actor = local['actor_id'] as String;
+        final actorSequence = local['actor_seq'] as int;
+        actorReceipts
+            .putIfAbsent(actor, () => <(int, int)>[])
+            .add((actorSequence, sequence));
+        final existing = await _row(
+          'SELECT server_sequence FROM operation_ack WHERE operation_id = ?',
+          [id],
+        );
+        if (existing != null) {
+          if (existing['server_sequence'] != sequence) {
+            throw StateError('Conflicting server acknowledgement.');
+          }
+          continue;
+        }
+        if (!await isPending(id)) {
+          throw StateError('Cannot acknowledge an operation outside outbox.');
+        }
+        await database.customStatement(
+          'INSERT INTO operation_ack '
+          '(operation_id, server_sequence, acknowledged_at) '
+          'VALUES (?, ?, ?)',
+          [
+            id,
+            sequence,
+            DateTime.now().toUtc().millisecondsSinceEpoch,
+          ],
+        );
+        await database.customStatement(
+          'DELETE FROM operation_outbox WHERE operation_id = ?',
+          [id],
+        );
       }
-      if (await operation(operationId) == null) {
-        throw StateError('Cannot acknowledge an unknown operation.');
+      for (final actor in actorReceipts.values) {
+        actor.sort((left, right) => left.$1.compareTo(right.$1));
+        for (var index = 1; index < actor.length; index++) {
+          if (actor[index].$2 <= actor[index - 1].$2) {
+            throw StateError('Non-monotonic actor acknowledgement.');
+          }
+        }
       }
-      await database.customStatement(
-        'INSERT INTO operation_ack '
-        '(operation_id, server_sequence, acknowledged_at) '
-        'VALUES (?, ?, ?)',
-        [
-          operationId,
-          serverSequence,
-          DateTime.now().toUtc().millisecondsSinceEpoch,
-        ],
-      );
-      await database.customStatement(
-        'DELETE FROM operation_outbox WHERE operation_id = ?',
-        [operationId],
-      );
     });
   }
 
@@ -692,7 +730,9 @@ class OperationStore {
   }
 
   Future<void> _advanceCheckpoint(String scope, int sequence) async {
-    if (scope.isEmpty || sequence < 0) {
+    if (scope.isEmpty ||
+        sequence < 0 ||
+        sequence > OperationEnvelope.maxSafeInteger) {
       throw ArgumentError('Invalid sync checkpoint.');
     }
     final current = await checkpoint(scope);
@@ -714,7 +754,8 @@ class OperationStore {
     required int serverSequence,
     required String snapshotJson,
   }) async {
-    if (serverSequence < 0) {
+    if (serverSequence < 0 ||
+        serverSequence > OperationEnvelope.maxSafeInteger) {
       throw ArgumentError.value(serverSequence, 'serverSequence');
     }
     jsonDecode(snapshotJson);

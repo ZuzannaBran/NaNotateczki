@@ -552,18 +552,37 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     if (received.length != receipts.length ||
         !setEquals(expected, received) ||
         cursors.length != receipts.length ||
-        receipts.any((receipt) => receipt.cursor <= 0)) {
+        receipts.any(
+          (receipt) =>
+              receipt.cursor <= 0 ||
+              receipt.cursor > OperationEnvelope.maxSafeInteger,
+        )) {
       throw const FormatException('Incomplete or invalid server ACK.');
     }
-    for (final receipt in receipts) {
-      if (!_isActive(generation)) {
-        return;
+    final cursorsById = {
+      for (final receipt in receipts) receipt.operationId: receipt.cursor,
+    };
+    final sorted = [...batch]
+      ..sort((left, right) {
+        final actor = left.actorId.compareTo(right.actorId);
+        if (actor != 0) {
+          return actor;
+        }
+        return left.actorSeq.compareTo(right.actorSeq);
+      });
+    final previousByActor = <String, int>{};
+    for (final operation in sorted) {
+      final cursor = cursorsById[operation.operationId]!;
+      final previous = previousByActor[operation.actorId];
+      if (previous != null && cursor <= previous) {
+        throw const FormatException('Non-monotonic actor ACK cursor.');
       }
-      await store.acknowledge(
-        receipt.operationId,
-        serverSequence: receipt.cursor,
-      );
+      previousByActor[operation.actorId] = cursor;
     }
+    if (!_isActive(generation)) {
+      return;
+    }
+    await store.acknowledgeBatch(cursorsById);
   }
 
   Future<void> _sendActor(
