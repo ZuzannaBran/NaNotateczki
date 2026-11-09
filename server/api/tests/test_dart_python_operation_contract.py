@@ -14,6 +14,7 @@ import pytest
 from app.operation_protocol import (
     KINDS,
     LIBRARY_DOCUMENT_ID,
+    MAX_DEPENDENCY_BYTES,
     MAX_SAFE_INTEGER,
     SCHEMA_VERSION,
     InvalidOperation,
@@ -49,7 +50,11 @@ def test_flutter_and_server_agree_on_wire_version_and_limits():
         rf"maxSafeInteger\s*=\s*{MAX_SAFE_INTEGER};", source
     )
     assert f"libraryDocumentId = '{LIBRARY_DOCUMENT_ID}'" in source
-    assert "dependencies.length > 256" in source
+    assert "dependencies.length * 39 > maxDependencyBytes" in source
+    assert re.search(
+        rf"maxDependencyBytes\\s*=\\s*{MAX_DEPENDENCY_BYTES // 1024}\\s*\\*\\s*1024;",
+        source,
+    )
 
 
 @pytest.mark.parametrize("target", ["document", "page", "object", "folder", "task"])
