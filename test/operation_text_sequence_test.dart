@@ -522,4 +522,86 @@ void main() {
       },
     ]);
   });
+  test('shared Dart Python Quill convergence contract', () {
+    final insert = textOperation(
+      operationId: firstId,
+      actorId: 'origin',
+      kind: OperationKind.textInsert,
+      logicalClock: 10,
+      payload: {
+        'afterAtomId': null,
+        'atoms': [
+          {'id': firstId, 'text': 'X'},
+        ],
+      },
+    );
+    final red = textOperation(
+      operationId: secondId,
+      actorId: 'alice',
+      kind: OperationKind.textFormat,
+      logicalClock: 11,
+      payload: {
+        'atomIds': [firstId],
+        'attributes': {'bold': true, 'color': 'red'},
+      },
+    );
+    final blue = textOperation(
+      operationId: thirdId,
+      actorId: 'zed',
+      kind: OperationKind.textFormat,
+      logicalClock: 11,
+      payload: {
+        'atomIds': [firstId],
+        'attributes': {'color': 'blue'},
+      },
+    );
+    final original = OperationTextSequence.apply({}, insert);
+    final left = OperationTextSequence.apply(
+      OperationTextSequence.apply(original, red),
+      blue,
+    );
+    final right = OperationTextSequence.apply(
+      OperationTextSequence.apply(original, blue),
+      red,
+    );
+    const expected = [
+      {
+        'insert': 'X',
+        'attributes': {'bold': true, 'color': 'blue'},
+      },
+    ];
+    expect(OperationTextSequence.renderDelta(left), expected);
+    expect(OperationTextSequence.renderDelta(right), expected);
+    final deleted = textOperation(
+      operationId: secondId,
+      actorId: 'alice',
+      kind: OperationKind.textDelete,
+      logicalClock: 20,
+      payload: {
+        'atomIds': [firstId],
+      },
+    );
+    final append = textOperation(
+      operationId: thirdId,
+      actorId: 'zed',
+      kind: OperationKind.textInsert,
+      logicalClock: 21,
+      payload: {
+        'afterAtomId': firstId,
+        'atoms': [
+          {'id': thirdId, 'text': 'B'},
+        ],
+      },
+    );
+    final retained = OperationTextSequence.apply(
+      OperationTextSequence.apply(original, deleted),
+      append,
+    );
+    expect(OperationTextSequence.render(retained), 'B');
+    expect(OperationTextSequence.renderDelta(retained), [
+      {'insert': 'B'},
+    ]);
+    expect((retained[firstId] as Map)['deleted'], isTrue);
+  });
+
 }
