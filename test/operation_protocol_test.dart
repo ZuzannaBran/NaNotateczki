@@ -75,6 +75,32 @@ void main() {
     );
   });
 
+  test('causal dependency IDs above 256 are losslessly validated', () {
+    final dependencies = [
+      for (var i = 0; i < 300; i++)
+        '${i.toRadixString(16).padLeft(8, '0')}'
+            '-1111-4111-8111-111111111111',
+    ];
+    final original = operation(dependencies: dependencies);
+    final restored = OperationEnvelope.fromJson(original.toJson());
+    expect(restored.dependencies, dependencies);
+    expect(restored.toJson(), original.toJson());
+  });
+
+  test('oversized dependency list is rejected without truncation', () {
+    final dependencies = [
+      for (var i = 0;
+          i < OperationEnvelope.maxDependencyBytes ~/ 39 + 1;
+          i++)
+        '${i.toRadixString(16).padLeft(8, '0')}'
+            '-1111-4111-8111-111111111111',
+    ];
+    expect(
+      () => operation(dependencies: dependencies),
+      throwsFormatException,
+    );
+  });
+
   test('rejects viewport data in document identity fields', () {
     expect(
       () => operation(
