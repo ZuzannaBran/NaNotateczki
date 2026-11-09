@@ -1,5 +1,24 @@
 # Dane NaNotateczki
 
+## Skalowalny budżet zależności bez obcinania (2026-11-09)
+
+Dart i Python akceptują więcej niż 256 niezależnych operacji w
+`dependencies`: obowiązuje wspólny limit 128 KiB zakodowanych UUID
+(39 bajtów na identyfikator z narzutem separatorów). Każda zależność
+pozostaje wymagana i walidowana; przy wyczerpaniu budżetu nowa operacja
+jest odrzucana przed zwiększeniem actorSeq, zamiast tracić rodziców.
+Testy obejmują 300 niezależnych rodziców, restart checkpointu,
+identyczny roundtrip protokołu Dart/Python i bezstratną odmowę ponad
+budżet. To rozszerzenie obsługiwanej liczby rodziców, nie docelowa
+kompaktacja trwałego frontiera; bardzo duża liczba niezależnych
+aktorów nadal wymaga kolejnego rozwiązania.
+
+API PostgreSQL pobiera listę rodziców zbiorczo przy więcej niż
+jednej zależności zamiast wykonywać zapytanie na każde UUID.
+Weryfikacja kompletności, scope dokumentu i logicalClock zachowuje
+zasady fail-closed. Obie kopie backendu i testów są identyczne.
+Nie zmieniono schematu SQLite ani nie aktywowano produkcyjnego v2.
+
 ## Rejestr kolejności warstw przy przenoszeniu v2 (2026-11-09)
 
 Poprawiono `EditorSqliteProjector._moveObject`: przeniesienie obiektu
