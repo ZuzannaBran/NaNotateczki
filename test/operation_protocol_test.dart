@@ -88,10 +88,9 @@ void main() {
   });
 
   test('oversized dependency list is rejected without truncation', () {
+    final count = OperationEnvelope.maxDependencyBytes ~/ 39 + 1;
     final dependencies = [
-      for (var i = 0;
-          i < OperationEnvelope.maxDependencyBytes ~/ 39 + 1;
-          i++)
+      for (var i = 0; i < count; i++)
         '${i.toRadixString(16).padLeft(8, '0')}'
             '-1111-4111-8111-111111111111',
     ];
