@@ -438,6 +438,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   budżet 128 KiB (39 bajtów/UUID), Python i Dart muszą być zgodne.
   Zbiorcze sprawdzanie rodziców: `server/api/app/routers/operations.py`;
   regresja 300 rodziców: `server/api/tests/test_operation_stage4.py`.
+  Regresja realnego HTTP + PostgreSQL i konkurencyjnego kursora:
+  `server/api/tests/test_stage12_real_stack.py`.
 - `server/api/tests/test_dart_python_operation_contract.py`: uruchamiany w
   CI aplikacji test zgodności nazw, targetów i ograniczeń protokołu
   Flutter/Python, sprawdza rzeczywisty model Python bez atrap.
@@ -459,6 +461,9 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   namespace folderów i zadań).
   `test/operation_ordering_test.dart`: kolejność, błędne zależności,
   wycofanie po błędzie, restart, odrzucone ID, 300 rodziców i limit bajtów.
+  Te same kontrakty LWW/Undo/tombstone i Quill są w
+  `test/operation_ordering_test.dart`, `test/operation_text_sequence_test.dart`
+  oraz lustrzanych testach `server/api/tests/`.
   Nowy `OperationStore` zapisuje operacje w Drift od etapu 3;
   legacy klienci nadal używają snapshotów v1 do czasu migracji.
 

@@ -1,5 +1,22 @@
 # Etap 12 — weryfikacja zapisu i synchronizacji
 
+## Pakiet 1 — kontrakty operacji i PostgreSQL (2026-11-09)
+
+- Dart i Python: kompletne 300 UUID w dependencies po roundtripie
+  i checkpoint restart; identyczny budżet 128 KiB, błąd ponad limit
+  bez zwiększenia actorSeq ani obcinania listy.
+- Regresje w obu reduktorach: ten sam wynik LWW/Undo/tombstone,
+  Quill format/color, wstawienie za usuniętym atomem.
+- PostgreSQL: osobny test transakcji blokowanych tym samym globalnym
+  advisory lock, a następnie porównanie kolejności zatwierdzeń i
+  przypisanych cursor.
+- Realne API i baza: 300 niezależnych parent operationId w jednym
+  późniejszym document.set, bez utraty zależności, powtórny ACK
+  pozostaje duplicate bez wzrostu revision/cursor.
+- Testy stage12 wykonują się wyłącznie z
+  `NN_STAGE12_REAL_DB=1` i lokalną izolowaną bazą. W innym środowisku
+  są pomijane, a nie uznawane za zaliczone.
+
 ## Rejestr kolejności warstw przy przenoszeniu v2 (2026-11-09)
 
 Poprawiono `EditorSqliteProjector._moveObject`: przeniesienie obiektu

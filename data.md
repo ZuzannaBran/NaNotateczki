@@ -1,5 +1,22 @@
 # Dane NaNotateczki
 
+## Pakiet 1: kontrola kontraktów i testy realnego stosu (2026-11-09)
+
+Regresje porównawcze Darta i Pythona mają identyczne przypadki
+LWW (kolor, warstwa, operacja kompensująca Undo, trwały tombstone)
+oraz Quill (jednoczesne formatowanie i konflikt koloru, usunięta
+kotwica i późniejsze wstawienie). Obie implementacje mają zwrócić
+identyczne wartości i Delta, niezależnie od kolejności dopuszczonych
+zdarzeń.
+
+`server/api/tests/test_stage12_real_stack.py` sprawdza w oddzielnej,
+tymczasowej bazie PostgreSQL dwie konkurencyjne transakcje używające
+produkcyjnego zamka `pg_advisory_xact_lock(681246731)`. Kolejna
+transakcja nie może zatwierdzić wyższego kursora przed wcześniejszą.
+Osobna regresja wysyła 300 niezależnych zależności przez prawdziwe
+HTTP API v2, sprawdza stan snapshotu, rewizję i idempotentny ACK.
+Zamknięcie testu nie oznacza uruchomienia produkcyjnego cutover.
+
 ## Skalowalny budżet zależności bez obcinania (2026-11-09)
 
 Dart i Python akceptują więcej niż 256 niezależnych operacji w
