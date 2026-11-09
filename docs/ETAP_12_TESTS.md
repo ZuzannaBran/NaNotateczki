@@ -1,5 +1,29 @@
 # Etap 12 — weryfikacja zapisu i synchronizacji
 
+## Powtarzanie błędów infrastruktury CI (2026-11-09)
+
+Przebieg 42579587105:
+- sqlite3 3.3.3: suma pobranej biblioteki różniła się od sumy
+  producenta jednocześnie dla Linux, macOS, Android i iOS; zakaz
+  wyłączania SHA-256 lub traktowania tego jako poprawnego testu.
+- Android Gradle 8.14: HTTP 504 z przekierowania GitHub Releases.
+- iOS device Release: bezpłatny runner nie ma profilu podpisującego,
+  więc sprawdzany jest unsigned xcodebuild Release, a nie IPA.
+- Dart: wyłącznie formatowanie, poprawione zgodnie z diffem.
+
+Skrypt flutter_transient_network_retry.sh ponawia tylko błędy
+Hash of downloaded file libsqlite3 oraz HTTP 502/503/504, maksymalnie
+trzy próby. Po ostatniej lub przy błędzie logiki/testu zwraca
+niepowodzenie. test_flutter_transient_network_retry.sh odtwarza
+przejściowe i trwałe błędy oraz weryfikuje bezpośredni URL Gradle
+i wyłączone podpisywanie w zadaniu kompilacji Release iOS.
+
+Powtarzalny test manualny po CI: zainstalować build aplikacji z
+rzeczywistym SQLite na Androidzie i iOS, utworzyć offline dokument,
+wykonać zmianę tekstu i kreski, zamknąć proces, uruchomić ponownie,
+sprawdzić dane, outbox i późniejszy ACK po połączeniu. Bez sprzętu
+nie oznaczać tego testu jako zaliczonego.
+
 Status: **zestawy testów dodane, niezaliczone środowiskowo; etap 12 NIE jest
 zamknięty**. Nie włączać jeszcze produkcyjnego cutover v1 → v2.
 

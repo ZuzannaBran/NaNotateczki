@@ -336,7 +336,7 @@ void main() {
     ]);
     expect(OperationTextSequence.render(initial), 'X');
   });
-test('corrupt Quill attribute precedence cannot be silently repaired', () {
+  test('corrupt Quill attribute precedence cannot be silently repaired', () {
     final original = textOperation(
       operationId: firstId,
       actorId: 'alice',

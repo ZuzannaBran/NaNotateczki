@@ -1091,7 +1091,7 @@ void main() {
       [local.operationId],
     );
   });
-test('SQLite restart keeps offline ink and remote title', () async {
+  test('SQLite restart keeps offline ink and remote title', () async {
     final directory = await Directory.systemTemp.createTemp('nn-v2-offline-');
     addTearDown(() => directory.delete(recursive: true));
     final file = File(directory.path + '/notes.sqlite');
@@ -1257,10 +1257,7 @@ test('SQLite restart keeps offline ink and remote title', () async {
     expect(merged.folder, 'Remote folder');
     expect(merged.pages.single.isBookmarked, isTrue);
     expect(merged.pages.single.inkStrokes.single.id, 'offline-three-way-ink');
-    expect(
-      await f.runtime.store.checkpoint('account:startup-account'),
-      3,
-    );
+    expect(await f.runtime.store.checkpoint('account:startup-account'), 3);
     expect(
       (await f.runtime.store.pending(
         includeDeferred: true,
@@ -1282,13 +1279,10 @@ test('SQLite restart keeps offline ink and remote title', () async {
     );
     f.accepted.add(conflicting.toJson());
     await f.runtime.engine.syncNow();
-    expect(
-      await f.runtime.store.checkpoint('account:startup-account'),
-      3,
-    );
+    expect(await f.runtime.store.checkpoint('account:startup-account'), 3);
     expect((await f.repository.getNotebook(note.uid))!.title, 'Offline title');
   });
-test('offline Quill insert and remote text geometry merge', () async {
+  test('offline Quill insert and remote text geometry merge', () async {
     final f = _Fixture(NativeDatabase.memory());
     addTearDown(f.close);
     expect(
@@ -1375,10 +1369,7 @@ test('offline Quill insert and remote text geometry merge', () async {
     expect(block.position.dx, 24.0);
     expect(block.text, contains('Base'));
     expect(block.text, contains('Offline '));
-    expect(
-      await f.runtime.store.checkpoint('account:startup-account'),
-      5,
-    );
+    expect(await f.runtime.store.checkpoint('account:startup-account'), 5);
     expect(
       (await f.runtime.store.pending(
         includeDeferred: true,

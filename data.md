@@ -1,5 +1,18 @@
 # Dane NaNotateczki
 
+## Granice reduktora tekstu i sprawdzania CI (2026-11-09)
+
+Zdalne zmiany geometrii bloku tekstowego wolno scalać z atomami
+Quill tylko dla object.set, który jest obsługiwany w projektorze
+SQLite. object.transform i object.reorder obecnie trafiają do
+redukora ink/obrazu, dlatego nie mogą wyprzedzać lokalnego outboxu
+tekstu. Test zapobiega nieprzewidzianej zmianie kursora.
+
+Awaria pobrania sqlite3 nie jest zgodą na pominięcie sumy SHA-256
+ani zmianą formatu danych. CI ponawia wyłącznie chwilowe błędy
+pobierania i nadal przerywa przy niepowodzeniu, niezależnie od
+platformy. Migracja oraz produkcyjny zapis v1 nadal bez zmian.
+
 ## Ochrona assetów, CRDT i restartu (2026-11-09)
 
 W trybie opt-in v2 bezpieczne operacje geometrii i atomów tekstu

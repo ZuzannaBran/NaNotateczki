@@ -54,6 +54,8 @@ jobs:
         run: bash .github/scripts/test_flutter_integration_retry.sh
       - name: Verify sqlite3 hash retry never masks test failures
         run: bash .github/scripts/test_flutter_sqlite3_download_retry.sh
+      - name: Verify transient download retry never hides test failures
+        run: bash .github/scripts/test_flutter_transient_network_retry.sh
       - name: Verify single-app native iOS test matrix
         run: bash .github/scripts/test_ios_integration_matrix.sh
       - name: Execute non-render native test suite
@@ -400,7 +402,17 @@ jobs:
       - name: Verify Linux startup environment
         if: matrix.platform == 'linux'
         run: bash .github/scripts/test_linux_environment.sh
-      - name: Verify merged UI and planner lifecycle on native desktop
+      - name: Verify desktop UI with dependency retry
+        if: matrix.platform != 'windows'
+        run: >-
+          bash .github/scripts/flutter_transient_network_retry.sh
+          flutter test test/merged_ui_integration_test.dart
+          test/pointer_contact_matrix_test.dart
+          test/study_planner_button_contrast_test.dart
+          test/study_planner_controller_test.dart
+          --reporter expanded --timeout 90s
+      - name: Verify desktop UI on Windows
+        if: matrix.platform == 'windows'
         run: >-
           flutter test test/merged_ui_integration_test.dart
           test/pointer_contact_matrix_test.dart
@@ -438,9 +450,14 @@ jobs:
       - name: Verify synthetic pen and palm contacts on macOS desktop
         if: matrix.platform == 'macos'
         run: flutter test integration_test/pointer_contact_matrix_test.dart -d macos
-      - name: Build release application
-        if: ${{ !cancelled() }}
-        run: flutter build ${{ matrix.platform }} --release
+      - name: Build release application (Windows)
+        if: ${{ !cancelled() && matrix.platform == 'windows' }}
+        run: flutter build windows --release
+      - name: Build release application with download retry
+        if: ${{ !cancelled() && matrix.platform != 'windows' }}
+        run: >-
+          bash .github/scripts/flutter_transient_network_retry.sh
+          flutter build ${{ matrix.platform }} --release
 
   android-build:
     if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') && !contains(github.event.head_commit.message, '[ci:android-only]') }}
@@ -459,10 +476,14 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: flutter build apk --debug
+      - run: >-
+          bash .github/scripts/flutter_transient_network_retry.sh
+          flutter build apk --debug
       - name: Compile Android Release APK (distribution signing not verified)
         if: ${{ !cancelled() }}
-        run: flutter build apk --release
+        run: >-
+          bash .github/scripts/flutter_transient_network_retry.sh
+          flutter build apk --release
 
   ios-build:
     if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') && !contains(github.event.head_commit.message, '[ci:android-only]') }}
@@ -496,10 +517,18 @@ jobs:
           pod install
           test -f "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
           grep -q "Pods.xcodeproj" Runner.xcworkspace/contents.xcworkspacedata
-      - run: flutter build ios --simulator --no-codesign
+      - run: >-
+          bash .github/scripts/flutter_transient_network_retry.sh
+          flutter build ios --simulator --no-codesign
       - name: Compile unsigned iOS device Release
         if: ${{ !cancelled() }}
-        run: flutter build ios --release --no-codesign
+        shell: bash
+        run: |
+          xcodebuild -workspace ios/Runner.xcworkspace \
+            -scheme Runner -configuration Release -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' build
 
   android-emulator:
     name: Android - real emulator end-to-end
@@ -521,7 +550,9 @@ jobs:
           cache: true
       - run: flutter pub get
       - name: Precompile Android debug APK before starting emulator
-        run: flutter build apk --debug
+        run: >-
+          bash .github/scripts/flutter_transient_network_retry.sh
+          flutter build apk --debug
       - name: Enable KVM for hardware acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
@@ -588,7 +619,9 @@ jobs:
           echo "SIMULATOR_UDID=$SIMULATOR_UDID" >> "$GITHUB_ENV"
       - name: Run all iOS integration cases in a single app process
         timeout-minutes: 20
-        run: bash .github/scripts/ios_integration_matrix.sh "$SIMULATOR_UDID"
+        run: >-
+          bash .github/scripts/flutter_transient_network_retry.sh
+          bash .github/scripts/ios_integration_matrix.sh "$SIMULATOR_UDID"
       - name: Capture iPad simulator launch diagnostics on failure
         if: ${{ failure() && matrix.device == 'iPad' }}
         shell: bash

@@ -558,7 +558,7 @@ void main() {
     expect(_allowed(document, pageTitle), isTrue);
   });
 
-test('text geometry commutes with concurrent Quill edits both ways', () {
+  test('text geometry commutes with concurrent Quill edits both ways', () {
     const atom = '00000000-0000-4000-8000-0000000000d1';
     final geometry = _operation(
       OperationKind.objectSet,
@@ -643,13 +643,55 @@ test('text geometry commutes with concurrent Quill edits both ways', () {
       remote: true,
       pageId: 'page-a',
       objectId: 'text-a',
-      payload: const {
-        'toPageId': 'page-b',
-        'sortIndex': 1,
-      },
+      payload: const {'toPageId': 'page-b', 'sortIndex': 1},
     );
     expect(_allowed(unsafe, insert), isFalse);
     expect(_allowed(oldText, insert), isFalse);
     expect(_allowed(moving, insert), isFalse);
+  });
+
+  test('text atoms never commute with ink-only transform or reorder', () {
+    const atom = '00000000-0000-4000-8000-0000000000d4';
+    final edit = _operation(
+      OperationKind.textInsert,
+      pageId: 'page-a',
+      objectId: 'text-a',
+      payload: const {
+        'afterAtomId': null,
+        'atoms': [
+          {'id': atom, 'text': 'Offline'},
+        ],
+      },
+    );
+    final transform = _operation(
+      OperationKind.objectTransform,
+      remote: true,
+      pageId: 'page-a',
+      objectId: 'text-a',
+      payload: const {
+        'properties': {'dx': 20.0},
+      },
+    );
+    final reorder = _operation(
+      OperationKind.objectReorder,
+      remote: true,
+      pageId: 'page-a',
+      objectId: 'text-a',
+      payload: const {
+        'properties': {'sortIndex': 1},
+      },
+    );
+    final set = _operation(
+      OperationKind.objectSet,
+      remote: true,
+      pageId: 'page-a',
+      objectId: 'text-a',
+      payload: const {
+        'properties': {'dx': 20.0},
+      },
+    );
+    expect(_allowed(transform, edit), isFalse);
+    expect(_allowed(reorder, edit), isFalse);
+    expect(_allowed(set, edit), isTrue);
   });
 }

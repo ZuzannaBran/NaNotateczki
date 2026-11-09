@@ -629,7 +629,9 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   geometrię bloku tekstu i kolizje assetId. Image object.create
   rezerwuje assetId, podobnie jak embed Quill także w tym samym bloku.
   Zmiany kontenera, kolizje pól i destrukcyjne usunięcia są blokowane.
-  Testy: `test/v2_outbox_conflict_policy_test.dart` (14 grup).
+  Dla bloków Quill tylko object.set jest dozwoloną operacją
+  geometrii; object.transform/reorder używają reduktorów ink/obrazu.
+  Testy: `test/v2_outbox_conflict_policy_test.dart` (16 grup).
 - `lib/data/sync/editor_v2_account_runtime.dart` tworzy izolowany
   `OperationStore`, `SyncEngine`, projektor i zweryfikowany asset gateway
   tylko dla konta z potwierdzonym protokołem v2. Zdalne operacje
@@ -748,6 +750,11 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   utracone ACK, echo, rebase, cursor gap, retry, kontrakt JSON.
 - `test/operation_store_test.dart`: dodatkowe regresje frontier i
   tombstones po przyjętej operacji zdalnej.
+- `.github/scripts/flutter_transient_network_retry.sh`:
+  maksymalnie trzy próby tylko dla błędów pobierania sqlite3
+  lub HTTP 502/503/504. Nie ignoruje błędów testów.
+  Regresje Bash: `test_flutter_transient_network_retry.sh`.
+  Macierz CI: bezpośredni Gradle 8.14, unsigned Xcode Release.
 - `docs/ETAP_5_SYNC_ENGINE.md`: granica migracji v1/v2 i
   nieuruchomione scenariusze E2E. Etap 6 dodaje konkretne reduktory
   edytora/Share, etap 11 przełącza istniejące dokumenty.

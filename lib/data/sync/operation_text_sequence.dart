@@ -200,8 +200,7 @@ class OperationTextSequence {
     final versions = atom['attributeVersions'];
     if (versions is! Map ||
         versions.entries.any(
-          (entry) =>
-              entry.key is! String || !_validAttributeRank(entry.value),
+          (entry) => entry.key is! String || !_validAttributeRank(entry.value),
         )) {
       throw const FormatException('Invalid attribute precedence.');
     }

@@ -1,5 +1,36 @@
 # Etap 5 — silnik synchronizacji operacji v2
 
+## CI infrastruktury i korekta reduktora (2026-11-09)
+
+Przebieg 42579587105 na 39069bb wykazał rozbieżności formattera
+w czterech plikach Dart (poprawione według dokładnego diffu CI).
+Backend 42579584141 zakończył się sukcesem.
+
+Dodatkowe niepowodzenia platform wynikały z HTTP 504 dla Gradle
+oraz nieprawidłowych sum SHA-256 przy pobieraniu natywnego SQLite.
+Testy nie mogą akceptować innej sumy ani pomijać kompilacji.
+W CI dodano do trzech prób wyłącznie przy tych błędach, z zachowaniem
+pierwotnego zakończenia niepowodzeniem dla zwykłych testów.
+Gradle 8.14 pobiera teraz dystrybucję z downloads.gradle.org
+bez pośredniego przekierowania do GitHub Releases.
+Weryfikację podpisanego iOS Release zastąpiono prawdziwym
+xcodebuild Release na fizyczny SDK z CODE_SIGNING_ALLOWED=NO;
+w CI nie ma profilu deweloperskiego. Nie potwierdza to eksportu IPA.
+
+W regule konfliktów wycofano dopuszczanie object.transform i
+object.reorder dla bloku tekstowego: obecny reducer SQLite obsługuje
+w tym przypadku geometrię przez object.set. Niepoprawny zdalny patch
+nie może wyprzedzać lokalnego outboxu. Test
+test/v2_outbox_conflict_policy_test.dart sprawdza obie odmowy,
+zachowując dozwoloną kombinację text.insert + object.set.
+
+Kontraktowy test Bash jest w
+.github/scripts/test_flutter_transient_network_retry.sh.
+Zweryfikowano go lokalnie przez mocki: hash → retry, HTTP 504 →
+retry, trwały błąd → odmowa, asercja testu → odmowa. Testy
+Flutter i Xcode nadal wymagają wyników nowego CI. Aplikacja
+pozostaje opt-in; pełnego rebase i cutover nie wdrożono.
+
 ## Rozszerzony rebase i integralność (2026-11-09)
 
 Wynik poprzedniego CI 42527261951: 16/17 zadań zielonych, w tym
@@ -8,13 +39,13 @@ format obu plików odtworzono z diffu CI przed dalszymi zmianami.
 
 V2OutboxConflictPolicy dopuszcza teraz niezależną geometrię i edycję
 atomów tego samego bloku tekstowego (insert/delete/format i
-object.set/transform/reorder dla bezpiecznych pól). Rezerwacja assetId
+object.set dla bezpiecznych pól). Rezerwacja assetId
 obejmuje także image object.create i dwa embedy w tym samym bloku,
 aby nie dopuścić do niejawnej kolizji podczas pracy offline.
 Wspólne pola, zmiany kontenera i destrukcyjne usunięcia nadal
 wymagają pełnego rebase.
 
-Testy regresyjne obejmują 14 grup reguł konfliktu, ponowne
+Testy regresyjne obejmują 16 grup reguł konfliktu, ponowne
 otwarcie plikowej SQLite z niepotwierdzoną kreską, trzy niezależne
 operacje w outboxie, konflikt metadanych i tekst Quill z jednoczesną
 zmianą geometrii. Kursor i outbox nie mogą zostać nadpisane.

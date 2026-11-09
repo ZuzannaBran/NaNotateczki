@@ -111,17 +111,14 @@ class V2OutboxConflictPolicy {
       OperationKind.textDelete,
       OperationKind.textFormat,
     };
-    const geometryKinds = {
-      OperationKind.objectSet,
-      OperationKind.objectTransform,
-      OperationKind.objectReorder,
-    };
     final textRemote = textKinds.contains(remote.kind);
     if (textRemote == textKinds.contains(local.kind)) {
       return false;
     }
     final geometry = textRemote ? local : remote;
-    if (!geometryKinds.contains(geometry.kind)) {
+    // The v2 SQLite text reducer supports geometry via object.set only.
+    // object.transform/reorder target ink and images, not text blocks.
+    if (geometry.kind != OperationKind.objectSet) {
       return false;
     }
     final properties = geometry.payload['properties'];
