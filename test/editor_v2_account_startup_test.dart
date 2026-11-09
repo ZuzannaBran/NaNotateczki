@@ -1267,7 +1267,7 @@ void main() {
     expect(again.pages.single.inkStrokes, hasLength(1));
   });
 
-  test('three offline edits preserve outbox across ranked title conflicts', () async {
+  test('offline LWW title preserves three queued edits', () async {
     final f = _Fixture(NativeDatabase.memory());
     addTearDown(f.close);
     expect(
