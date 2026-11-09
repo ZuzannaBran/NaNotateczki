@@ -412,7 +412,7 @@ void main() {
       );
     },
   );
-  test('offline independent merge keeps same-object conflicts', () async {
+  test('offline independent merge resolves scalar conflicts by rank', () async {
     final fixture = _Fixture(NativeDatabase.memory());
     addTearDown(fixture.close);
     expect(
@@ -589,18 +589,18 @@ void main() {
     await fixture.runtime.engine.syncNow();
     expect(
       await fixture.runtime.store.checkpoint('account:startup-account'),
-      6,
+      7,
     );
     expect(
       await fixture.runtime.store.operation(competing.operationId),
-      isNull,
+      isNotNull,
     );
     final afterConflict = (await fixture.repository.getNotebook(notebook.uid))!;
     expect(
       afterConflict.pages.single.inkStrokes
           .singleWhere((stroke) => stroke.id == remote.objectId)
           .width,
-      3.0,
+      4.0,
     );
     expect(
       (await fixture.runtime.store.pending(
@@ -1267,7 +1267,7 @@ void main() {
     expect(again.pages.single.inkStrokes, hasLength(1));
   });
 
-  test('three offline edits merge only independent metadata', () async {
+  test('three offline edits preserve outbox across ranked title conflicts', () async {
     final f = _Fixture(NativeDatabase.memory());
     addTearDown(f.close);
     expect(
@@ -1359,8 +1359,14 @@ void main() {
     );
     f.accepted.add(conflicting.toJson());
     await f.runtime.engine.syncNow();
-    expect(await f.runtime.store.checkpoint('account:startup-account'), 3);
-    expect((await f.repository.getNotebook(note.uid))!.title, 'Offline title');
+    expect(await f.runtime.store.checkpoint('account:startup-account'), 4);
+    expect((await f.repository.getNotebook(note.uid))!.title, 'Remote conflict');
+    expect(
+      (await f.runtime.store.pending(
+        includeDeferred: true,
+      )).map((operation) => operation.operationId),
+      [title.operationId, bookmark.operationId, ink.operationId],
+    );
   });
   test('offline Quill insert and remote text geometry merge', () async {
     final f = _Fixture(NativeDatabase.memory());

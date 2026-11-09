@@ -516,7 +516,7 @@ void main() {
     expect(_allowed(remote, local), isFalse);
   });
 
-  test('multiple local changes require every one to commute', () {
+  test('all local edits commute only when each target is safe', () {
     final remote = _operation(
       OperationKind.pageSet,
       remote: true,
@@ -553,15 +553,28 @@ void main() {
     );
     expect(
       V2OutboxConflictPolicy.canApply(remote, [independent, localTitle]),
-      isFalse,
+      isTrue,
     );
     expect(
       V2OutboxConflictPolicy.canApply(remote, [localTitle, independent]),
+      isTrue,
+    );
+    final pendingDelete = _operation(
+      OperationKind.pageDelete,
+      objectId: 'page-a',
+      payload: const {},
+    );
+    expect(
+      V2OutboxConflictPolicy.canApply(remote, [independent, pendingDelete]),
+      isFalse,
+    );
+    expect(
+      V2OutboxConflictPolicy.canApply(remote, [pendingDelete, independent]),
       isFalse,
     );
   });
 
-  test('page deletion blocks document metadata, page edits do not', () {
+  test('page deletion commutes with document metadata only', () {
     final document = _operation(
       OperationKind.documentSet,
       remote: true,
@@ -581,8 +594,9 @@ void main() {
         'properties': {'title': 'Local'},
       },
     );
-    expect(_allowed(document, deleted), isFalse);
+    expect(_allowed(document, deleted), isTrue);
     expect(_allowed(document, pageTitle), isTrue);
+    expect(_allowed(pageTitle, deleted), isFalse);
   });
 
   test('text geometry commutes with concurrent Quill edits both ways', () {
@@ -786,7 +800,7 @@ void main() {
     expect(_allowed(pageB, remoteWidth), isTrue);
   });
 
-  test('local document and page deletion block remote object mutations', () {
+  test('document deletion blocks; another page may be removed', () {
     final remote = _operation(
       OperationKind.objectSet,
       remote: true,
@@ -812,8 +826,15 @@ void main() {
       payload: const {},
     );
     expect(_allowed(remote, documentDelete), isFalse);
-    expect(_allowed(remote, pageDelete), isFalse);
+    expect(_allowed(remote, pageDelete), isTrue);
     expect(_allowed(remote, objectDelete), isTrue);
+    final samePageDelete = _operation(
+      OperationKind.pageDelete,
+      objectId: 'page-a',
+      payload: const {},
+    );
+    expect(_allowed(remote, samePageDelete), isFalse);
+    expect(_allowed(samePageDelete, remote), isFalse);
   });
 
   test('remote Quill inserts commute with pending page title', () {
