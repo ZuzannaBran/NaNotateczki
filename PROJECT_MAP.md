@@ -434,6 +434,10 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   dokładnie 36 znaków (także przy zależnościach, Undo i atomach tekstu),
   bez akceptowania końcowego znaku nowej linii. Bez mieszania stanu
   widoku z treścią. Test: `test/operation_protocol_test.dart`.
+- Protokół przyjmuje ponad 256 niezależnych UUID bez obcinania;
+  budżet 128 KiB (39 bajtów/UUID), Python i Dart muszą być zgodne.
+  Zbiorcze sprawdzanie rodziców: `server/api/app/routers/operations.py`;
+  regresja 300 rodziców: `server/api/tests/test_operation_stage4.py`.
 - `server/api/tests/test_dart_python_operation_contract.py`: uruchamiany w
   CI aplikacji test zgodności nazw, targetów i ograniczeń protokołu
   Flutter/Python, sprawdza rzeczywisty model Python bez atrap.
@@ -447,14 +451,14 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 
 - `lib/data/sync/operation_ordering.dart`: `OperationActorClock`
   (Lamport, zakres jednego dokumentu zachowany w checkpointcie, redukcja
-  tylko przyczynowo pokrytych frontierów, fail-closed ponad 256 niezależnych),
+  tylko przyczynowo pokrytych frontierów, 128 KiB pełnych zależności),
   `CausalOperationBuffer` (atomowe zatwierdzanie gotowych operacji,
   kwarantanna wadliwych zaległych pakietów, duplikaty i rozgałęzienia),
   `OperationCheckpoint` (pełna historia i odrzucone ID, bez kompaktowania)
   oraz `OperationPropertyRegister` (reguły pól i tombstones, osobne
   namespace folderów i zadań).
   `test/operation_ordering_test.dart`: kolejność, błędne zależności,
-  wycofanie po błędzie, restart, odrzucone ID, limit zależności.
+  wycofanie po błędzie, restart, odrzucone ID, 300 rodziców i limit bajtów.
   Nowy `OperationStore` zapisuje operacje w Drift od etapu 3;
   legacy klienci nadal używają snapshotów v1 do czasu migracji.
 
