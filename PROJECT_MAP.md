@@ -466,8 +466,10 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   projekcji, aktora i outboxu), ACK, tombstones oraz checkpointy i snapshoty.
   `acknowledgeBatch` potwierdza i usuwa całą paczkę w jednej
   transakcji, waliduje tylko lokalne ID, zakres 2^53-1, unikalność
-  i kolejność kursorów actorSeq. Regresje: `test/operation_store_test.dart`
-  obejmują rollback i restart plikowej SQLite.
+  i kolejność kursorów actorSeq. Sprawdza też wcześniejsze ACK
+  we WSZYSTKICH paczkach (globalny cursor i historyczny actorSeq),
+  także po restarcie SQLite. Regresje: `test/operation_store_test.dart`
+  obejmują rollback, ponowne użycie cursor i restart plikowej bazy.
   190: `writeLocalBatch(onCommittedInTransaction:)` zapisuje dodatkowe
   metadane wewnątrz transakcji po wszystkich intentach. Błąd callbacku
   cofa cały gest; pusty wsad dozwolony wyłącznie z callbackiem. Lista
@@ -644,7 +646,9 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   page.delete przechodzi przy niezależnych metadanych i edycjach
   na innej stronie, ale odmawia dla tej samej strony, move,
   nowych stron i media; nie stosuje snapshotów v1.
-  Testy: `test/v2_outbox_conflict_policy_test.dart` (32 grup).
+  Testy: `test/v2_outbox_conflict_policy_test.dart` (36 grup),
+  w tym niezależne object.move, source/destination page.delete
+  i zablokowane edycje tego samego UID.
 - `lib/data/sync/editor_v2_account_runtime.dart` tworzy izolowany
   `OperationStore`, `SyncEngine`, projektor i zweryfikowany asset gateway
   tylko dla konta z potwierdzonym protokołem v2. Zdalne operacje
@@ -665,7 +669,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   przed document.delete i niezależny Quill insert + format;
   Dodatkowe przypadki: konkurencyjne metadane strony i inserty Quill,
   restart plikowej SQLite, trzy intenty w outboxie oraz geometria
-  podczas edycji atomów tekstu; zdalna nowa strona obok offline
+  podczas edycji atomów tekstu; zdalny move obok offline bookmarka
+  i lokalny move obok zdalnego page.set; zdalna nowa strona obok offline
   metadanych i ink, restart bez podwójnych stron, kolizja UID;
   produkcyjne realtime pozostaje domyślnie włączone i jest testowane
   przez realny Linux E2E, który używa tego samego startu co AppScope.
@@ -800,7 +805,12 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `server/api/app/routers/operations.py`:
   `validate_batch_receipts` sprawdza kompletność ACK, unikalność
   cursor i monotoniczne actorSeq przed session.commit().
+  `list_operations` odrzuca cursor spoza zakresu 0..2^53-1
+  przed zapytaniem do PostgreSQL.
   Test: `server/api/tests/test_operation_stage4.py`, mirror backendu.
+- `server/api/tests/test_operation_projection.py`: niezależne
+  object.move z identycznym sortIndex mają trwały z-order
+  niezależnie od kolejności nadejścia; UID bez duplikatów.
 - `.github/scripts/flutter_transient_network_retry.sh`:
   maksymalnie trzy próby tylko dla błędów pobierania sqlite3
   lub HTTP 502/503/504. Nie ignoruje błędów testów.

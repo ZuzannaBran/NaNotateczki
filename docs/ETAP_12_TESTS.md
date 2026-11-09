@@ -1,5 +1,42 @@
 # Etap 12 — weryfikacja zapisu i synchronizacji
 
+## Historia ACK, przenoszenie i flake iPad (2026-11-09)
+
+Ostatni app CI 42602433069: 15/17 poprawnych.
+Błąd Dart: tylko format dwóch plików; zastosowano
+dokładny patch formattera. iPad E2E: po zakończonym
+buildzie Xcode proces nie wyświetlił wyników testu
+i przekroczył limit 20 minut. Nie uznano tego za
+udany przebieg; iPhone, Android E2E i Linux v2 E2E
+przeszły. Backend CI 42602398631 zielony.
+Kolejny push uruchomi nową pełną macierz.
+
+OperationStore testuje ponowne wykorzystanie
+server_sequence w późniejszej paczce przez inny
+operationId, zamianę kursora między aktorami oraz
+cofnięcie relacji actorSeq↔cursor. Test plikowego
+SQLite sprawdza trwałość blokady po restarcie
+i późniejsze poprawne ACK. Odrzucony ACK nie może
+opróżnić outboxu.
+
+Testy V2OutboxConflictPolicy sprawdzają pary
+przeniesień niezależnych UID, blokadę wspólnego
+UID i konflikt page.delete dla obu końców.
+REST/SQLite: remote ink move z offline bookmarkiem
+i pending ink move z niezależną zmianą nazwy strony;
+weryfikują stronę docelową, zapis kursora i outbox.
+Po stronie Python: równoległe obiekty o jednakowym
+sortIndex, różna kolejność dostarczenia, deterministyczne
+z-order oraz fail-closed feed cursor.
+
+Scenariusz ręczny: offline na urządzeniu A zmień
+bookmark strony i położenie kreski X; na urządzeniu B
+przenieś niezależną kreskę Y do drugiej strony.
+Po online i restarcie obie tożsamości oraz kolejność
+powinny zostać zachowane. Równoczesny move + edycja
+tej samej kreski ma zatrzymać odbiór do rozstrzygnięcia,
+nie zastępować lokalnej treści.
+
 ## Regresje transakcji ACK i granic feed (2026-11-09)
 
 CI 42595806151: 16/17 zielonych, formatter zgłosił

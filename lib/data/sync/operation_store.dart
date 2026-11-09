@@ -638,10 +638,8 @@ class OperationStore {
   }
 
   /// ACK and outbox deletion are atomic and idempotent.
-  Future<void> acknowledge(
-    String operationId, {
-    required int serverSequence,
-  }) => acknowledgeBatch({operationId: serverSequence});
+  Future<void> acknowledge(String operationId, {required int serverSequence}) =>
+      acknowledgeBatch({operationId: serverSequence});
 
   /// Accept a full server receipt batch or retain every pending intent.
   ///
@@ -672,9 +670,42 @@ class OperationStore {
         }
         final actor = local['actor_id'] as String;
         final actorSequence = local['actor_seq'] as int;
-        actorReceipts
-            .putIfAbsent(actor, () => <(int, int)>[])
-            .add((actorSequence, sequence));
+        actorReceipts.putIfAbsent(actor, () => <(int, int)>[]).add((
+          actorSequence,
+          sequence,
+        ));
+        // Earlier ACK batches must not reuse a global cursor or reverse the
+        // actor's causal order. Compare against durable receipts after restart.
+        final reused = await _row(
+          'SELECT operation_id FROM operation_ack '
+          'WHERE server_sequence = ? AND operation_id != ? LIMIT 1',
+          [sequence, id],
+        );
+        if (reused != null) {
+          throw StateError('Server cursor belongs to another operation.');
+        }
+        final older = await _row(
+          'SELECT MAX(a.server_sequence) AS cursor '
+          'FROM operation_ack a INNER JOIN operations o '
+          'ON o.operation_id = a.operation_id '
+          'WHERE o.actor_id = ? AND o.actor_seq < ?',
+          [actor, actorSequence],
+        );
+        final olderCursor = older?['cursor'] as int?;
+        if (olderCursor != null && olderCursor >= sequence) {
+          throw StateError('Non-monotonic historical actor ACK.');
+        }
+        final newer = await _row(
+          'SELECT MIN(a.server_sequence) AS cursor '
+          'FROM operation_ack a INNER JOIN operations o '
+          'ON o.operation_id = a.operation_id '
+          'WHERE o.actor_id = ? AND o.actor_seq > ?',
+          [actor, actorSequence],
+        );
+        final newerCursor = newer?['cursor'] as int?;
+        if (newerCursor != null && newerCursor <= sequence) {
+          throw StateError('Non-monotonic historical actor ACK.');
+        }
         final existing = await _row(
           'SELECT server_sequence FROM operation_ack WHERE operation_id = ?',
           [id],
@@ -692,11 +723,7 @@ class OperationStore {
           'INSERT INTO operation_ack '
           '(operation_id, server_sequence, acknowledged_at) '
           'VALUES (?, ?, ?)',
-          [
-            id,
-            sequence,
-            DateTime.now().toUtc().millisecondsSinceEpoch,
-          ],
+          [id, sequence, DateTime.now().toUtc().millisecondsSinceEpoch],
         );
         await database.customStatement(
           'DELETE FROM operation_outbox WHERE operation_id = ?',

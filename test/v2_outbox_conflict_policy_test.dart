@@ -1219,4 +1219,114 @@ void main() {
     expect(V2OutboxConflictPolicy.canApply(removed, [safe]), isTrue);
     expect(V2OutboxConflictPolicy.canApply(removed, [safe, unsafe]), isFalse);
   });
+
+  test('move of one ink object commutes with another ink edit', () {
+    final move = _operation(
+      OperationKind.objectMove,
+      remote: true,
+      pageId: 'first',
+      objectId: 'ink-moved',
+      payload: const {'toPageId': 'second', 'sortIndex': 3},
+    );
+    final style = _operation(
+      OperationKind.objectSet,
+      pageId: 'first',
+      objectId: 'ink-untouched',
+      payload: const {
+        'properties': {'colorValue': 0xFF224466},
+      },
+    );
+    final newStroke = _operation(
+      OperationKind.strokeCreate,
+      pageId: 'second',
+      objectId: 'ink-new',
+      payload: const {
+        'value': {'objectType': 'stroke'},
+      },
+    );
+    expect(_allowed(move, style), isTrue);
+    expect(_allowed(style, move), isTrue);
+    expect(_allowed(move, newStroke), isTrue);
+    expect(_allowed(newStroke, move), isTrue);
+    expect(V2OutboxConflictPolicy.canApply(move, [style, newStroke]), isTrue);
+  });
+
+  test('same-object move never outruns offline field edits', () {
+    final move = _operation(
+      OperationKind.objectMove,
+      remote: true,
+      pageId: 'first',
+      objectId: 'same-ink',
+      payload: const {'toPageId': 'second', 'sortIndex': 2},
+    );
+    final color = _operation(
+      OperationKind.objectSet,
+      pageId: 'first',
+      objectId: 'same-ink',
+      payload: const {
+        'properties': {'colorValue': 0xFF445566},
+      },
+    );
+    final pendingMove = _operation(
+      OperationKind.objectMove,
+      pageId: 'first',
+      objectId: 'same-ink',
+      payload: const {'toPageId': 'third', 'sortIndex': 1},
+    );
+    expect(_allowed(move, color), isFalse);
+    expect(_allowed(color, move), isFalse);
+    expect(_allowed(move, pendingMove), isFalse);
+    expect(_allowed(pendingMove, move), isFalse);
+  });
+
+  test('move cannot race with deleting its source or destination', () {
+    final move = _operation(
+      OperationKind.objectMove,
+      remote: true,
+      pageId: 'source',
+      objectId: 'moved-ink',
+      payload: const {'toPageId': 'target', 'sortIndex': 1},
+    );
+    final deleteSource = _operation(
+      OperationKind.pageDelete,
+      objectId: 'source',
+      payload: const {},
+    );
+    final deleteTarget = _operation(
+      OperationKind.pageDelete,
+      objectId: 'target',
+      payload: const {},
+    );
+    expect(_allowed(move, deleteSource), isFalse);
+    expect(_allowed(deleteSource, move), isFalse);
+    expect(_allowed(move, deleteTarget), isFalse);
+    expect(_allowed(deleteTarget, move), isFalse);
+  });
+
+  test('remote move and offline page bookmark remain independent', () {
+    final move = _operation(
+      OperationKind.objectMove,
+      remote: true,
+      pageId: 'source',
+      objectId: 'moved-ink',
+      payload: const {'toPageId': 'target', 'sortIndex': 1},
+    );
+    final metadata = _operation(
+      OperationKind.pageSet,
+      objectId: 'source',
+      payload: const {
+        'properties': {'isBookmarked': true},
+      },
+    );
+    final title = _operation(
+      OperationKind.documentSet,
+      payload: const {
+        'properties': {'title': 'Offline notebook'},
+      },
+    );
+    expect(_allowed(move, metadata), isTrue);
+    expect(_allowed(metadata, move), isTrue);
+    expect(_allowed(move, title), isTrue);
+    expect(_allowed(title, move), isTrue);
+  });
 }

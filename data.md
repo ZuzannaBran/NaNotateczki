@@ -1,5 +1,31 @@
 # Dane NaNotateczki
 
+## Historyczny ACK i niezależne object.move (2026-11-09)
+
+Trwały outbox v2 odrzuca nie tylko duplikaty kursora wewnątrz
+bieżącej paczki. Przy acknowledgeBatch SQLite sprawdza
+wcześniej zatwierdzone potwierdzenia: globalny server_sequence
+nie może należeć do innego operationId, a numer kursora
+musi być większy od wszystkich wcześniejszych actorSeq i
+mniejszy od wszystkich późniejszych actorSeq tego samego
+aktora. Dotyczy to również ponowienia po restarcie SQLite.
+Błąd dowolnego wpisu wycofuje całą nową paczkę.
+
+Równoległe object.move różnych UID mogą zachodzić obok
+metadanych stron i niezależnych edycji innych obiektów.
+Kolidujące ruchy i style tego samego UID, source/destination
+page.delete oraz konflikty zasobów pozostają zablokowane
+do pełnego rebase — nie przenosimy oryginalnych pending
+EditorAction na inną stronę bez ponownego sprawdzenia
+referencji. Testy API/SQLite potwierdzają zdalny ruch
+obok lokalnego bookmarka i ruch lokalny obok zdalnego tytułu.
+
+Backend odrzuca kursory REST feed spoza zakresu 0..2^53-1
+zanim czyta dziennik. Pozycja warstwy dwóch niezależnych
+object.move do tej samej strony pozostaje deterministyczna
+przez sortIndex i UID. Produkcyjny v1 i schemat Drift
+pozostają bez zmian.
+
 ## Atomowe ACK całej paczki i bezpieczny kursor v2 (2026-11-09)
 
 Dawny SyncEngine wykonywał ACK każdego operationId osobną

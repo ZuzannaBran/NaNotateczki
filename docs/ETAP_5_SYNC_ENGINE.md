@@ -1,5 +1,38 @@
 # Etap 5 — silnik synchronizacji operacji v2
 
+## Historia potwierdzeń i równoległe przenoszenie (2026-11-09)
+
+Ostatnia sprawdzona macierz aplikacji 42602433069:
+15/17 zadań zaliczonych, Dart odrzucony wyłącznie za
+formatowanie dwóch plików; iPad E2E przekroczył limit
+20 minut po zakończeniu builda Xcode bez błędu aplikacji
+w udostępnionym logu. Backend 42602398631 był zielony.
+Dart format zastosowano według dokładnego diffu.
+
+ACK waliduje teraz trwałą historię SQLite między
+paczkami, także po restarcie i dla innych aktorów.
+Taki sam cursor nie może potwierdzić różnych operacji
+w kolejnych paczkach. Causal actorSeq zachowuje rosnące
+server_sequence względem wszystkich już zapisanych
+potwierdzeń — również gdy spóźniony ACK dotyczy
+wcześniejszego actorSeq. Błąd nie opróżnia outboxu.
+
+Rozszerzono testy bezpiecznego rebase przenoszeń:
+remote object.move na innym UID obok lokalnej
+edycji ink lub page.set, remote page.set obok
+lokalnego object.move, konflikt tej samej tożsamości,
+konkurencyjne kasowanie strony źródłowej i docelowej.
+Scenariusze REST/SQLite sprawdzają brak utraty kreski,
+bookmarka, tytułu i lokalnego outboxu. Nie zmieniono
+semantyki move tego samego UID z równoległymi edycjami:
+te przypadki nadal wymagają full rebase.
+
+Backend ogranicza wejściowy cursor feed do
+[0, MAX_SAFE_INTEGER], a testy projekcji potwierdzają
+konwergencję dwóch niezależnych move na tę samą
+pozycję warstwy. Pozostaje produkcyjne przejście
+v1→v2 w etapie 11 i rebase tego samego obiektu.
+
 ## Atomowa odpowiedź ACK i kontrola aktora (2026-11-09)
 
 W przebiegu 42595806151 aplikacji przeszło 16/17 zadań;

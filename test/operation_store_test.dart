@@ -369,16 +369,13 @@ void main() {
     final first = await add('batch-ack-first');
     final second = await add('batch-ack-second');
     await expectLater(
-      store.acknowledgeBatch({
-        first.operationId: 51,
-        const Uuid().v4(): 52,
-      }),
+      store.acknowledgeBatch({first.operationId: 51, const Uuid().v4(): 52}),
       throwsStateError,
     );
-    expect(
-      (await store.pending()).map((op) => op.operationId),
-      [first.operationId, second.operationId],
-    );
+    expect((await store.pending()).map((op) => op.operationId), [
+      first.operationId,
+      second.operationId,
+    ]);
     expect(
       (await database.customSelect('SELECT * FROM operation_ack').get()),
       isEmpty,
@@ -404,10 +401,7 @@ void main() {
     final third = await add('batch-pending-third');
     await store.acknowledge(first.operationId, serverSequence: 61);
     await expectLater(
-      store.acknowledgeBatch({
-        second.operationId: 62,
-        first.operationId: 999,
-      }),
+      store.acknowledgeBatch({second.operationId: 62, first.operationId: 999}),
       throwsStateError,
     );
     expect(await store.isPending(second.operationId), isTrue);
@@ -428,10 +422,7 @@ void main() {
     final first = await add('duplicate-first');
     final second = await add('duplicate-second');
     await expectLater(
-      store.acknowledgeBatch({
-        first.operationId: 71,
-        second.operationId: 71,
-      }),
+      store.acknowledgeBatch({first.operationId: 71, second.operationId: 71}),
       throwsArgumentError,
     );
     expect(await store.pending(), hasLength(2));
@@ -445,10 +436,7 @@ void main() {
     final first = await add('actor-sequence-first');
     final second = await add('actor-sequence-second');
     await expectLater(
-      store.acknowledgeBatch({
-        first.operationId: 95,
-        second.operationId: 94,
-      }),
+      store.acknowledgeBatch({first.operationId: 95, second.operationId: 94}),
       throwsStateError,
     );
     expect(await store.pending(), hasLength(2));
@@ -505,17 +493,10 @@ void main() {
       dependencies: const [],
       logicalClock: 1,
     );
-    await store.applyRemote(
-      remote,
-      serverSequence: 1,
-      apply: () async {},
-    );
+    await store.applyRemote(remote, serverSequence: 1, apply: () async {});
     final local = await add('real-local');
     await expectLater(
-      store.acknowledgeBatch({
-        local.operationId: 81,
-        remote.operationId: 82,
-      }),
+      store.acknowledgeBatch({local.operationId: 81, remote.operationId: 82}),
       throwsStateError,
     );
     expect(await store.isPending(local.operationId), isTrue);
@@ -565,10 +546,7 @@ void main() {
         "BEGIN SELECT RAISE(ABORT, 'injected rollback'); END",
       );
       await expectLater(
-        journal.acknowledgeBatch({
-          firstId: 101,
-          secondId: 102,
-        }),
+        journal.acknowledgeBatch({firstId: 101, secondId: 102}),
         throwsException,
       );
     } finally {
@@ -577,10 +555,10 @@ void main() {
     final restarted = NotesDatabase(NativeDatabase(file));
     try {
       final journal = OperationStore(restarted);
-      expect(
-        (await journal.pending()).map((op) => op.operationId),
-        [firstId, secondId],
-      );
+      expect((await journal.pending()).map((op) => op.operationId), [
+        firstId,
+        secondId,
+      ]);
       expect(
         (await restarted.customSelect('SELECT * FROM operation_ack').get()),
         isEmpty,
@@ -594,6 +572,119 @@ void main() {
       );
     } finally {
       await restarted.close();
+    }
+  });
+
+  test('old server cursor cannot ACK a different local operation', () async {
+    final first = await add('cursor-bound-first');
+    final second = await add('cursor-bound-second');
+    await store.acknowledge(first.operationId, serverSequence: 301);
+    await expectLater(
+      store.acknowledge(second.operationId, serverSequence: 301),
+      throwsStateError,
+    );
+    expect(await store.isPending(second.operationId), isTrue);
+    expect(
+      (await database.customSelect('SELECT * FROM operation_ack').get()),
+      hasLength(1),
+    );
+    await store.acknowledge(second.operationId, serverSequence: 302);
+    expect(await store.pending(), isEmpty);
+  });
+
+  test('old ACK cannot reverse actor order across separate batches', () async {
+    final first = await add('historical-order-first');
+    final second = await add('historical-order-second');
+    await store.acknowledge(first.operationId, serverSequence: 500);
+    await expectLater(
+      store.acknowledge(second.operationId, serverSequence: 499),
+      throwsStateError,
+    );
+    expect(await store.isPending(second.operationId), isTrue);
+    await store.acknowledge(second.operationId, serverSequence: 501);
+    expect(await store.pending(), isEmpty);
+  });
+
+  test('late ACK for earlier actor sequence cannot overtake later', () async {
+    final first = await add('late-ack-first');
+    final second = await add('late-ack-second');
+    await store.acknowledge(second.operationId, serverSequence: 601);
+    await expectLater(
+      store.acknowledge(first.operationId, serverSequence: 602),
+      throwsStateError,
+    );
+    expect(await store.isPending(first.operationId), isTrue);
+    await store.acknowledge(first.operationId, serverSequence: 600);
+    expect(await store.pending(), isEmpty);
+  });
+
+  test('previously used cursor is rejected across distinct actors', () async {
+    final first = await add('cross-actor-first');
+    final second = await add('cross-actor-second', actorId: 'other-device');
+    await store.acknowledge(first.operationId, serverSequence: 701);
+    await expectLater(
+      store.acknowledge(second.operationId, serverSequence: 701),
+      throwsStateError,
+    );
+    expect(await store.isPending(second.operationId), isTrue);
+    await store.acknowledge(second.operationId, serverSequence: 702);
+    expect(await store.pending(), isEmpty);
+  });
+
+  test('cursor binding survives SQLite restart across ACK batches', () async {
+    final directory = await Directory.systemTemp.createTemp('ack-binding-');
+    addTearDown(() => directory.delete(recursive: true));
+    final file = File('${directory.path}/notes.sqlite');
+    late String firstId;
+    late String secondId;
+    final firstDatabase = NotesDatabase(NativeDatabase(file));
+    try {
+      final journal = OperationStore(firstDatabase);
+      final first = await journal.writeLocal(
+        actorId: 'cursor-restart-actor',
+        documentId: 'cursor-restart-note',
+        pageId: 'page',
+        objectId: 'one',
+        kind: OperationKind.objectCreate,
+        payload: const {
+          'value': {'name': 'one'},
+        },
+        apply: (_) async {},
+      );
+      final second = await journal.writeLocal(
+        actorId: 'cursor-restart-actor',
+        documentId: 'cursor-restart-note',
+        pageId: 'page',
+        objectId: 'two',
+        kind: OperationKind.objectCreate,
+        payload: const {
+          'value': {'name': 'two'},
+        },
+        apply: (_) async {},
+      );
+      firstId = first.operationId;
+      secondId = second.operationId;
+      await journal.acknowledge(firstId, serverSequence: 801);
+    } finally {
+      await firstDatabase.close();
+    }
+    final recovered = NotesDatabase(NativeDatabase(file));
+    try {
+      final journal = OperationStore(recovered);
+      expect(await journal.isPending(secondId), isTrue);
+      await expectLater(
+        journal.acknowledge(secondId, serverSequence: 801),
+        throwsStateError,
+      );
+      await expectLater(
+        journal.acknowledge(secondId, serverSequence: 799),
+        throwsStateError,
+      );
+      expect(await journal.isPending(secondId), isTrue);
+      await journal.acknowledge(secondId, serverSequence: 802);
+      expect(await journal.pending(), isEmpty);
+    } finally {
+      await recovered.close();
     }
   });
 
