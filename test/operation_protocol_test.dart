@@ -94,10 +94,7 @@ void main() {
         '${i.toRadixString(16).padLeft(8, '0')}'
             '-1111-4111-8111-111111111111',
     ];
-    expect(
-      () => operation(dependencies: dependencies),
-      throwsFormatException,
-    );
+    expect(() => operation(dependencies: dependencies), throwsFormatException);
   });
 
   test('rejects viewport data in document identity fields', () {

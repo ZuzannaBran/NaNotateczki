@@ -52,7 +52,7 @@ def test_flutter_and_server_agree_on_wire_version_and_limits():
     assert f"libraryDocumentId = '{LIBRARY_DOCUMENT_ID}'" in source
     assert "dependencies.length * 39 > maxDependencyBytes" in source
     assert re.search(
-        rf"maxDependencyBytes\\s*=\\s*{MAX_DEPENDENCY_BYTES // 1024}\\s*\\*\\s*1024;",
+        rf"maxDependencyBytes\s*=\s*{MAX_DEPENDENCY_BYTES // 1024}\s*\*\s*1024;",
         source,
     )
 
