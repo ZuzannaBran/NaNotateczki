@@ -70,6 +70,16 @@ if bash .github/scripts/flutter_transient_network_retry.sh; then
   echo 'The retry wrapper must reject an empty command.' >&2
   exit 1
 fi
+# sqlite3 3.x would otherwise download a second untrusted binary from
+# GitHub releases. The 0.5.x Flutter plugin already bundles a native library.
+grep -Fxq 'hooks:' pubspec.yaml
+grep -Fxq '  user_defines:' pubspec.yaml
+grep -Fxq '    sqlite3:' pubspec.yaml
+grep -Fxq '      source: system' pubspec.yaml
+grep -Eq '^  sqlite3_flutter_libs: \^0\.5\.' pubspec.yaml
+grep -Eq '^  sqlite3: \^3\.' pubspec.yaml
+grep -Fq 'test/sqlite_system_library_test.dart' \
+  .github/workflows/cross_platform_tests.yml
 # Keep CI off the GitHub Release redirect that returned HTTP 504.
 grep -Fq 'distributionUrl=https\://downloads.gradle.org/distributions/gradle-8.14-all.zip' \
   android/gradle/wrapper/gradle-wrapper.properties

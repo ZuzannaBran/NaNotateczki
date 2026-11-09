@@ -631,7 +631,10 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   Zmiany kontenera, kolizje pól i destrukcyjne usunięcia są blokowane.
   Dla bloków Quill tylko object.set jest dozwoloną operacją
   geometrii; object.transform/reorder używają reduktorów ink/obrazu.
-  Testy: `test/v2_outbox_conflict_policy_test.dart` (16 grup).
+  Dodatkowo: zdalne obiekty przy lokalnym document.set/page.set
+  oraz wspólne, identyczne receipty asset.attach między właścicielami.
+  Zmiany nie przepuszczają delete ani niezgodnych assetów.
+  Testy: `test/v2_outbox_conflict_policy_test.dart` (22 grup).
 - `lib/data/sync/editor_v2_account_runtime.dart` tworzy izolowany
   `OperationStore`, `SyncEngine`, projektor i zweryfikowany asset gateway
   tylko dla konta z potwierdzonym protokołem v2. Zdalne operacje
@@ -750,6 +753,17 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   utracone ACK, echo, rebase, cursor gap, retry, kontrakt JSON.
 - `test/operation_store_test.dart`: dodatkowe regresje frontier i
   tombstones po przyjętej operacji zdalnej.
+- `pubspec.yaml`: hook sqlite3 `source: system` używa istniejących
+  bibliotek sqlite3_flutter_libs 0.5.x na mobile/desktop,
+  unikając pobierania drugiej kopii z GitHub Releases.
+  Regresja: `test/sqlite_system_library_test.dart` (FTS5,
+  JSON, transakcja i plikowy WAL po restarcie). Macierz desktop
+  weryfikuje natywny ABI na Linux/macOS/Windows.
+- `server/api/app/operation_projection.py`: lustrzany backend
+  zapisuje assetVersions/assetReceipts dopiero po walidacji,
+  by odrzucony konflikt nie zmieniał stanu w pamięci.
+  `server/api/tests/test_stage2_assets.py`: równi właściciele,
+  odmowa różnych bytes/MIME i starszy snapshot bez receiptu.
 - `.github/scripts/flutter_transient_network_retry.sh`:
   maksymalnie trzy próby tylko dla błędów pobierania sqlite3
   lub HTTP 502/503/504. Nie ignoruje błędów testów.

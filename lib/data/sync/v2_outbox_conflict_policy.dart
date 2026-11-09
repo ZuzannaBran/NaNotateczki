@@ -23,16 +23,22 @@ class V2OutboxConflictPolicy {
           remote.kind == OperationKind.pageSet) {
         return _independentMetadata(remote, local);
       }
+      if (local.kind == OperationKind.documentSet ||
+          local.kind == OperationKind.pageSet) {
+        // The same metadata/object pair must commute in both directions.
+        return _independentMetadata(local, remote);
+      }
       if (remote.kind.target != OperationTarget.object ||
           local.kind.target != OperationTarget.object) {
         return false;
       }
       final remoteAssets = _assetIds(remote);
       final localAssets = _assetIds(local);
-      if (remoteAssets == null ||
-          localAssets == null ||
-          remoteAssets.intersection(localAssets).isNotEmpty) {
+      if (remoteAssets == null || localAssets == null) {
         return false;
+      }
+      if (remoteAssets.intersection(localAssets).isNotEmpty) {
+        return _identicalAssetReceiptForIndependentOwners(remote, local);
       }
       if (remote.objectId == local.objectId) {
         return _independentProperties(remote, local) ||
@@ -41,6 +47,29 @@ class V2OutboxConflictPolicy {
       }
       return true;
     });
+  }
+
+  /// Reusing a verified immutable asset across two owners is safe.
+  ///
+  /// A create, embed or replacement carries no complete receipt and still
+  /// blocks on a matching ID. Different bytes can never share one asset ID.
+  static bool _identicalAssetReceiptForIndependentOwners(
+    OperationEnvelope remote,
+    OperationEnvelope local,
+  ) {
+    if (remote.kind != OperationKind.assetAttach ||
+        local.kind != OperationKind.assetAttach ||
+        remote.objectId == local.objectId) {
+      return false;
+    }
+    const fields = {'assetId', 'sha256', 'sizeBytes', 'mediaType'};
+    return remote.payload.keys.toSet().containsAll(fields) &&
+        local.payload.keys.toSet().containsAll(fields) &&
+        remote.payload.length == fields.length &&
+        local.payload.length == fields.length &&
+        fields.every(
+          (field) => remote.payload[field] == local.payload[field],
+        );
   }
 
   static bool _independentMetadata(

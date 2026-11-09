@@ -1,5 +1,23 @@
 # Dane NaNotateczki
 
+## SQLite system ABI i bezpieczny równoległy odbiór (2026-11-09)
+
+Budowanie aplikacji używa obecnie natywnych bibliotek SQLite
+dostarczonych przez sqlite3_flutter_libs 0.5.x lub OS, zamiast
+drugiego pobierania binariów z GitHub Releases. Konfiguracja
+`sqlite3: ^3.3.3` i schemat Drift pozostają bez zmian.
+Regresja otwiera, zamyka i ponownie otwiera plik w trybie WAL,
+sprawdza JSON, FTS5, transakcje i nienadpisywanie operacji po ID.
+Ścieżki iOS/Android wymagają potwierdzenia w macierzy CI.
+
+Outbox konta v2 może współistnieć z niezależną operacją zdalną
+przy lokalnym document.set/page.set. Nie dotyczy to delete ani
+niepotwierdzonych kotwic CRDT. Dwa obiekty mogą współdzielić
+ten sam assetId tylko przy dwóch zgodnych, pełnych receiptach.
+Backend nie tworzy pustej księgi receiptów ani pola wersji
+na odrzuconym konflikcie. Nie zmieniono danych produkcyjnych
+ani granicy migracji ze starego v1.
+
 ## Granice reduktora tekstu i sprawdzania CI (2026-11-09)
 
 Zdalne zmiany geometrii bloku tekstowego wolno scalać z atomami

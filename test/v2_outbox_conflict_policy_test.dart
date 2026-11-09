@@ -694,4 +694,209 @@ void main() {
     expect(_allowed(reorder, edit), isFalse);
     expect(_allowed(set, edit), isTrue);
   });
+
+  test('remote objects commute with pending document and page metadata', () {
+    final remoteStroke = _operation(
+      OperationKind.strokeCreate,
+      remote: true,
+      pageId: 'page-a',
+      objectId: 'peer-stroke',
+      payload: const {
+        'value': {'objectType': 'stroke'},
+      },
+    );
+    final localTitle = _operation(
+      OperationKind.documentSet,
+      payload: const {
+        'properties': {'title': 'Offline notebook'},
+      },
+    );
+    final localBookmark = _operation(
+      OperationKind.pageSet,
+      objectId: 'page-a',
+      payload: const {
+        'properties': {'isBookmarked': true},
+      },
+    );
+    expect(_allowed(remoteStroke, localTitle), isTrue);
+    expect(_allowed(remoteStroke, localBookmark), isTrue);
+    expect(
+      V2OutboxConflictPolicy.canApply(
+        remoteStroke,
+        [localTitle, localBookmark],
+      ),
+      isTrue,
+    );
+  });
+
+  test('object changes commute with metadata on unrelated pages', () {
+    final remoteWidth = _operation(
+      OperationKind.objectSet,
+      remote: true,
+      pageId: 'page-a',
+      objectId: 'ink-a',
+      payload: const {
+        'properties': {'width': 5.0},
+      },
+    );
+    final pageA = _operation(
+      OperationKind.pageSet,
+      objectId: 'page-a',
+      payload: const {
+        'properties': {'title': 'Page A'},
+      },
+    );
+    final pageB = _operation(
+      OperationKind.pageSet,
+      objectId: 'page-b',
+      payload: const {
+        'properties': {'title': 'Page B'},
+      },
+    );
+    expect(_allowed(remoteWidth, pageA), isTrue);
+    expect(_allowed(remoteWidth, pageB), isTrue);
+    expect(_allowed(pageA, remoteWidth), isTrue);
+    expect(_allowed(pageB, remoteWidth), isTrue);
+  });
+
+  test('local document and page deletion block remote object mutations', () {
+    final remote = _operation(
+      OperationKind.objectSet,
+      remote: true,
+      pageId: 'page-a',
+      objectId: 'ink-a',
+      payload: const {
+        'properties': {'width': 5.0},
+      },
+    );
+    final documentDelete = _operation(
+      OperationKind.documentDelete,
+      payload: const {},
+    );
+    final pageDelete = _operation(
+      OperationKind.pageDelete,
+      objectId: 'page-b',
+      payload: const {},
+    );
+    final objectDelete = _operation(
+      OperationKind.objectDelete,
+      pageId: 'page-b',
+      objectId: 'ink-b',
+      payload: const {},
+    );
+    expect(_allowed(remote, documentDelete), isFalse);
+    expect(_allowed(remote, pageDelete), isFalse);
+    expect(_allowed(remote, objectDelete), isTrue);
+  });
+
+  test('remote Quill inserts commute with pending page title', () {
+    const atomId = '00000000-0000-4000-8000-0000000000e1';
+    final remoteText = _operation(
+      OperationKind.textInsert,
+      remote: true,
+      pageId: 'page-a',
+      objectId: 'text-a',
+      payload: const {
+        'afterAtomId': null,
+        'atoms': [
+          {'id': atomId, 'text': 'Remote'},
+        ],
+      },
+    );
+    final title = _operation(
+      OperationKind.pageSet,
+      objectId: 'page-a',
+      payload: const {
+        'properties': {'title': 'Offline'},
+      },
+    );
+    expect(_allowed(remoteText, title), isTrue);
+    expect(_allowed(title, remoteText), isTrue);
+  });
+
+  test('identical asset receipts can serve independent remote owners', () {
+    final remote = _operation(
+      OperationKind.assetAttach,
+      remote: true,
+      pageId: 'page-a',
+      objectId: 'image-a',
+      payload: {
+        'assetId': 'shared-asset',
+        'sha256': ''.padLeft(64, 'a'),
+        'sizeBytes': 12,
+        'mediaType': 'image/png',
+      },
+    );
+    final anotherOwner = _operation(
+      OperationKind.assetAttach,
+      pageId: 'page-b',
+      objectId: 'image-b',
+      payload: {
+        'assetId': 'shared-asset',
+        'sha256': ''.padLeft(64, 'a'),
+        'sizeBytes': 12,
+        'mediaType': 'image/png',
+      },
+    );
+    expect(_allowed(remote, anotherOwner), isTrue);
+    expect(_allowed(anotherOwner, remote), isTrue);
+  });
+
+  test('asset alias reuse rejects different bytes, mime and same owner', () {
+    final remote = _operation(
+      OperationKind.assetAttach,
+      remote: true,
+      pageId: 'page-a',
+      objectId: 'image-a',
+      payload: {
+        'assetId': 'shared-asset',
+        'sha256': ''.padLeft(64, 'a'),
+        'sizeBytes': 12,
+        'mediaType': 'image/png',
+      },
+    );
+    OperationEnvelope local(Map<String, dynamic> payload, String owner) =>
+        _operation(
+          OperationKind.assetAttach,
+          pageId: 'page-b',
+          objectId: owner,
+          payload: payload,
+        );
+    expect(
+      _allowed(
+        remote,
+        local({
+          'assetId': 'shared-asset',
+          'sha256': ''.padLeft(64, 'b'),
+          'sizeBytes': 12,
+          'mediaType': 'image/png',
+        }, 'image-b'),
+      ),
+      isFalse,
+    );
+    expect(
+      _allowed(
+        remote,
+        local({
+          'assetId': 'shared-asset',
+          'sha256': ''.padLeft(64, 'a'),
+          'sizeBytes': 12,
+          'mediaType': 'application/pdf',
+        }, 'image-b'),
+      ),
+      isFalse,
+    );
+    expect(
+      _allowed(
+        remote,
+        local({
+          'assetId': 'shared-asset',
+          'sha256': ''.padLeft(64, 'a'),
+          'sizeBytes': 12,
+          'mediaType': 'image/png',
+        }, 'image-a'),
+      ),
+      isFalse,
+    );
+  });
 }

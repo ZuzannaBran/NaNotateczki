@@ -1377,4 +1377,163 @@ void main() {
       [local.operationId],
     );
   });
+
+  test('remote stroke updates replay past offline page bookmark', () async {
+    final f = _Fixture(NativeDatabase.memory());
+    addTearDown(f.close);
+    expect(
+      await f.runtime.startForCurrentAccount(isCurrent: () => true),
+      isTrue,
+    );
+    final note = await f.repository.createNotebook();
+    await f.runtime.engine.syncNow();
+    final pageId = note.pages.single.id;
+    final local = await f.runtime.store.writeLocal(
+      actorId: f.runtime.engine.actorIdForDocument(note.uid),
+      documentId: note.uid,
+      objectId: pageId,
+      kind: OperationKind.pageSet,
+      payload: const {
+        'properties': {'isBookmarked': true},
+      },
+      apply: f.runtime.projector.apply,
+    );
+    f.rejectPosts = true;
+    final create = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-000000009a01',
+      actorId: 'stroke-peer',
+      actorSeq: 1,
+      logicalClock: local.logicalClock + 1,
+      dependencies: [f.accepted.last['operationId'] as String],
+      documentId: note.uid,
+      pageId: pageId,
+      objectId: 'peer-offline-stroke',
+      kind: OperationKind.strokeCreate,
+      payload: const {
+        'value': {
+          'objectType': 'stroke',
+          'colorValue': 0xFF123456,
+          'width': 2.0,
+          'toolIndex': 0,
+          'sortIndex': 0,
+          'points': [
+            [1.0, 2.0, 0.5],
+          ],
+        },
+      },
+    );
+    f.accepted.add(create.toJson());
+    await f.runtime.engine.syncNow();
+    var saved = (await f.repository.getNotebook(note.uid))!;
+    expect(saved.pages.single.isBookmarked, isTrue);
+    expect(saved.pages.single.inkStrokes.single.id, 'peer-offline-stroke');
+    expect(await f.runtime.store.checkpoint('account:startup-account'), 3);
+    final update = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-000000009a02',
+      actorId: 'stroke-peer',
+      actorSeq: 2,
+      logicalClock: create.logicalClock + 1,
+      dependencies: [create.operationId],
+      documentId: note.uid,
+      pageId: pageId,
+      objectId: create.objectId,
+      kind: OperationKind.objectSet,
+      payload: const {
+        'properties': {'width': 4.0},
+      },
+    );
+    f.accepted.add(update.toJson());
+    await f.runtime.engine.syncNow();
+    saved = (await f.repository.getNotebook(note.uid))!;
+    expect(saved.pages.single.isBookmarked, isTrue);
+    expect(saved.pages.single.inkStrokes.single.width, 4.0);
+    expect(await f.runtime.store.checkpoint('account:startup-account'), 4);
+    expect(
+      (await f.runtime.store.pending(
+        includeDeferred: true,
+      )).map((operation) => operation.operationId),
+      [local.operationId],
+    );
+  });
+
+  test('remote stroke merges with two offline metadata edits', () async {
+    final f = _Fixture(NativeDatabase.memory());
+    addTearDown(f.close);
+    expect(
+      await f.runtime.startForCurrentAccount(isCurrent: () => true),
+      isTrue,
+    );
+    final note = await f.repository.createNotebook();
+    await f.runtime.engine.syncNow();
+    final pageId = note.pages.single.id;
+    final actor = f.runtime.engine.actorIdForDocument(note.uid);
+    await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: note.uid,
+      pageId: pageId,
+      objectId: 'shared-stroke',
+      kind: OperationKind.strokeCreate,
+      payload: const {
+        'value': {
+          'objectType': 'stroke',
+          'colorValue': 0xFF123456,
+          'width': 2.0,
+          'toolIndex': 0,
+          'sortIndex': 0,
+          'points': [
+            [1.0, 2.0, 0.5],
+          ],
+        },
+      },
+      apply: f.runtime.projector.apply,
+    );
+    await f.runtime.engine.syncNow();
+    final localTitle = await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: note.uid,
+      kind: OperationKind.documentSet,
+      payload: const {
+        'properties': {'title': 'Offline title'},
+      },
+      apply: f.runtime.projector.apply,
+    );
+    final localBookmark = await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: note.uid,
+      objectId: pageId,
+      kind: OperationKind.pageSet,
+      payload: const {
+        'properties': {'isBookmarked': true},
+      },
+      apply: f.runtime.projector.apply,
+    );
+    f.rejectPosts = true;
+    final remote = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-000000009a03',
+      actorId: 'geometry-peer',
+      actorSeq: 1,
+      logicalClock: localBookmark.logicalClock + 1,
+      dependencies: [f.accepted.last['operationId'] as String],
+      documentId: note.uid,
+      pageId: pageId,
+      objectId: 'shared-stroke',
+      kind: OperationKind.objectSet,
+      payload: const {
+        'properties': {'width': 5.0},
+      },
+    );
+    f.accepted.add(remote.toJson());
+    await f.runtime.engine.syncNow();
+    final saved = (await f.repository.getNotebook(note.uid))!;
+    expect(saved.title, 'Offline title');
+    expect(saved.pages.single.isBookmarked, isTrue);
+    expect(saved.pages.single.inkStrokes.single.width, 5.0);
+    expect(await f.runtime.store.checkpoint('account:startup-account'), 4);
+    expect(
+      (await f.runtime.store.pending(
+        includeDeferred: true,
+      )).map((operation) => operation.operationId),
+      [localTitle.operationId, localBookmark.operationId],
+    );
+  });
 }

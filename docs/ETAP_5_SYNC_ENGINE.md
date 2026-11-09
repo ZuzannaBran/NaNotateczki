@@ -1,5 +1,38 @@
 # Etap 5 — silnik synchronizacji operacji v2
 
+## Natywna biblioteka i kolejne bezpieczne scalanie (2026-11-09)
+
+Najnowszy przebieg 42582273859: analiza i formatowanie Dart są
+zielone, Linux z realnym backendem v2 i backend API także; większość
+czerwonych platform otrzymywała niepoprawną odpowiedź zamiast natywnego
+artefaktu sqlite3. Suma otrzymanej treści była identyczna na różnych
+architekturach, a oczekiwane SHA-256 różne. Ponawianie trzy razy
+nie rozwiązywało problemu. Nie zmieniamy sum kontrolnych.
+
+W pubspec.yaml ustawiono hook sqlite3 3.x na `source: system`,
+korzystający z bibliotek już dostarczanych przez wtyczkę
+sqlite3_flutter_libs 0.5.x lub system operacyjny. Nie zmieniano
+schematu Drift, danych ani wersji protokołu. CI sprawdza natywną
+bibliotekę, transakcje, JSON, FTS5, zapis WAL i ponowne otwarcie
+pliku. Na mobilnych OS integracje nadal potrzebują potwierdzenia
+na nowym buildzie. Czysty test Bash kontroluje konfigurację hooków.
+
+V2OutboxConflictPolicy dopuszcza teraz operacje obiektów podczas
+lokalnego document.set/page.set, symetrycznie do istniejącej reguły
+zdalnych metadanych. Każdy lokalny intent pozostaje w outboxie,
+bez zmiany actorSeq i kolejności ACK. Destrukcyjne usunięcia
+i wspólne pola nadal blokują niebezpieczne scalanie.
+
+Jedno assetId można wykorzystać dla dwóch różnych właścicieli
+tylko gdy oba asset.attach niosą identyczny, pełny i zweryfikowany
+receipt: SHA-256, MIME, długość i identyfikator. Wspólne ID przy
+różnych bajtach, obrazach bez receipt albo embedach pozostaje
+blokowane. Regresje Dart obejmują 22 przypadki polityki oraz
+dwa nowe scenariusze REST/SQLite z niezależnym outboxem.
+
+Etap 5 i migracja v1 → v2 nadal nie są zamknięte. Zmiany muszą
+przejść pełną macierz CI; produkcyjne przełączenie pozostaje opt-in.
+
 ## CI infrastruktury i korekta reduktora (2026-11-09)
 
 Przebieg 42579587105 na 39069bb wykazał rozbieżności formattera

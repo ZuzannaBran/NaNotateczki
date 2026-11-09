@@ -77,6 +77,16 @@ dev_dependencies:
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
+
+# Native sqlite3 is already bundled by sqlite3_flutter_libs on mobile and
+# desktop. Resolve the existing library instead of downloading another binary
+# from GitHub releases (whose blocked asset response fails SHA-256 verification).
+# Keep sqlite3_flutter_libs at 0.5.x until native packaging is migrated.
+hooks:
+  user_defines:
+    sqlite3:
+      source: system
+
 # The following section is specific to Flutter packages.
 flutter:
 

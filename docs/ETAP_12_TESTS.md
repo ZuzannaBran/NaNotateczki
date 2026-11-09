@@ -1,5 +1,36 @@
 # Etap 12 — weryfikacja zapisu i synchronizacji
 
+## Natywny SQLite i symetryczne metadata/outbox (2026-11-09)
+
+CI 42582273859 wyjaśnił wieloplatformowe błędy: powtarzany błąd
+SHA-256 przy pobieraniu natywnego artefaktu sqlite3. Hook
+`source: system` korzysta z wcześniej dostarczonego SQLite,
+bez wyłączania integralności pobranych plików. Zweryfikować
+macOS/Linux/Windows przez nowy test
+`test/sqlite_system_library_test.dart`: transakcja, rollback,
+JSON, FTS5, WAL, zamknięcie pliku, restart i deduplikacja ID.
+Android/iOS nadal wymagają nowej kompilacji i próby na urządzeniu.
+
+Nowe regresje `test/v2_outbox_conflict_policy_test.dart`:
+symetria niezależnych metadanych, usunięcia wstrzymujące pull,
+równoczesne atomy Quill i reużycie tylko identycznego receipt
+asset.attach na niezależnych obiektach. REST/SQLite w
+`test/editor_v2_account_startup_test.dart` odtwarza zdalny
+stroke.create + object.set przy lokalnym page.set oraz zdalny
+object.set przy dwóch lokalnych zmianach document.set/page.set.
+Kursor i pending outbox pozostają kontrolowane po kolejnych pull.
+
+Po stronie PostgreSQL `test_stage2_assets.py` weryfikuje
+wspólne, zweryfikowane receipty, zakaz niezgodnych danych i
+niezmienność projekcji po odmowie, także przy historycznym
+stanie bez księgi receiptów.
+
+Nowe automatyczne scenariusze wymagają wyniku z Actions.
+Przy ręcznej weryfikacji na rzeczywistym urządzeniu należy
+sprawdzić istniejący dokument po aktualizacji bibliotek SQLite,
+w tym PNG/PDF, Quill i offline outbox. Bez tej weryfikacji
+nie potwierdzać produkcyjnego cutover.
+
 ## Powtarzanie błędów infrastruktury CI (2026-11-09)
 
 Przebieg 42579587105:
