@@ -721,10 +721,10 @@ void main() {
     expect(_allowed(remoteStroke, localTitle), isTrue);
     expect(_allowed(remoteStroke, localBookmark), isTrue);
     expect(
-      V2OutboxConflictPolicy.canApply(
-        remoteStroke,
-        [localTitle, localBookmark],
-      ),
+      V2OutboxConflictPolicy.canApply(remoteStroke, [
+        localTitle,
+        localBookmark,
+      ]),
       isTrue,
     );
   });
@@ -898,5 +898,156 @@ void main() {
       ),
       isFalse,
     );
+  });
+
+
+  test('new page and existing metadata commute in both directions', () {
+    final created = _operation(
+      OperationKind.pageCreate,
+      remote: true,
+      objectId: 'page-new',
+      payload: const {
+        'value': {'title': 'Remote', 'isBookmarked': false},
+      },
+    );
+    final title = _operation(
+      OperationKind.documentSet,
+      payload: const {
+        'properties': {'title': 'Offline'},
+      },
+    );
+    final otherPage = _operation(
+      OperationKind.pageSet,
+      objectId: 'page-old',
+      payload: const {
+        'properties': {'isBookmarked': true},
+      },
+    );
+    expect(_allowed(created, title), isTrue);
+    expect(_allowed(title, created), isTrue);
+    expect(_allowed(created, otherPage), isTrue);
+    expect(_allowed(otherPage, created), isTrue);
+    expect(
+      V2OutboxConflictPolicy.canApply(created, [title, otherPage]),
+      isTrue,
+    );
+  });
+
+  test('new page does not block ink or Quill on existing page', () {
+    final created = _operation(
+      OperationKind.pageCreate,
+      remote: true,
+      objectId: 'page-new',
+      payload: const {
+        'value': {'title': 'Remote', 'isBookmarked': false},
+      },
+    );
+    final stroke = _operation(
+      OperationKind.strokeCreate,
+      pageId: 'page-old',
+      objectId: 'stroke-old',
+      payload: const {
+        'value': {'objectType': 'stroke'},
+      },
+    );
+    final text = _operation(
+      OperationKind.textInsert,
+      pageId: 'page-old',
+      objectId: 'text-old',
+      payload: const {
+        'afterAtomId': null,
+        'atoms': [
+          {
+            'id': '00000000-0000-4000-8000-0000000000e2',
+            'text': 'Offline',
+          },
+        ],
+      },
+    );
+    expect(_allowed(created, stroke), isTrue);
+    expect(_allowed(created, text), isTrue);
+    expect(_allowed(stroke, created), isTrue);
+    expect(_allowed(text, created), isTrue);
+  });
+
+  test('concurrent page creation cannot reorder pending new pages', () {
+    final created = _operation(
+      OperationKind.pageCreate,
+      remote: true,
+      objectId: 'page-new',
+      payload: const {
+        'value': {'title': 'Remote', 'isBookmarked': false},
+      },
+    );
+    final another = _operation(
+      OperationKind.pageCreate,
+      objectId: 'page-other',
+      payload: const {
+        'value': {'title': 'Offline', 'isBookmarked': false},
+      },
+    );
+    final samePage = _operation(
+      OperationKind.pageSet,
+      objectId: 'page-new',
+      payload: const {
+        'properties': {'title': 'Local'},
+      },
+    );
+    expect(_allowed(created, another), isFalse);
+    expect(_allowed(another, created), isFalse);
+    expect(_allowed(created, samePage), isFalse);
+    expect(_allowed(samePage, created), isFalse);
+  });
+
+  test('new page does not skip destructive and container operations', () {
+    final created = _operation(
+      OperationKind.pageCreate,
+      remote: true,
+      objectId: 'page-new',
+      payload: const {
+        'value': {'title': 'Remote', 'isBookmarked': false},
+      },
+    );
+    final deleted = _operation(
+      OperationKind.pageDelete,
+      objectId: 'page-old',
+      payload: const {},
+    );
+    final moved = _operation(
+      OperationKind.objectMove,
+      pageId: 'page-old',
+      objectId: 'ink',
+      payload: const {'toPageId': 'page-new', 'sortIndex': 0},
+    );
+    final targetNew = _operation(
+      OperationKind.objectSet,
+      pageId: 'page-new',
+      objectId: 'ink',
+      payload: const {
+        'properties': {'width': 2.0},
+      },
+    );
+    expect(_allowed(created, deleted), isFalse);
+    expect(_allowed(created, moved), isFalse);
+    expect(_allowed(created, targetNew), isFalse);
+  });
+
+  test('new page gate rejects unrelated document namespaces', () {
+    final created = _operation(
+      OperationKind.pageCreate,
+      remote: true,
+      objectId: 'page-new',
+      payload: const {
+        'value': {'title': 'Remote', 'isBookmarked': false},
+      },
+    );
+    final foreign = _operation(
+      OperationKind.documentSet,
+      documentId: 'other-document',
+      payload: const {
+        'properties': {'title': 'Foreign'},
+      },
+    );
+    expect(_allowed(created, foreign), isFalse);
   });
 }

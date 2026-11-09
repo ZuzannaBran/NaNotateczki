@@ -19,6 +19,12 @@ class V2OutboxConflictPolicy {
       if (local.documentId != remote.documentId) {
         return false;
       }
+      if (remote.kind == OperationKind.pageCreate) {
+        return _independentPageCreate(remote, local);
+      }
+      if (local.kind == OperationKind.pageCreate) {
+        return _independentPageCreate(local, remote);
+      }
       if (remote.kind == OperationKind.documentSet ||
           remote.kind == OperationKind.pageSet) {
         return _independentMetadata(remote, local);
@@ -67,9 +73,41 @@ class V2OutboxConflictPolicy {
         local.payload.keys.toSet().containsAll(fields) &&
         remote.payload.length == fields.length &&
         local.payload.length == fields.length &&
-        fields.every(
-          (field) => remote.payload[field] == local.payload[field],
-        );
+        fields.every((field) => remote.payload[field] == local.payload[field]);
+  }
+
+  /// A new page appends a fresh identity without touching existing pages.
+  ///
+  /// Concurrent page creations and destructive operations are deliberately
+  /// held back: their ordering or deletion preconditions may differ.
+  static bool _independentPageCreate(
+    OperationEnvelope created,
+    OperationEnvelope other,
+  ) {
+    if (created.objectId == null) {
+      return false;
+    }
+    if (other.kind == OperationKind.documentSet) {
+      return true;
+    }
+    if (other.kind == OperationKind.pageSet) {
+      return other.objectId != created.objectId;
+    }
+    const independentObjects = {
+      OperationKind.strokeCreate,
+      OperationKind.objectCreate,
+      OperationKind.objectSet,
+      OperationKind.objectTransform,
+      OperationKind.objectReorder,
+      OperationKind.textInsert,
+      OperationKind.textDelete,
+      OperationKind.textFormat,
+      OperationKind.assetAttach,
+      OperationKind.assetDetach,
+    };
+    return other.pageId != null &&
+        other.pageId != created.objectId &&
+        independentObjects.contains(other.kind);
   }
 
   static bool _independentMetadata(

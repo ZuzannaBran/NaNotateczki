@@ -634,7 +634,10 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   Dodatkowo: zdalne obiekty przy lokalnym document.set/page.set
   oraz wspólne, identyczne receipty asset.attach między właścicielami.
   Zmiany nie przepuszczają delete ani niezgodnych assetów.
-  Testy: `test/v2_outbox_conflict_policy_test.dart` (22 grup).
+  Nowa strona może przejść mimo offline metadanych i edycji obiektów
+  innych stron; konkurencyjne page.create, move, delete i kolizje UID
+  nadal blokują kursor.
+  Testy: `test/v2_outbox_conflict_policy_test.dart` (27 grup).
 - `lib/data/sync/editor_v2_account_runtime.dart` tworzy izolowany
   `OperationStore`, `SyncEngine`, projektor i zweryfikowany asset gateway
   tylko dla konta z potwierdzonym protokołem v2. Zdalne operacje
@@ -655,7 +658,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   przed document.delete i niezależny Quill insert + format;
   Dodatkowe przypadki: konkurencyjne metadane strony i inserty Quill,
   restart plikowej SQLite, trzy intenty w outboxie oraz geometria
-  podczas edycji atomów tekstu;
+  podczas edycji atomów tekstu; zdalna nowa strona obok offline
+  metadanych i ink, restart bez podwójnych stron, kolizja UID;
   produkcyjne realtime pozostaje domyślnie włączone i jest testowane
   przez realny Linux E2E, który używa tego samego startu co AppScope.
 - `lib/app/app_scope.dart`: przełączenie konta v2 jest **opt-in** przez
@@ -764,6 +768,11 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   by odrzucony konflikt nie zmieniał stanu w pamięci.
   `server/api/tests/test_stage2_assets.py`: równi właściciele,
   odmowa różnych bytes/MIME i starszy snapshot bez receiptu.
+- `server/api/app/operation_projection.py`: mirroring backendu
+  odrzuca uszkodzone rang wersji skalarnej, assetów i lastMove
+  przed zapisem; historyczne inne obiekty także są kontrolowane.
+  Regresje: `server/api/tests/test_operation_projection.py`
+  i `server/api/tests/test_stage2_assets.py`.
 - `.github/scripts/flutter_transient_network_retry.sh`:
   maksymalnie trzy próby tylko dla błędów pobierania sqlite3
   lub HTTP 502/503/504. Nie ignoruje błędów testów.

@@ -1,5 +1,23 @@
 # Dane NaNotateczki
 
+## Rangi projekcji i kolejność stron przy offline v2 (2026-11-09)
+
+Wersje skalarne `versions` i assetów `assetVersions` w backendzie
+muszą mieć strukturę [logicalClock, actorId, actorSeq, operationId].
+Nieprawidłowy kształt, typ lub nieprawidłowa lista są błędem
+integralności: nie wolno ich automatycznie zastępować nową rangą.
+Dotyczy także `lastMove.rank` i innych właścicieli assetu przy
+ustalaniu historycznego receipt. Stan projekcji i dotychczasowe
+operacje pozostają bez zmian przy odmowie.
+
+Nowa strona może przyjść z serwera mimo lokalnie
+niepotwierdzonego tytułu, bookmarka lub niezależnego ink
+na istniejącej stronie. Nie zezwala to na dwa równoległe
+`page.create`, konflikt UID, usunięcia ani move obiektu
+na dopiero tworzoną stronę. Testy sprawdzają również trwały
+checkpoint i nieduplikowanie strony po restarcie SQLite.
+Granica migracji v1→v2 pozostaje bez zmian.
+
 ## SQLite system ABI i bezpieczny równoległy odbiór (2026-11-09)
 
 Budowanie aplikacji używa obecnie natywnych bibliotek SQLite

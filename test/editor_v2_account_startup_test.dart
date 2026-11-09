@@ -1536,4 +1536,257 @@ void main() {
       [localTitle.operationId, localBookmark.operationId],
     );
   });
+
+
+  test('offline metadata survives remote page create', () async {
+    final f = _Fixture(NativeDatabase.memory());
+    addTearDown(f.close);
+    expect(
+      await f.runtime.startForCurrentAccount(isCurrent: () => true),
+      isTrue,
+    );
+    final note = await f.repository.createNotebook();
+    await f.runtime.engine.syncNow();
+    final actor = f.runtime.engine.actorIdForDocument(note.uid);
+    final localTitle = await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: note.uid,
+      kind: OperationKind.documentSet,
+      payload: const {
+        'properties': {'title': 'Offline title'},
+      },
+      apply: f.runtime.projector.apply,
+    );
+    final bookmark = await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: note.uid,
+      objectId: note.pages.single.id,
+      kind: OperationKind.pageSet,
+      payload: const {
+        'properties': {'isBookmarked': true},
+      },
+      apply: f.runtime.projector.apply,
+    );
+    f.rejectPosts = true;
+    final created = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-00000000a001',
+      actorId: 'page-peer',
+      actorSeq: 1,
+      logicalClock: bookmark.logicalClock + 1,
+      dependencies: [f.accepted.last['operationId'] as String],
+      documentId: note.uid,
+      objectId: 'remote-new-page',
+      kind: OperationKind.pageCreate,
+      payload: const {
+        'value': {'title': 'Remote page', 'isBookmarked': false},
+      },
+    );
+    f.accepted.add(created.toJson());
+    await f.runtime.engine.syncNow();
+    final saved = (await f.repository.getNotebook(note.uid))!;
+    expect(saved.title, 'Offline title');
+    expect(saved.pages, hasLength(2));
+    expect(saved.pages.first.isBookmarked, isTrue);
+    expect(saved.pages.last.id, 'remote-new-page');
+    expect(saved.pages.last.title, 'Remote page');
+    expect(await f.runtime.store.checkpoint('account:startup-account'), 3);
+    expect(
+      (await f.runtime.store.pending(
+        includeDeferred: true,
+      )).map((entry) => entry.operationId),
+      [localTitle.operationId, bookmark.operationId],
+    );
+  });
+
+  test('remote new page preserves pending ink on another page', () async {
+    final f = _Fixture(NativeDatabase.memory());
+    addTearDown(f.close);
+    expect(
+      await f.runtime.startForCurrentAccount(isCurrent: () => true),
+      isTrue,
+    );
+    final note = await f.repository.createNotebook();
+    await f.runtime.engine.syncNow();
+    final local = await f.runtime.store.writeLocal(
+      actorId: f.runtime.engine.actorIdForDocument(note.uid),
+      documentId: note.uid,
+      pageId: note.pages.single.id,
+      objectId: 'offline-page-create-ink',
+      kind: OperationKind.strokeCreate,
+      payload: const {
+        'value': {
+          'objectType': 'stroke',
+          'colorValue': 0xFF224466,
+          'width': 2.0,
+          'toolIndex': 0,
+          'sortIndex': 0,
+          'points': [
+            [1.0, 2.0, 0.5],
+          ],
+        },
+      },
+      apply: f.runtime.projector.apply,
+    );
+    f.rejectPosts = true;
+    final created = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-00000000a002',
+      actorId: 'page-peer',
+      actorSeq: 1,
+      logicalClock: local.logicalClock + 1,
+      dependencies: [f.accepted.last['operationId'] as String],
+      documentId: note.uid,
+      objectId: 'remote-second-page',
+      kind: OperationKind.pageCreate,
+      payload: const {
+        'value': {'title': 'Second', 'isBookmarked': false},
+      },
+    );
+    f.accepted.add(created.toJson());
+    await f.runtime.engine.syncNow();
+    final saved = (await f.repository.getNotebook(note.uid))!;
+    expect(saved.pages, hasLength(2));
+    expect(
+      saved.pages.first.inkStrokes.single.id,
+      'offline-page-create-ink',
+    );
+    expect(saved.pages.last.id, 'remote-second-page');
+    expect(await f.runtime.store.checkpoint('account:startup-account'), 3);
+    expect(
+      (await f.runtime.store.pending(
+        includeDeferred: true,
+      )).map((entry) => entry.operationId),
+      [local.operationId],
+    );
+  });
+
+
+  test('remote page remains unique after SQLite restart', () async {
+    final dir = await Directory.systemTemp.createTemp('nn-page-restart-');
+    addTearDown(() => dir.delete(recursive: true));
+    final file = File(dir.path + '/notes.sqlite');
+    final first = _Fixture(NativeDatabase(file));
+    late String documentId;
+    late String localOperationId;
+    late List<Map<String, dynamic>> feed;
+    try {
+      expect(
+        await first.runtime.startForCurrentAccount(isCurrent: () => true),
+        isTrue,
+      );
+      final note = await first.repository.createNotebook();
+      documentId = note.uid;
+      await first.runtime.engine.syncNow();
+      final local = await first.runtime.store.writeLocal(
+        actorId: first.runtime.engine.actorIdForDocument(note.uid),
+        documentId: note.uid,
+        objectId: note.pages.single.id,
+        kind: OperationKind.pageSet,
+        payload: const {
+          'properties': {'isBookmarked': true},
+        },
+        apply: first.runtime.projector.apply,
+      );
+      localOperationId = local.operationId;
+      first.rejectPosts = true;
+      final created = OperationEnvelope(
+        operationId: '00000000-0000-4000-8000-00000000a003',
+        actorId: 'page-restart-peer',
+        actorSeq: 1,
+        logicalClock: local.logicalClock + 1,
+        dependencies: [first.accepted.last['operationId'] as String],
+        documentId: documentId,
+        objectId: 'remote-restart-page',
+        kind: OperationKind.pageCreate,
+        payload: const {
+          'value': {'title': 'Persisted peer page', 'isBookmarked': false},
+        },
+      );
+      first.accepted.add(created.toJson());
+      await first.runtime.engine.syncNow();
+      expect(
+        await first.runtime.store.checkpoint('account:startup-account'),
+        3,
+      );
+      feed = first.accepted
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+    } finally {
+      await first.close();
+    }
+    final restarted = _Fixture(NativeDatabase(file));
+    addTearDown(restarted.close);
+    restarted.accepted.addAll(feed);
+    restarted.rejectPosts = true;
+    expect(
+      await restarted.runtime.startForCurrentAccount(isCurrent: () => true),
+      isTrue,
+    );
+    await restarted.runtime.engine.syncNow();
+    final note = (await restarted.repository.getNotebook(documentId))!;
+    expect(note.pages, hasLength(2));
+    expect(note.pages.first.isBookmarked, isTrue);
+    expect(note.pages.last.id, 'remote-restart-page');
+    expect(
+      await restarted.runtime.store.checkpoint('account:startup-account'),
+      3,
+    );
+    expect(
+      (await restarted.runtime.store.pending(
+        includeDeferred: true,
+      )).map((operation) => operation.operationId),
+      [localOperationId],
+    );
+    await restarted.runtime.engine.syncNow();
+    expect(
+      (await restarted.repository.getNotebook(documentId))!.pages,
+      hasLength(2),
+    );
+  });
+
+  test('conflicting remote page identity does not advance cursor', () async {
+    final f = _Fixture(NativeDatabase.memory());
+    addTearDown(f.close);
+    expect(
+      await f.runtime.startForCurrentAccount(isCurrent: () => true),
+      isTrue,
+    );
+    final note = await f.repository.createNotebook();
+    await f.runtime.engine.syncNow();
+    final local = await f.runtime.store.writeLocal(
+      actorId: f.runtime.engine.actorIdForDocument(note.uid),
+      documentId: note.uid,
+      objectId: note.pages.single.id,
+      kind: OperationKind.pageSet,
+      payload: const {
+        'properties': {'isBookmarked': true},
+      },
+      apply: f.runtime.projector.apply,
+    );
+    f.rejectPosts = true;
+    final collision = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-00000000a004',
+      actorId: 'collision-peer',
+      actorSeq: 1,
+      logicalClock: local.logicalClock + 1,
+      dependencies: [f.accepted.last['operationId'] as String],
+      documentId: note.uid,
+      objectId: note.pages.single.id,
+      kind: OperationKind.pageCreate,
+      payload: const {
+        'value': {'title': 'Conflicting page', 'isBookmarked': false},
+      },
+    );
+    f.accepted.add(collision.toJson());
+    await f.runtime.engine.syncNow();
+    final current = (await f.repository.getNotebook(note.uid))!;
+    expect(current.pages, hasLength(1));
+    expect(current.pages.single.isBookmarked, isTrue);
+    expect(await f.runtime.store.checkpoint('account:startup-account'), 2);
+    expect(
+      (await f.runtime.store.pending(
+        includeDeferred: true,
+      )).map((operation) => operation.operationId),
+      [local.operationId],
+    );
+  });
 }

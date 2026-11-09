@@ -1,5 +1,31 @@
 # Etap 12 — weryfikacja zapisu i synchronizacji
 
+## Odporność projekcji PostgreSQL i nowych stron (2026-11-09)
+
+Przebieg 42587383593: 16/17 zielonych, jedyny błąd formatowania
+trzech plików. Dokładną poprawkę uwzględniono przed nowymi testami.
+
+Dodano regresje po stronie serwera dla uszkodzonych `versions`,
+`assetVersions`, `lastMove.rank` i historycznych pól assetów
+należących do innych obiektów. Wadliwa ranga nie może zostać
+potraktowana jako starsza wersja i po cichu nadpisana; testy
+sprawdzają brak zmiany stanu także przy uszkodzeniu nieedytowanego
+pola. Walidacja nie może ominąć księgi trwałych receiptów.
+Testy uruchamia macierz backendu i kopia Python w repo aplikacji.
+
+Testy Dart: pięć nowych scenariuszy z `page.create` i
+różnymi operacjami offline, dwa scenariusze REST/SQLite dla
+strony z równoległym bookmarkiem, tytułem i kreską, restart bazy
+z niedostarczonym outboxem, a także konflikt istniejącego UID.
+Kursor nie może ominąć kolizji ani wyczyścić lokalnych operacji.
+
+Do testu ręcznego: na dwóch urządzeniach otworzyć to samo
+konto v2 opt-in, odłączyć pierwsze, zmienić tytuł strony
+i dorysować kreskę, na drugim dodać nową stronę, a następnie
+połączyć pierwsze. Zweryfikować UID, kolejność stron, obecność
+kreski i outbox po ponownym uruchomieniu. Testu ręcznego bez
+urządzeń nie oznaczamy jako zaliczonego.
+
 ## Natywny SQLite i symetryczne metadata/outbox (2026-11-09)
 
 CI 42582273859 wyjaśnił wieloplatformowe błędy: powtarzany błąd

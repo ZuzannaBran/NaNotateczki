@@ -13,34 +13,29 @@ void main() {
       'CREATE TABLE items (id INTEGER PRIMARY KEY, '
       'payload TEXT NOT NULL)',
     );
-    database.execute(
-      'INSERT INTO items (payload) VALUES (?)',
-      ['{"title":"persisted"}'],
-    );
+    database.execute('INSERT INTO items (payload) VALUES (?)', [
+      '{"title":"persisted"}',
+    ]);
     final json = database.select(
       "SELECT json_extract(payload, '\$.title') AS title FROM items",
     );
     expect(json.single['title'], 'persisted');
 
-    database.execute(
-      'CREATE VIRTUAL TABLE search USING fts5(content)',
-    );
-    database.execute(
-      'INSERT INTO search (content) VALUES (?)',
-      ['offline notebook'],
-    );
+    database.execute('CREATE VIRTUAL TABLE search USING fts5(content)');
+    database.execute('INSERT INTO search (content) VALUES (?)', [
+      'offline notebook',
+    ]);
     expect(
-      database.select(
-        "SELECT content FROM search WHERE search MATCH 'offline'",
-      ).single['content'],
+      database
+          .select("SELECT content FROM search WHERE search MATCH 'offline'")
+          .single['content'],
       'offline notebook',
     );
 
     database.execute('BEGIN IMMEDIATE');
-    database.execute(
-      'INSERT INTO items (payload) VALUES (?)',
-      ['{"title":"temporary"}'],
-    );
+    database.execute('INSERT INTO items (payload) VALUES (?)', [
+      '{"title":"temporary"}',
+    ]);
     database.execute('ROLLBACK');
     expect(
       database.select('SELECT count(*) AS count FROM items').single['count'],
@@ -60,10 +55,10 @@ void main() {
         'CREATE TABLE operations '
         '(operation_id TEXT PRIMARY KEY, payload TEXT NOT NULL)',
       );
-      first.execute(
-        'INSERT INTO operations VALUES (?, ?)',
-        ['operation-1', '{"kind":"text.insert"}'],
-      );
+      first.execute('INSERT INTO operations VALUES (?, ?)', [
+        'operation-1',
+        '{"kind":"text.insert"}',
+      ]);
     } finally {
       first.close();
     }
@@ -77,13 +72,13 @@ void main() {
         ).single['payload'],
         '{"kind":"text.insert"}',
       );
-      reopened.execute(
-        'INSERT OR IGNORE INTO operations VALUES (?, ?)',
-        ['operation-1', '{"kind":"text.delete"}'],
-      );
-      final count = reopened.select(
-        'SELECT count(*) AS total FROM operations',
-      ).single['total'];
+      reopened.execute('INSERT OR IGNORE INTO operations VALUES (?, ?)', [
+        'operation-1',
+        '{"kind":"text.delete"}',
+      ]);
+      final count = reopened
+          .select('SELECT count(*) AS total FROM operations')
+          .single['total'];
       expect(count, 1);
       expect(
         reopened.select(

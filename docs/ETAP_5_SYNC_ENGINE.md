@@ -1,5 +1,29 @@
 # Etap 5 — silnik synchronizacji operacji v2
 
+## Etap 5: tworzenie stron obok outboxu offline (2026-11-09)
+
+W przebiegu CI 42587383593 przeszło 16 z 17 zadań, w tym Android,
+iOS na iPhonie i iPadzie, Linux, Windows, macOS, Web oraz Linux E2E
+z realnym backendem. Jedyna porażka: trzy drobne odchylenia od
+standardowego formattera Dart; uwzględniono dokładny diff.
+Na samym CI nie stwierdzono regresji SQLite ani backendu.
+
+`V2OutboxConflictPolicy.canApply` pozwala przyjąć zdalne
+`page.create` obok lokalnych `document.set`, `page.set` innych
+stron i niezależnych operacji obiektowych na istniejącej stronie.
+Działa też odwrotna kombinacja z lokalnym `page.create` oraz
+zdalnymi metadanymi. Nie przepuszcza równoległego tworzenia stron
+(zależna kolejność), zmian tego samego UID, destrukcyjnych
+usunięć, `object.move` ani operacji na dopiero tworzonej stronie.
+Zmiany nadal są zatwierdzane w dotychczasowej transakcji SQLite.
+
+27 testów polityki konfliktów obejmuje nowe granice tworzenia stron,
+a testy REST/SQLite sprawdzają kursor, lokalny outbox, tworzenie
+strony przy lokalnym ink i metadanych oraz brak duplikatów po
+restarcie plikowej SQLite. Kolizja UID zatrzymuje kursor bez
+nadpisania strony. Pełny rebase move/delete i cutover v1/v2
+pozostają niedostępne.
+
 ## Natywna biblioteka i kolejne bezpieczne scalanie (2026-11-09)
 
 Najnowszy przebieg 42582273859: analiza i formatowanie Dart są
