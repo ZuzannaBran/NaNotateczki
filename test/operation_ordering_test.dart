@@ -832,14 +832,10 @@ void main() {
       for (final operation in [...order, inverse]) {
         register.apply(operation);
       }
-      expect(register.fieldsFor(initial), {
-        'colorValue': 51,
-        'sortIndex': 5,
-      });
+      expect(register.fieldsFor(initial), {'colorValue': 51, 'sortIndex': 5});
       register.apply(removal);
       register.apply(initial);
       expect(register.fieldsFor(initial), isNull);
     }
   });
-
 }

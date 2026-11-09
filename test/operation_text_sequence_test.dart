@@ -603,5 +603,4 @@ void main() {
     ]);
     expect((retained[firstId] as Map)['deleted'], isTrue);
   });
-
 }
