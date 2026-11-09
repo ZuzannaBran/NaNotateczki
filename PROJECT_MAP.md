@@ -623,20 +623,20 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   Regresja: `test/editor_controller_v2_test.dart` (restart Undo/Redo).
 
 
-- lib/data/sync/v2_outbox_conflict_policy.dart:
-  V2OutboxConflictPolicy.canApply jest bezstanowa kontrola
-  bezpiecznego scalania kazdego remote z calym lokalnym outboxem
-  danego dokumentu. Obejmuje metadane, rozlaczne pola, Quill
-  insert/delete/format, atomy, kotwice i assety embedow.
-  Regresje: test/v2_outbox_conflict_policy_test.dart.
+- `lib/data/sync/v2_outbox_conflict_policy.dart`:
+  `V2OutboxConflictPolicy.canApply` filtruje wszystkie lokalne intenty
+  przed przyjęciem remote: metadane, rozłączne atomy Quill, niezależną
+  geometrię bloku tekstu i kolizje assetId. Image object.create
+  rezerwuje assetId, podobnie jak embed Quill także w tym samym bloku.
+  Zmiany kontenera, kolizje pól i destrukcyjne usunięcia są blokowane.
+  Testy: `test/v2_outbox_conflict_policy_test.dart` (14 grup).
 - `lib/data/sync/editor_v2_account_runtime.dart` tworzy izolowany
   `OperationStore`, `SyncEngine`, projektor i zweryfikowany asset gateway
   tylko dla konta z potwierdzonym protokołem v2. Zdalne operacje
-  dotyczące różnych UID oraz rozłączne pola `object.set`,
-  `object.transform` i `object.reorder` tego samego UID mogą być
-  zapisane mimo lokalnego outboxu. Tak samo `text.format` na
-  rozłącznych atomach/atrybutach Quill. Kolizje pól, formatowania
-  i assetów oraz zmiany kontenera blokują kursor do pełnego rebase.
+  różnych UID, rozłączne metadane i właściwości obiektów oraz Quill
+  insert/delete/format i geometria tego samego bloku tekstowego
+  mogą przejść mimo lokalnego outboxu. Kolizje atomów, assetId,
+  wspólnych pól, usunięcia i zmiany kontenera blokują kursor.
   101: `attachEditor`; 110: `detachEditor`; 117: `editorForDocument`;
   144: `startForCurrentAccount` wiąże i waliduje repozytorium oraz
   sprawdza właściciela przed startem i po każdym await. Anulowanie
@@ -648,7 +648,9 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   formatowanie Quill i konflikt wspólnego atrybutu/atomu;
   dodatkowe regresje: zdalne metadane przy offline ink, ochrona
   przed document.delete i niezależny Quill insert + format;
-  Dodatkowe przypadki: konkurencyjne metadane strony i inserty Quill;
+  Dodatkowe przypadki: konkurencyjne metadane strony i inserty Quill,
+  restart plikowej SQLite, trzy intenty w outboxie oraz geometria
+  podczas edycji atomów tekstu;
   produkcyjne realtime pozostaje domyślnie włączone i jest testowane
   przez realny Linux E2E, który używa tego samego startu co AppScope.
 - `lib/app/app_scope.dart`: przełączenie konta v2 jest **opt-in** przez
@@ -781,6 +783,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `lib/data/sync/operation_text_sequence.dart`:
   `OperationTextSequence` — RGA/CRDT atomów z deterministycznym
   porządkiem, kotwicami i usunięciami zachowanymi do replay;
+  nowe sprawdzanie utrwalonych rang attributeVersions przed edycją
+  i przy odczycie Delta, bez możliwości zamaskowania korupcji;
   `operation_protocol.dart` waliduje `text.insert/delete` i blokuje
   próby zmiany typu obiektu oraz wewnętrznych danych CRDT.
   Backend odpowiednik: `api/app/text_sequence.py`, podłączony w

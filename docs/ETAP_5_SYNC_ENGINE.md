@@ -1,5 +1,34 @@
 # Etap 5 — silnik synchronizacji operacji v2
 
+## Rozszerzony rebase i integralność (2026-11-09)
+
+Wynik poprzedniego CI 42527261951: 16/17 zadań zielonych, w tym
+iPad; nieudane było wyłącznie formatowanie nowych testów. Dokładny
+format obu plików odtworzono z diffu CI przed dalszymi zmianami.
+
+V2OutboxConflictPolicy dopuszcza teraz niezależną geometrię i edycję
+atomów tego samego bloku tekstowego (insert/delete/format i
+object.set/transform/reorder dla bezpiecznych pól). Rezerwacja assetId
+obejmuje także image object.create i dwa embedy w tym samym bloku,
+aby nie dopuścić do niejawnej kolizji podczas pracy offline.
+Wspólne pola, zmiany kontenera i destrukcyjne usunięcia nadal
+wymagają pełnego rebase.
+
+Testy regresyjne obejmują 14 grup reguł konfliktu, ponowne
+otwarcie plikowej SQLite z niepotwierdzoną kreską, trzy niezależne
+operacje w outboxie, konflikt metadanych i tekst Quill z jednoczesną
+zmianą geometrii. Kursor i outbox nie mogą zostać nadpisane.
+
+RGA Quill w Dart oraz Python odrzuca wadliwy rank atomu, kotwicę
+i metadane attributeVersions przed formatowaniem. Różne kolejności
+dostarczenia używają tej samej deterministycznej precedencji.
+Zmieniono także lustrzane źródła backendu w drzewie aplikacji.
+
+Etap 4: backend ma zielone wcześniejsze CI, ale nowa poprawka
+wymaga przebiegu. Etap 5: pozostają migracja kont v1, pełny rebase
+move/delete, Share/Planer v2 i bezpieczny produkcyjny cutover.
+Nie włączać produkcyjnego v2 ani nie usuwać zapisu v1.
+
 ## Kolejny pakiet rebase + diagnostyka (2026-11-08)
 
 Czysty moduł V2OutboxConflictPolicy oddziela decyzję o bezpiecznym

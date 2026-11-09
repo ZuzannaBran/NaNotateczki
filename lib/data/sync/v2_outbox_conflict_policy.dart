@@ -27,15 +27,19 @@ class V2OutboxConflictPolicy {
           local.kind.target != OperationTarget.object) {
         return false;
       }
-      if (remote.objectId == local.objectId) {
-        return _independentProperties(remote, local) ||
-            _independentText(remote, local);
-      }
       final remoteAssets = _assetIds(remote);
       final localAssets = _assetIds(local);
-      return remoteAssets != null &&
-          localAssets != null &&
-          remoteAssets.intersection(localAssets).isEmpty;
+      if (remoteAssets == null ||
+          localAssets == null ||
+          remoteAssets.intersection(localAssets).isNotEmpty) {
+        return false;
+      }
+      if (remote.objectId == local.objectId) {
+        return _independentProperties(remote, local) ||
+            _independentText(remote, local) ||
+            _independentTextAndGeometry(remote, local);
+      }
+      return true;
     });
   }
 
@@ -92,6 +96,47 @@ class V2OutboxConflictPolicy {
       return false;
     }
     return first.keys.toSet().intersection(second.keys.toSet()).isEmpty;
+  }
+
+  /// Quill atoms and the text box geometry occupy different SQLite fields.
+  static bool _independentTextAndGeometry(
+    OperationEnvelope remote,
+    OperationEnvelope local,
+  ) {
+    if (remote.pageId != local.pageId) {
+      return false;
+    }
+    const textKinds = {
+      OperationKind.textInsert,
+      OperationKind.textDelete,
+      OperationKind.textFormat,
+    };
+    const geometryKinds = {
+      OperationKind.objectSet,
+      OperationKind.objectTransform,
+      OperationKind.objectReorder,
+    };
+    final textRemote = textKinds.contains(remote.kind);
+    if (textRemote == textKinds.contains(local.kind)) {
+      return false;
+    }
+    final geometry = textRemote ? local : remote;
+    if (!geometryKinds.contains(geometry.kind)) {
+      return false;
+    }
+    final properties = geometry.payload['properties'];
+    const safeFields = {
+      'fontSize',
+      'colorValue',
+      'width',
+      'rotation',
+      'dx',
+      'dy',
+      'sortIndex',
+    };
+    return properties is Map &&
+        properties.isNotEmpty &&
+        properties.keys.every(safeFields.contains);
   }
 
   static bool _independentText(
@@ -184,6 +229,16 @@ class V2OutboxConflictPolicy {
         return null;
       }
       ids.add(id);
+    }
+    if (operation.kind == OperationKind.objectCreate) {
+      final value = operation.payload['value'];
+      if (value is Map && value['objectType'] == 'image') {
+        final id = value['assetId'];
+        if (id is! String) {
+          return null;
+        }
+        ids.add(id);
+      }
     }
     if (operation.kind == OperationKind.objectSet) {
       final properties = operation.payload['properties'];

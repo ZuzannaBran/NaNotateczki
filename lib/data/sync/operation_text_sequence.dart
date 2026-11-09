@@ -18,6 +18,12 @@ class OperationTextSequence {
     OperationEnvelope operation,
   ) {
     final atoms = Map<String, dynamic>.from(current);
+    for (final atom in atoms.values) {
+      if (atom is! Map) {
+        throw const FormatException('Malformed text atom graph.');
+      }
+      _validateAtomVersions(atom);
+    }
     final payload = operation.payload;
     operation.validateForV2Projection();
     if (operation.kind == OperationKind.textInsert) {
@@ -159,7 +165,7 @@ class OperationTextSequence {
   ];
 
   static bool _rankIsLater(List<Object> current, List previous) {
-    if (previous.length != 4) {
+    if (!_validAttributeRank(previous)) {
       throw const FormatException('Invalid attribute precedence.');
     }
     for (var i = 0; i < current.length; i++) {
@@ -177,6 +183,28 @@ class OperationTextSequence {
       }
     }
     return false;
+  }
+
+  static bool _validAttributeRank(Object? rank) =>
+      rank is List &&
+      rank.length == 4 &&
+      rank[0] is int &&
+      rank[1] is String &&
+      rank[2] is int &&
+      rank[3] is String;
+
+  static void _validateAtomVersions(Map atom) {
+    if (!atom.containsKey('attributeVersions')) {
+      return;
+    }
+    final versions = atom['attributeVersions'];
+    if (versions is! Map ||
+        versions.entries.any(
+          (entry) =>
+              entry.key is! String || !_validAttributeRank(entry.value),
+        )) {
+      throw const FormatException('Invalid attribute precedence.');
+    }
   }
 
   /// Converts projected atoms into a Quill snapshot without losing styles.
@@ -248,6 +276,7 @@ class OperationTextSequence {
               value['attributeVersions'] is! Map)) {
         throw const FormatException('Malformed text atom graph.');
       }
+      _validateAtomVersions(value);
       if (value.containsKey('embed')) {
         if (value['text'] != '\uFFFC') {
           throw const FormatException('Invalid Quill embed atom.');

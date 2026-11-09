@@ -1,5 +1,15 @@
 # Dane NaNotateczki
 
+## Ochrona assetów, CRDT i restartu (2026-11-09)
+
+W trybie opt-in v2 bezpieczne operacje geometrii i atomów tekstu
+mogą scalać się bez zastępowania snapshotem dokumentu. AssetId
+z image object.create oraz z embedów Quill jest uwzględniany
+również przy konflikcie tego samego obiektu. Zła ranga lub wersja
+atrybutu Quill zatrzymuje edycję, nie może zostać nadpisana jako
+pozorna naprawa. Testy obejmują restart plikowej SQLite z outboxem
+i niezależną zdalną aktualizacją. Cutover v1/v2 nadal zablokowany.
+
 ## Częściowy rebase offline v2 (2026-11-08)
 
 Reguły V2OutboxConflictPolicy dopuszczają rozlaczne metadane dokumentu

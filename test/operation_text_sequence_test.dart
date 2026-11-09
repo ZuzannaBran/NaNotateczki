@@ -336,4 +336,95 @@ void main() {
     ]);
     expect(OperationTextSequence.render(initial), 'X');
   });
+test('corrupt Quill attribute precedence cannot be silently repaired', () {
+    final original = textOperation(
+      operationId: firstId,
+      actorId: 'alice',
+      kind: OperationKind.textInsert,
+      payload: {
+        'afterAtomId': null,
+        'atoms': [
+          {
+            'id': firstId,
+            'text': 'A',
+            'attributes': {'bold': true},
+          },
+        ],
+      },
+    );
+    final initial = OperationTextSequence.apply({}, original);
+    final malformed = <String, dynamic>{
+      for (final entry in initial.entries)
+        entry.key: {
+          ...Map<String, dynamic>.from(entry.value as Map),
+          'attributeVersions': {
+            'bold': [10, {}, 1, firstId],
+          },
+        },
+    };
+    final format = textOperation(
+      operationId: secondId,
+      actorId: 'alice',
+      kind: OperationKind.textFormat,
+      logicalClock: 12,
+      payload: {
+        'atomIds': [firstId],
+        'attributes': {'bold': false},
+      },
+    );
+    expect(
+      () => OperationTextSequence.render(malformed),
+      throwsFormatException,
+    );
+    expect(
+      () => OperationTextSequence.apply(malformed, format),
+      throwsFormatException,
+    );
+    expect(OperationTextSequence.render(initial), 'A');
+  });
+
+  test('corrupt Quill precedence also blocks unrelated text insertion', () {
+    final original = textOperation(
+      operationId: firstId,
+      actorId: 'alice',
+      kind: OperationKind.textInsert,
+      payload: {
+        'afterAtomId': null,
+        'atoms': [
+          {
+            'id': firstId,
+            'text': 'A',
+            'attributes': {'bold': true},
+          },
+        ],
+      },
+    );
+    final state = OperationTextSequence.apply({}, original);
+    final corruptAtom = Map<String, dynamic>.from(state[firstId] as Map);
+    corruptAtom['attributeVersions'] = {
+      'bold': [true, 'alice', 1, firstId],
+    };
+    final malformed = <String, dynamic>{firstId: corruptAtom};
+    final another = textOperation(
+      operationId: secondId,
+      actorId: 'bob',
+      kind: OperationKind.textInsert,
+      logicalClock: 11,
+      payload: {
+        'afterAtomId': null,
+        'atoms': [
+          {'id': secondId, 'text': 'B'},
+        ],
+      },
+    );
+    expect(
+      () => OperationTextSequence.visibleIds(malformed),
+      throwsFormatException,
+    );
+    expect(
+      () => OperationTextSequence.apply(malformed, another),
+      throwsFormatException,
+    );
+    expect(OperationTextSequence.render(state), 'A');
+  });
 }

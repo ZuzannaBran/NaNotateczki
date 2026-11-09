@@ -957,9 +957,7 @@ void main() {
     final merged = (await f.repository.getNotebook(note.uid))!;
     expect(merged.pages.single.title, 'Offline page title');
     expect(merged.pages.single.isBookmarked, isTrue);
-    final cursor = await f.runtime.store.checkpoint(
-      'account:startup-account',
-    );
+    final cursor = await f.runtime.store.checkpoint('account:startup-account');
     expect(cursor, 3);
 
     final conflicting = OperationEnvelope(
@@ -977,10 +975,7 @@ void main() {
     );
     f.accepted.add(conflicting.toJson());
     await f.runtime.engine.syncNow();
-    expect(
-      await f.runtime.store.checkpoint('account:startup-account'),
-      cursor,
-    );
+    expect(await f.runtime.store.checkpoint('account:startup-account'), cursor);
     expect(await f.runtime.store.operation(conflicting.operationId), isNull);
     final unchanged = (await f.repository.getNotebook(note.uid))!;
     expect(unchanged.pages.single.title, 'Offline page title');
@@ -1082,9 +1077,7 @@ void main() {
     expect(merged.text, contains('Base'));
     expect(merged.text, contains('Offline '));
     expect(merged.text, contains('Remote '));
-    final cursor = await f.runtime.store.checkpoint(
-      'account:startup-account',
-    );
+    final cursor = await f.runtime.store.checkpoint('account:startup-account');
     expect(cursor, 5);
     await f.runtime.engine.syncNow();
     final replayed = (await f.repository.getNotebook(
@@ -1098,5 +1091,299 @@ void main() {
       [local.operationId],
     );
   });
+test('SQLite restart keeps offline ink and remote title', () async {
+    final directory = await Directory.systemTemp.createTemp('nn-v2-offline-');
+    addTearDown(() => directory.delete(recursive: true));
+    final file = File(directory.path + '/notes.sqlite');
+    final first = _Fixture(NativeDatabase(file));
+    late String documentId;
+    late String localOperationId;
+    late List<Map<String, dynamic>> feed;
+    try {
+      expect(
+        await first.runtime.startForCurrentAccount(isCurrent: () => true),
+        isTrue,
+      );
+      final note = await first.repository.createNotebook();
+      documentId = note.uid;
+      await first.runtime.engine.syncNow();
+      final pageId = note.pages.single.id;
+      final local = await first.runtime.store.writeLocal(
+        actorId: first.runtime.engine.actorIdForDocument(documentId),
+        documentId: documentId,
+        pageId: pageId,
+        objectId: 'offline-restart-stroke',
+        kind: OperationKind.strokeCreate,
+        payload: const {
+          'value': {
+            'objectType': 'stroke',
+            'colorValue': 0xFF123456,
+            'width': 2.0,
+            'toolIndex': 0,
+            'sortIndex': 0,
+            'points': [
+              [1.0, 2.0, 0.5],
+            ],
+          },
+        },
+        apply: first.runtime.projector.apply,
+      );
+      localOperationId = local.operationId;
+      first.rejectPosts = true;
+      final remote = OperationEnvelope(
+        operationId: '00000000-0000-4000-8000-000000009981',
+        actorId: 'restart-peer',
+        actorSeq: 1,
+        logicalClock: local.logicalClock + 1,
+        dependencies: [first.accepted.last['operationId'] as String],
+        documentId: documentId,
+        kind: OperationKind.documentSet,
+        payload: const {
+          'properties': {'title': 'Peer title'},
+        },
+      );
+      first.accepted.add(remote.toJson());
+      await first.runtime.engine.syncNow();
+      expect(
+        await first.runtime.store.checkpoint('account:startup-account'),
+        3,
+      );
+      feed = first.accepted
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+    } finally {
+      await first.close();
+    }
 
+    final restarted = _Fixture(NativeDatabase(file));
+    addTearDown(restarted.close);
+    restarted.accepted.addAll(feed);
+    restarted.rejectPosts = true;
+    expect(
+      await restarted.runtime.startForCurrentAccount(isCurrent: () => true),
+      isTrue,
+    );
+    await restarted.runtime.engine.syncNow();
+    final restored = (await restarted.repository.getNotebook(documentId))!;
+    expect(restored.title, 'Peer title');
+    expect(restored.pages.single.inkStrokes, hasLength(1));
+    expect(
+      restored.pages.single.inkStrokes.single.id,
+      'offline-restart-stroke',
+    );
+    expect(
+      await restarted.runtime.store.checkpoint('account:startup-account'),
+      3,
+    );
+    expect(
+      (await restarted.runtime.store.pending(
+        includeDeferred: true,
+      )).map((operation) => operation.operationId),
+      [localOperationId],
+    );
+    await restarted.runtime.engine.syncNow();
+    final again = (await restarted.repository.getNotebook(documentId))!;
+    expect(again.title, 'Peer title');
+    expect(again.pages.single.inkStrokes, hasLength(1));
+  });
+
+  test('three offline edits merge only independent metadata', () async {
+    final f = _Fixture(NativeDatabase.memory());
+    addTearDown(f.close);
+    expect(
+      await f.runtime.startForCurrentAccount(isCurrent: () => true),
+      isTrue,
+    );
+    final note = await f.repository.createNotebook();
+    await f.runtime.engine.syncNow();
+    final actor = f.runtime.engine.actorIdForDocument(note.uid);
+    final pageId = note.pages.single.id;
+    final title = await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: note.uid,
+      kind: OperationKind.documentSet,
+      payload: const {
+        'properties': {'title': 'Offline title'},
+      },
+      apply: f.runtime.projector.apply,
+    );
+    final bookmark = await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: note.uid,
+      kind: OperationKind.pageSet,
+      objectId: pageId,
+      payload: const {
+        'properties': {'isBookmarked': true},
+      },
+      apply: f.runtime.projector.apply,
+    );
+    final ink = await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: note.uid,
+      pageId: pageId,
+      objectId: 'offline-three-way-ink',
+      kind: OperationKind.strokeCreate,
+      payload: const {
+        'value': {
+          'objectType': 'stroke',
+          'colorValue': 0xFF123456,
+          'width': 2.0,
+          'toolIndex': 0,
+          'sortIndex': 0,
+          'points': [
+            [1.0, 2.0, 0.5],
+          ],
+        },
+      },
+      apply: f.runtime.projector.apply,
+    );
+    f.rejectPosts = true;
+    final folder = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-000000009982',
+      actorId: 'folder-peer',
+      actorSeq: 1,
+      logicalClock: ink.logicalClock + 1,
+      dependencies: [f.accepted.last['operationId'] as String],
+      documentId: note.uid,
+      kind: OperationKind.documentSet,
+      payload: const {
+        'properties': {'folder': 'Remote folder'},
+      },
+    );
+    f.accepted.add(folder.toJson());
+    await f.runtime.engine.syncNow();
+    final merged = (await f.repository.getNotebook(note.uid))!;
+    expect(merged.title, 'Offline title');
+    expect(merged.folder, 'Remote folder');
+    expect(merged.pages.single.isBookmarked, isTrue);
+    expect(merged.pages.single.inkStrokes.single.id, 'offline-three-way-ink');
+    expect(
+      await f.runtime.store.checkpoint('account:startup-account'),
+      3,
+    );
+    expect(
+      (await f.runtime.store.pending(
+        includeDeferred: true,
+      )).map((operation) => operation.operationId),
+      [title.operationId, bookmark.operationId, ink.operationId],
+    );
+
+    final conflicting = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-000000009983',
+      actorId: 'folder-peer',
+      actorSeq: 2,
+      logicalClock: folder.logicalClock + 1,
+      dependencies: [folder.operationId],
+      documentId: note.uid,
+      kind: OperationKind.documentSet,
+      payload: const {
+        'properties': {'title': 'Remote conflict'},
+      },
+    );
+    f.accepted.add(conflicting.toJson());
+    await f.runtime.engine.syncNow();
+    expect(
+      await f.runtime.store.checkpoint('account:startup-account'),
+      3,
+    );
+    expect((await f.repository.getNotebook(note.uid))!.title, 'Offline title');
+  });
+test('offline Quill insert and remote text geometry merge', () async {
+    final f = _Fixture(NativeDatabase.memory());
+    addTearDown(f.close);
+    expect(
+      await f.runtime.startForCurrentAccount(isCurrent: () => true),
+      isTrue,
+    );
+    final note = await f.repository.createNotebook();
+    await f.runtime.engine.syncNow();
+    final pageId = note.pages.single.id;
+    final actor = f.runtime.engine.actorIdForDocument(note.uid);
+    const objectId = 'offline-text-geometry';
+    const firstAtom = '00000000-0000-4000-8000-000000009991';
+    const offlineAtom = '00000000-0000-4000-8000-000000009992';
+    await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: note.uid,
+      pageId: pageId,
+      objectId: objectId,
+      kind: OperationKind.objectCreate,
+      payload: const {
+        'value': {
+          'objectType': 'text',
+          'dx': 5.0,
+          'dy': 6.0,
+          'width': 160.0,
+          'fontSize': 18.0,
+          'rotation': 0.0,
+          'colorValue': 0xFF224466,
+          'sortIndex': 0,
+        },
+      },
+      apply: f.runtime.projector.apply,
+    );
+    await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: note.uid,
+      pageId: pageId,
+      objectId: objectId,
+      kind: OperationKind.textInsert,
+      payload: const {
+        'afterAtomId': null,
+        'atoms': [
+          {'id': firstAtom, 'text': 'Base\n'},
+        ],
+      },
+      apply: f.runtime.projector.apply,
+    );
+    await f.runtime.engine.syncNow();
+    final local = await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: note.uid,
+      pageId: pageId,
+      objectId: objectId,
+      kind: OperationKind.textInsert,
+      payload: const {
+        'afterAtomId': null,
+        'atoms': [
+          {'id': offlineAtom, 'text': 'Offline '},
+        ],
+      },
+      apply: f.runtime.projector.apply,
+    );
+    f.rejectPosts = true;
+    final remote = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-000000009993',
+      actorId: 'geometry-peer',
+      actorSeq: 1,
+      logicalClock: local.logicalClock + 1,
+      dependencies: [f.accepted.last['operationId'] as String],
+      documentId: note.uid,
+      pageId: pageId,
+      objectId: objectId,
+      kind: OperationKind.objectSet,
+      payload: const {
+        'properties': {'width': 240.0, 'dx': 24.0},
+      },
+    );
+    f.accepted.add(remote.toJson());
+    await f.runtime.engine.syncNow();
+    final block = (await f.repository.getNotebook(
+      note.uid,
+    ))!.pages.single.textBlocks.single;
+    expect(block.width, 240.0);
+    expect(block.position.dx, 24.0);
+    expect(block.text, contains('Base'));
+    expect(block.text, contains('Offline '));
+    expect(
+      await f.runtime.store.checkpoint('account:startup-account'),
+      5,
+    );
+    expect(
+      (await f.runtime.store.pending(
+        includeDeferred: true,
+      )).map((operation) => operation.operationId),
+      [local.operationId],
+    );
+  });
 }
