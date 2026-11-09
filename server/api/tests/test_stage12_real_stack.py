@@ -177,6 +177,51 @@ def feed(client, token):
         cursor = payload["cursor"]
 
 
+def test_300_independent_parents_commit_over_real_http_and_postgresql(client):
+    """A bounded full frontier is applied without dropping any parent ID."""
+    _, token = identity()
+    document = "frontier-" + uuid.uuid4().hex
+    creator = Actor(document, "frontier-create-" + uuid.uuid4().hex)
+    created = creator.next(
+        "document.create", payload={"value": {"title": "base"}},
+    )
+    submit(client, token, [created])
+
+    parents = []
+    for index in range(300):
+        actor = Actor(document, f"frontier-peer-{index}", clock=1)
+        parents.append(actor.next(
+            "document.set",
+            payload={"properties": {"title": f"peer-{index}"}},
+            after=[created["operationId"]],
+        ))
+    for index in range(0, len(parents), 50):
+        submitted = submit(client, token, parents[index:index + 50])
+        assert len(submitted["acknowledgements"]) == 50
+        assert all(
+            receipt["status"] == "applied"
+            for receipt in submitted["acknowledgements"]
+        )
+
+    merger = Actor(document, "frontier-merge", clock=2)
+    merged = merger.next(
+        "document.set", payload={"properties": {"title": "merged"}},
+        after=[entry["operationId"] for entry in parents],
+    )
+    assert len(merged["dependencies"]) == 300
+    received = submit(client, token, [merged])
+    assert received["acknowledgements"][0]["status"] == "applied"
+    state = snapshot(client, token, document)
+    assert state["revision"] == 302
+    assert state["state"]["properties"]["title"] == "merged"
+    before_cursor = state["cursor"]
+
+    replay = submit(client, token, [merged])
+    assert replay["acknowledgements"][0]["status"] == "duplicate"
+    assert snapshot(client, token, document)["revision"] == 302
+    assert snapshot(client, token, document)["cursor"] == before_cursor
+
+
 def test_global_cursor_tracks_commit_order_of_competing_transactions():
     """Real PostgreSQL serializes the v2 cursor before either commit."""
     _require_disposable_database()
