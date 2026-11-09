@@ -24,6 +24,21 @@ REST/SQLite przy offline edycji, przegraną i wygraną zdalnego rank,
 Quill format→null i ruch z jedną atomową listą punktów. Bramka
 odrzuca nieznane pola obiektów, w tym historyczne text/ocrText.
 
+## Ochrona całego feedu i offline delete przy page.create (2026-11-09)
+
+SyncEngine odrzuca niekompletną lub niepoprawnie uporządkowaną stronę
+REST/Share przed zapisaniem jakiejkolwiek jej operacji, także gdy
+niestandardowy gateway nie używa walidatora HttpOperationGateway.
+Nie wolno przesunąć checkpointu ani częściowo odtworzyć strony
+z nieprawidłowym cursor/hasMore. Operacje z innym documentId
+nadal podlegają osobnej walidacji identyfikatorów.
+
+Utworzenie nowej strony jest niezależne od usunięcia odrębnego
+obiektu na już istniejącej stronie. Niedozwolone są usunięcia
+na dopiero tworzonej stronie, współbieżne page.delete i move.
+Lokalny outbox i tombstone nie są przepisywane. Produkcyjny
+cutover v1→v2 nadal pozostaje wyłączony.
+
 ## Historyczny ACK i niezależne object.move (2026-11-09)
 
 Trwały outbox v2 odrzuca nie tylko duplikaty kursora wewnątrz

@@ -1227,10 +1227,9 @@ void main() {
       final saved = (await notebooks.getNotebook(documentId))!;
       expect(saved.pages.single.inkStrokes.single.width, 7.0);
       expect(await store.checkpoint('ink-scalar-rank'), 2);
-      expect(
-        (await store.pending()).map((op) => op.operationId),
-        [created.single.operationId],
-      );
+      expect((await store.pending()).map((op) => op.operationId), [
+        created.single.operationId,
+      ]);
     });
 
     test('SQLite stroke points converge, reverse=$reverseOrder', () async {

@@ -84,8 +84,8 @@ class V2OutboxConflictPolicy {
 
   /// A new page appends a fresh identity without touching existing pages.
   ///
-  /// Concurrent page creations and destructive operations are deliberately
-  /// held back: their ordering or deletion preconditions may differ.
+  /// Deleting a distinct object on an existing page also commutes. Page
+  /// deletion, container moves and concurrent page creations remain blocked.
   static bool _independentPageCreate(
     OperationEnvelope created,
     OperationEnvelope other,
@@ -105,6 +105,7 @@ class V2OutboxConflictPolicy {
       OperationKind.objectSet,
       OperationKind.objectTransform,
       OperationKind.objectReorder,
+      OperationKind.objectDelete,
       OperationKind.textInsert,
       OperationKind.textDelete,
       OperationKind.textFormat,

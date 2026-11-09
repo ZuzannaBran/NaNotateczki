@@ -369,6 +369,27 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  /// Validate a full page before applying its first operation. This is also
+  /// required for non-HTTP gateways, which do not use the REST validator.
+  static void _validateFeedPage(OperationFeedPage page, int requested) {
+    if (page.cursor < requested ||
+        page.cursor > OperationEnvelope.maxSafeInteger ||
+        (page.hasMore && page.operations.isEmpty)) {
+      throw const FormatException('Invalid operation feed cursor.');
+    }
+    var previous = requested;
+    for (final item in page.operations) {
+      if (item.cursor <= previous ||
+          item.cursor > OperationEnvelope.maxSafeInteger) {
+        throw const FormatException('Non-monotonic operation feed.');
+      }
+      previous = item.cursor;
+    }
+    if (previous != page.cursor) {
+      throw const FormatException('Inconsistent operation feed cursor.');
+    }
+  }
+
   /// Do not advance the durable global cursor past an unapplied operation.
   /// Other independent operations in the same page can still be committed:
   /// replay after a crash or gap is idempotent.
@@ -379,6 +400,7 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
       if (!_isActive(generation)) {
         return;
       }
+      _validateFeedPage(page, cursor);
       var contiguous = cursor;
       Object? blocked;
       var gap = false;

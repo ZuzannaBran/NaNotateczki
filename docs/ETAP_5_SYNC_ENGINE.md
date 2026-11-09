@@ -1,5 +1,28 @@
 # Etap 5 — silnik synchronizacji operacji v2
 
+## Walidacja feedu i usuwanie offline przy tworzeniu strony (2026-11-09)
+
+Przed dowolną transakcją projekcji SyncEngine waliduje całą otrzymaną
+stronę operacji: bezpieczny zakres i rosnące kursory, zgodność kursora
+strony z ostatnim eventem i niepusty feed przy hasMore. Kontrola działa
+również dla bram innych niż HttpOperationGateway. Błędna strona
+nie zapisuje nawet poprawnego prefiksu, nie przesuwa checkpointu
+i nie usuwa lokalnego outboxu. Test: test/sync_engine_test.dart.
+
+Bezpieczny rebase obejmuje teraz page.create przy równoległym
+object.delete na innej, istniejącej stronie. Obie operacje pozostawiają
+własne tombstone i identyfikatory, bez przesuwania actorSeq. Usuwanie
+obiektu na dopiero tworzonej stronie, page.delete, move i media
+pozostają zablokowane. Testy: polityka konfliktów oraz REST/SQLite
+test/editor_v2_account_startup_test.dart.
+
+CI 42639658192: 14/17 zadań zaliczonych; Dart zatrzymał się na
+dwóch fragmentach formatowania (zastosowano dokładny diff),
+kontrakt Python ujawnił test z logicalClock=100 wcześniejszym
+niż clock=820 operacji create (test poprawiony w serwerze),
+kompilacja iOS no-sign została anulowana. Te zmiany wymagają
+nowego przebiegu; produkcyjne v1 pozostaje nietknięte.
+
 ## Rebase wspólnych rejestrów LWW i Quill (2026-11-09)
 
 Ostatni app CI 42617311998: 16/17 sukcesów, w tym iPad i

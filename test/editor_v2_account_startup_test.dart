@@ -922,6 +922,79 @@ void main() {
     );
   });
 
+  test('offline object deletion survives remote page creation', () async {
+    final f = _Fixture(NativeDatabase.memory());
+    addTearDown(f.close);
+    expect(
+      await f.runtime.startForCurrentAccount(isCurrent: () => true),
+      isTrue,
+    );
+    final note = await f.repository.createNotebook();
+    await f.runtime.engine.syncNow();
+    final actor = f.runtime.engine.actorIdForDocument(note.uid);
+    final pageId = note.pages.single.id;
+    await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: note.uid,
+      kind: OperationKind.strokeCreate,
+      pageId: pageId,
+      objectId: 'offline-deleted-stroke',
+      payload: const {
+        'value': {
+          'objectType': 'stroke',
+          'colorValue': 0xFF123456,
+          'width': 2.0,
+          'toolIndex': 0,
+          'sortIndex': 0,
+          'points': [
+            [1.0, 2.0, 0.5],
+          ],
+        },
+      },
+      apply: f.runtime.projector.apply,
+    );
+    await f.runtime.engine.syncNow();
+    final deletion = await f.runtime.store.writeLocal(
+      actorId: actor,
+      documentId: note.uid,
+      kind: OperationKind.objectDelete,
+      pageId: pageId,
+      objectId: 'offline-deleted-stroke',
+      payload: const {},
+      apply: f.runtime.projector.apply,
+    );
+    f.rejectPosts = true;
+    final remote = OperationEnvelope(
+      operationId: '00000000-0000-4000-8000-000000009994',
+      actorId: 'page-creation-peer',
+      actorSeq: 1,
+      logicalClock: deletion.logicalClock + 1,
+      dependencies: [f.accepted.last['operationId'] as String],
+      documentId: note.uid,
+      objectId: 'page-from-peer',
+      kind: OperationKind.pageCreate,
+      payload: const {
+        'value': {'title': 'Peer page', 'isBookmarked': false},
+      },
+    );
+    f.accepted.add(remote.toJson());
+    await f.runtime.engine.syncNow();
+
+    final merged = (await f.repository.getNotebook(note.uid))!;
+    expect(merged.pages, hasLength(2));
+    expect(merged.pages.first.inkStrokes, isEmpty);
+    expect(merged.pages.last.id, remote.objectId);
+    expect(await f.runtime.store.checkpoint('account:startup-account'), 4);
+    expect(
+      (await f.runtime.store.pending(
+        includeDeferred: true,
+      )).map((operation) => operation.operationId),
+      [deletion.operationId],
+    );
+    await f.runtime.engine.syncNow();
+    expect((await f.repository.getNotebook(note.uid))!.pages, hasLength(2));
+  });
+
   test('offline page title and remote bookmark keep both edits', () async {
     final f = _Fixture(NativeDatabase.memory());
     addTearDown(f.close);
@@ -983,10 +1056,7 @@ void main() {
       await f.runtime.store.checkpoint('account:startup-account'),
       cursor + 1,
     );
-    expect(
-      await f.runtime.store.operation(conflicting.operationId),
-      isNotNull,
-    );
+    expect(await f.runtime.store.operation(conflicting.operationId), isNotNull);
     final resolved = (await f.repository.getNotebook(note.uid))!;
     expect(resolved.pages.single.title, 'Conflicting title');
     expect(

@@ -640,9 +640,9 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   Dodatkowo: zdalne obiekty przy lokalnym document.set/page.set
   oraz wspólne, identyczne receipty asset.attach między właścicielami.
   Zmiany nie przepuszczają delete ani niezgodnych assetów.
-  Nowa strona może przejść mimo offline metadanych i edycji obiektów
-  innych stron; konkurencyjne page.create, move, delete i kolizje UID
-  nadal blokują kursor.
+  Nowa strona może przejść mimo offline metadanych, edycji i usunięć
+  innych obiektów na istniejących stronach; konkurencyjne page.create,
+  page.delete, move i kolizje UID nadal blokują kursor.
   page.delete przechodzi przy niezależnych metadanych i edycjach
   na innej stronie, ale odmawia dla tej samej strony, move,
   nowych stron i media; nie stosuje snapshotów v1.
@@ -652,7 +652,7 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   Nie przepuszcza snapshotowych text/ocrText, nieznanych pól
   document/page, assetId, image
   multi-field transforms ani ruchu tego samego edytowanego UID.
-  Testy: `test/v2_outbox_conflict_policy_test.dart` (45 grupy).
+  Testy: `test/v2_outbox_conflict_policy_test.dart` (46 grup).
 - `lib/data/sync/editor_v2_account_runtime.dart` tworzy izolowany
   `OperationStore`, `SyncEngine`, projektor i zweryfikowany asset gateway
   tylko dla konta z potwierdzonym protokołem v2. Zdalne operacje
@@ -741,8 +741,10 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   Cała paczka ACK przechodzi jedną transakcją SQLite albo
   zostaje w outboxie; zduplikowany, malejący lub zbyt duży
   cursor nie może zwolnić żadnej operacji.
+  Przed zapisaniem choćby pierwszego eventu silnik sprawdza cały feed
+  (kursory, kolejność, hasMore), także dla bram innych niż HTTP.
   Regresje: `test/sync_engine_test.dart` (drugi INSERT fail,
-  retry, pusty feed i wadliwe receipty).
+  retry, pusty feed, nieprawidłowe strony i wadliwe receipty).
   `onRemoteCommitted` powiadamia UI dopiero po commit SQLite i przed
   przesunięciem kursora; błędny patch jest ponawiany, a ACK własnego
   aktora nie odmalowuje widoku. Powtórny odczyt obcego envelope nie

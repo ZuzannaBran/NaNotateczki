@@ -113,6 +113,18 @@ class _QuietFeedGateway extends _FakeGateway {
   }
 }
 
+class _MalformedFeedGateway extends _FakeGateway {
+  _MalformedFeedGateway(this.page);
+
+  final OperationFeedPage page;
+
+  @override
+  Future<OperationFeedPage> readAfter(int cursor) async {
+    reads++;
+    return page;
+  }
+}
+
 class _ReversedAckGateway extends _QuietFeedGateway {
   @override
   Future<List<OperationReceipt>> send(
@@ -243,6 +255,61 @@ void main() {
       ),
     );
   }
+
+  test('malformed feed pages cannot commit valid-looking prefixes', () async {
+    final first = _remote('remote-peer', 'bad-feed-first');
+    final second = _remote('remote-peer', 'bad-feed-second');
+    final malformed = [
+      OperationFeedPage(
+        cursor: 2,
+        hasMore: false,
+        operations: [SequencedOperation(1, first)],
+      ),
+      OperationFeedPage(
+        cursor: 1,
+        hasMore: false,
+        operations: [
+          SequencedOperation(1, first),
+          SequencedOperation(1, second),
+        ],
+      ),
+      const OperationFeedPage(
+        cursor: 0,
+        hasMore: true,
+        operations: [],
+      ),
+      OperationFeedPage(
+        cursor: OperationEnvelope.maxSafeInteger + 1,
+        hasMore: false,
+        operations: const [],
+      ),
+    ];
+    for (final page in malformed) {
+      await engine.stop();
+      engine.dispose();
+      gateway = _MalformedFeedGateway(page);
+      engine = SyncEngine(
+        store: store,
+        gateway: gateway,
+        actorId: 'actor-local',
+        checkpointScope: 'user-A-v2',
+        enableRealtime: false,
+        applyRemote: (remote, _) async {
+          await database.customStatement(
+            'INSERT INTO projection_probe VALUES (?, ?)',
+            [remote.objectId, 'remote'],
+          );
+        },
+      );
+      await engine.start();
+      expect(
+        (await database.customSelect('SELECT * FROM projection_probe').get()),
+        isEmpty,
+      );
+      expect(await store.checkpoint('user-A-v2'), 0);
+      expect(engine.lastError, contains('feed'));
+    }
+  });
 
   test(
     'stopping during asset preparation cannot send old account edits',

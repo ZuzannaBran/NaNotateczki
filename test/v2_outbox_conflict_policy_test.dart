@@ -349,6 +349,33 @@ void main() {
     expect(_allowed(embed, separate), isTrue);
   });
 
+  test('new page commutes with offline deletion on another page', () {
+    final created = _operation(
+      OperationKind.pageCreate,
+      remote: true,
+      objectId: 'page-added',
+      payload: const {
+        'value': {'title': 'Remote', 'isBookmarked': false},
+      },
+    );
+    final removed = _operation(
+      OperationKind.objectDelete,
+      pageId: 'page-existing',
+      objectId: 'old-stroke',
+      payload: const {},
+    );
+    final unsafe = _operation(
+      OperationKind.objectDelete,
+      pageId: 'page-added',
+      objectId: 'old-stroke',
+      payload: const {},
+    );
+    expect(_allowed(created, removed), isTrue);
+    expect(_allowed(removed, created), isTrue);
+    expect(_allowed(created, unsafe), isFalse);
+    expect(_allowed(unsafe, created), isFalse);
+  });
+
   test('a remote deletion still waits for the local outbox', () {
     final deleted = _operation(
       OperationKind.documentDelete,

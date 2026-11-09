@@ -1,5 +1,16 @@
 # Etap 12 — weryfikacja zapisu i synchronizacji
 
+## Dodatkowe regresje etap 5 (2026-11-09)
+
+- Test silnika odrzuca cztery uszkodzone strony feedu (rozbieżny
+  page cursor, powtórzony cursor, puste hasMore, przekroczenie 2^53-1)
+  przed jakimkolwiek zapisem do SQLite lub przesunięciem checkpointu.
+- Test polityki i REST/SQLite: nowa strona przy lokalnym usunięciu
+  odrębnej kreski; zachowane tombstone, outbox i pojedynczy remote page.
+- Po zbudowaniu sprawdzić ręcznie również wznowienie na innym urządzeniu
+  i offline delete + remote create, bez odzyskania usuniętej kreski.
+  To jest scenariusz ręczny, nie zaliczony test automatyczny.
+
 ## Walidacja ranków wspólnych pól i Quill (2026-11-09)
 
 Ostatni app CI 42617311998: 16/17 zadań zielonych,
