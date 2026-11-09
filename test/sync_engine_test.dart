@@ -273,11 +273,7 @@ void main() {
           SequencedOperation(1, second),
         ],
       ),
-      const OperationFeedPage(
-        cursor: 0,
-        hasMore: true,
-        operations: [],
-      ),
+      const OperationFeedPage(cursor: 0, hasMore: true, operations: []),
       OperationFeedPage(
         cursor: OperationEnvelope.maxSafeInteger + 1,
         hasMore: false,
