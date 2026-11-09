@@ -404,6 +404,9 @@ class OperationEnvelope {
     return value;
   }
 
+  /// Maximum serialized causal IDs in one operation (39 bytes per UUID).
+  static const maxDependencyBytes = 128 * 1024;
+
   void _validate() {
     if (schemaVersion != currentSchemaVersion) {
       throw FormatException('Unsupported operation schema: $schemaVersion');
@@ -422,7 +425,7 @@ class OperationEnvelope {
         logicalClock > maxSafeInteger) {
       throw const FormatException('Invalid actor, sequence, or clock.');
     }
-    if (dependencies.length > 256 ||
+    if (dependencies.length * 39 > maxDependencyBytes ||
         dependencies.toSet().length != dependencies.length ||
         dependencies.contains(operationId) ||
         dependencies.any((id) => !_isValidUuid(id)) ||
