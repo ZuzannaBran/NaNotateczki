@@ -1,5 +1,22 @@
 # Etap 5 — silnik synchronizacji operacji v2
 
+## Rejestr kolejności warstw przy przenoszeniu v2 (2026-11-09)
+
+Poprawiono `EditorSqliteProjector._moveObject`: przeniesienie obiektu
+nie może nadpisać `sortIndex` ustawionego przez `object.reorder`
+o wyższej randze `(clock, actor, seq, operationId)`. Projekcja
+SQLite zachowuje wygrywającą pozycję, zgodnie z serwerowym
+`_merge` (LWW), również gdy najpierw dotrze zmiana warstwy.
+Dotyczy kreski, obrazu i bloku tekstowego.
+
+Test SQLite sprawdza oba porządki poprawnych zdarzeń, brak
+duplikatu UID, checkpoint, outbox i idempotencję powtórnego feedu.
+Test Python obejmuje obie kolejności oraz rangę zapisaną
+w projekcji. Testy obu repozytoriów mają ten sam kod.
+Pełny rebase tego samego UID w różnych kontenerach nadal
+wymaga osobnej implementacji; produkcyjnego cutover nie włączono.
+
+
 ## Walidacja feedu i usuwanie offline przy tworzeniu strony (2026-11-09)
 
 Przed dowolną transakcją projekcji SyncEngine waliduje całą otrzymaną

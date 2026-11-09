@@ -908,6 +908,89 @@ void main() {
     });
   }
 
+  for (final moveFirst in [false, true]) {
+    test('move keeps newer z-order, moveFirst=$moveFirst', () async {
+      const destination = 'ranked-move-destination';
+      final setup = await write([
+        const LocalOperationDraft(
+          kind: OperationKind.pageCreate,
+          objectId: destination,
+          payload: {
+            'value': {'title': 'Destination', 'isBookmarked': false},
+          },
+        ),
+        LocalOperationDraft(
+          kind: OperationKind.strokeCreate,
+          pageId: pageId,
+          objectId: 'ranked-move-ink',
+          payload: {'value': _stroke()},
+        ),
+      ]);
+      final move = OperationEnvelope(
+        operationId: const Uuid().v4(),
+        actorId: 'move-actor',
+        actorSeq: 1,
+        logicalClock: 50,
+        documentId: documentId,
+        pageId: pageId,
+        objectId: 'ranked-move-ink',
+        kind: OperationKind.objectMove,
+        payload: const {'toPageId': destination, 'sortIndex': 2},
+        dependencies: [setup.last.operationId],
+      );
+      final reorder = OperationEnvelope(
+        operationId: const Uuid().v4(),
+        actorId: 'reorder-actor',
+        actorSeq: 1,
+        logicalClock: 60,
+        documentId: documentId,
+        pageId: moveFirst ? destination : pageId,
+        objectId: 'ranked-move-ink',
+        kind: OperationKind.objectReorder,
+        payload: const {
+          'properties': {'sortIndex': 9},
+        },
+        dependencies: [setup.last.operationId],
+      );
+      final delivered = moveFirst ? [move, reorder] : [reorder, move];
+      for (var i = 0; i < delivered.length; i++) {
+        final operation = delivered[i];
+        expect(
+          await store.applyRemote(
+            operation,
+            serverSequence: i + 1,
+            checkpointScope: 'ranked-move-z-order',
+            apply: () => projector.apply(operation),
+          ),
+          isTrue,
+        );
+      }
+      final rows = await database
+          .customSelect(
+            'SELECT page_uid, sort_index FROM ink_stroke_rows WHERE uid = ?',
+            variables: [const Variable<String>('ranked-move-ink')],
+          )
+          .get();
+      expect(rows, hasLength(1));
+      expect(rows.single.read<String>('page_uid'), destination);
+      expect(rows.single.read<int>('sort_index'), 9);
+      expect(await store.checkpoint('ranked-move-z-order'), 2);
+      expect(
+        (await store.pending()).map((op) => op.operationId),
+        setup.map((op) => op.operationId),
+      );
+      expect(
+        await store.applyRemote(
+          delivered.last,
+          serverSequence: 2,
+          checkpointScope: 'ranked-move-z-order',
+          apply: () => projector.apply(delivered.last),
+        ),
+        isFalse,
+      );
+    });
+  }
+
   test(
     'object.move preserves the stroke identity across notebook pages',
     () async {

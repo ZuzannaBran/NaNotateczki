@@ -611,15 +611,16 @@ class EditorSqliteProjector {
       throw StateError('Destination page has been tombstoned.');
     }
     final ink = await _row(
-      'SELECT page_uid FROM ink_stroke_rows WHERE uid = ?',
+      'SELECT page_uid, sort_index FROM ink_stroke_rows WHERE uid = ?',
       [Variable<String>(op.objectId!)],
     );
     final image = await _row(
-      'SELECT page_uid FROM image_block_rows WHERE uid = ?',
+      'SELECT page_uid, sort_index FROM image_block_rows WHERE uid = ?',
       [Variable<String>(op.objectId!)],
     );
     final text = await _row(
-      'SELECT page_uid, delta_json FROM text_block_rows WHERE uid = ?',
+      'SELECT page_uid, sort_index, delta_json '
+      'FROM text_block_rows WHERE uid = ?',
       [Variable<String>(op.objectId!)],
     );
     final matches =
@@ -714,10 +715,16 @@ class EditorSqliteProjector {
         : image != null
         ? 'image_block_rows'
         : 'text_block_rows';
+    // Preserve the stronger sortIndex register even when a move relocates
+    // the object after a newer, already committed reorder.
+    final accepted = await _winningProperties(op, {'sortIndex': index});
+    final effectiveIndex = accepted.containsKey('sortIndex')
+        ? index
+        : (ink ?? image ?? text)!['sort_index'] as int;
     await database.customStatement(
       'UPDATE $table SET page_uid = ?, sort_index = ? '
       'WHERE uid = ? AND page_uid = ?',
-      [destinationId, index, op.objectId, actualSourceId],
+      [destinationId, effectiveIndex, op.objectId, actualSourceId],
     );
   }
 

@@ -501,7 +501,9 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   usuwającego białe znaki użytkownika.
   Rzutowanie atomów korzysta z `OperationStore.textAtoms`, a update pól
   porównuje rank `(clock, actor, seq, operationId)` z historią operacji,
-  niezależnie od kolejności dostarczenia.
+  niezależnie od kolejności dostarczenia. Move zmienia stronę,
+  ale zachowuje mocniejszą rangę `sortIndex` po `object.reorder`;
+  test `editor_sqlite_projector_test.dart` weryfikuje obie kolejności.
   Dla image/PDF `object.create` zapisuje metadane w dzienniku,
   bez pustego rekordu obrazu. Dopiero `asset.attach` po weryfikacji
   bajtów w `VerifiedEditorAssetBuffer` materializuje obraz w SQLite
