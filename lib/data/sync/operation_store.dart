@@ -439,9 +439,12 @@ class OperationStore {
         'WHERE o.operation_id = ?',
         [_remoteActorScope(entry.actorId), previous],
       );
-      final covered = previousReceipt?['source'] == 'local'
-          ? previousReceipt?['ack_cursor'] as int?
-          : previousReceipt?['remote_cursor'] as int?;
+      int? covered;
+      if (previousReceipt != null) {
+        covered = previousReceipt['source'] == 'local'
+            ? previousReceipt['ack_cursor'] as int?
+            : previousReceipt['remote_cursor'] as int?;
+      }
       if (covered == null ||
           entry.causalCursor == null ||
           covered > entry.causalCursor!) {

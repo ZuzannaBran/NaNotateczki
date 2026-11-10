@@ -94,6 +94,7 @@ class OperationEnvelope {
   final Map<String, dynamic> payload;
   final List<String> dependencies;
   final int logicalClock;
+
   /// A contiguous, durably applied server feed prefix covering older parents.
   final int? causalCursor;
   final String? revertsOperationId;

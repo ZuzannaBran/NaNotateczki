@@ -1192,7 +1192,8 @@ void main() {
   test('compact cursor covers 300 committed remote actor heads', () async {
     store = OperationStore(database, checkpointScope: 'account:test');
     for (var i = 0; i < 300; i++) {
-      final id = '${(i + 4000).toRadixString(16).padLeft(8, '0')}'
+      final id =
+          '${(i + 4000).toRadixString(16).padLeft(8, '0')}'
           '-1111-4111-8111-111111111111';
       final remote = OperationEnvelope(
         operationId: id,
@@ -1294,6 +1295,67 @@ void main() {
     );
     expect(await store.operation(remote.operationId), isNull);
     expect(await store.pending(), isEmpty);
+  });
+
+  test('remote predecessor requires its durable cursor before compaction', () async {
+    store = OperationStore(database, checkpointScope: 'account:test');
+    final first = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'same-remote',
+      actorSeq: 1,
+      logicalClock: 1,
+      documentId: 'document-one',
+      pageId: 'page-one',
+      objectId: 'first-remote',
+      kind: OperationKind.objectCreate,
+      payload: const {'value': {'x': 1}},
+      dependencies: const [],
+    );
+    await store.applyRemote(
+      first,
+      serverSequence: 50,
+      checkpointScope: 'account:test',
+      apply: () async {},
+    );
+    final second = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: first.actorId,
+      actorSeq: 2,
+      logicalClock: 2,
+      documentId: first.documentId,
+      pageId: first.pageId,
+      objectId: 'second-remote',
+      kind: OperationKind.objectCreate,
+      payload: const {'value': {'x': 2}},
+      dependencies: const [],
+      causalCursor: 50,
+    );
+    const actorScope = 'remote-actor:["account:test","same-remote"]';
+    await database.customStatement(
+      'DELETE FROM sync_checkpoints WHERE scope = ?',
+      [actorScope],
+    );
+    await expectLater(
+      store.applyRemote(
+        second,
+        serverSequence: 51,
+        coveredCursor: 50,
+        apply: () async {},
+      ),
+      throwsStateError,
+    );
+    expect(await store.operation(second.operationId), isNull);
+    await store.advanceCheckpoint(actorScope, 50);
+    expect(
+      await store.applyRemote(
+        second,
+        serverSequence: 51,
+        coveredCursor: 50,
+        apply: () async {},
+      ),
+      isTrue,
+    );
+    expect(await store.operation(second.operationId), isNotNull);
   });
 
   test('compact remote cannot bypass an unresolved feed gap', () async {

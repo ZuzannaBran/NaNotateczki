@@ -337,20 +337,20 @@ void main() {
               'INSERT INTO projection_probe VALUES (?, ?)',
               [op.objectId, 'remote'],
             );
-        },
-      );
-      await engine.start();
-    }
+          },
+        );
+        await engine.start();
+      }
 
-    await usePage(false);
-    expect(await store.operation(remote.operationId), isNull);
-    expect(await store.checkpoint('user-A-v2'), 0);
-    expect(engine.lastError, contains('gap'));
+      await usePage(false);
+      expect(await store.operation(remote.operationId), isNull);
+      expect(await store.checkpoint('user-A-v2'), 0);
+      expect(engine.lastError, contains('gap'));
 
-    await usePage(true);
-    expect(await store.operation(remote.operationId), isNotNull);
-    expect(await store.checkpoint('user-A-v2'), 5);
-    expect(engine.lastError, isNull);
+      await usePage(true);
+      expect(await store.operation(remote.operationId), isNotNull);
+      expect(await store.checkpoint('user-A-v2'), 5);
+      expect(engine.lastError, isNull);
     },
   );
 
