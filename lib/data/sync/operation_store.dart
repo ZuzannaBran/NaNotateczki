@@ -251,6 +251,10 @@ class OperationStore {
     final previousId = state?['last_operation_id'] as String?;
     // A new local intent observes the durable remote actor frontier.
     // This must be read inside the same transaction as actorSeq.
+    final remoteScopeJoin = checkpointScope == null
+        ? "ON remote.scope = 'remote-actor:' || actor.actor_id "
+        : "ON remote.scope = 'remote-actor:' || "
+              "json_array(?, actor.actor_id) ";
     final observed = await database
         .customSelect(
           'SELECT actor.last_operation_id, latest.source, '
@@ -262,7 +266,7 @@ class OperationStore {
           'LEFT JOIN operation_ack ack '
           'ON ack.operation_id = actor.last_operation_id '
           'LEFT JOIN sync_checkpoints remote '
-          "${checkpointScope == null ? "ON remote.scope = 'remote-actor:' || actor.actor_id " : "ON remote.scope = 'remote-actor:' || json_array(?, actor.actor_id) "}"
+          '$remoteScopeJoin'
           'WHERE actor.actor_id != ? AND latest.document_id = ? '
           'ORDER BY actor.actor_id',
           variables: [
