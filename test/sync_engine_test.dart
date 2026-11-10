@@ -307,8 +307,9 @@ void main() {
     }
   });
 
-  test('filtered REST prefix covers invisible cursors, not unverified gaps',
-      () async {
+  test(
+    'filtered REST prefix covers invisible cursors, not unverified gaps',
+    () async {
     final remote = OperationEnvelope.fromJson({
       ..._remote('share-peer', 'share-object').toJson(),
       'causalCursor': 4,
@@ -317,12 +318,14 @@ void main() {
     Future<void> usePage(bool verified) async {
       await engine.stop();
       engine.dispose();
-      gateway = _MalformedFeedGateway(OperationFeedPage(
-        cursor: 5,
-        hasMore: false,
-        operations: [SequencedOperation(5, remote)],
-        verifiedVisiblePrefix: verified,
-      ));
+      gateway = _MalformedFeedGateway(
+        OperationFeedPage(
+          cursor: 5,
+          hasMore: false,
+          operations: [SequencedOperation(5, remote)],
+          verifiedVisiblePrefix: verified,
+        ),
+      );
       engine = SyncEngine(
         store: store,
         gateway: gateway,
@@ -348,7 +351,8 @@ void main() {
     expect(await store.operation(remote.operationId), isNotNull);
     expect(await store.checkpoint('user-A-v2'), 5);
     expect(engine.lastError, isNull);
-  });
+    },
+  );
 
   test(
     'stopping during asset preparation cannot send old account edits',
