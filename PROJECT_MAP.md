@@ -1,6 +1,8 @@
 # PROJECT_MAP.md
 
-Regresja kompaktacji (2026-11-10): dodatkowy test trwałego kursora poprzednika aktora i odmowy jego pominięcia bez ACK w `test/operation_store_test.dart`.
+Regresja kompaktacji (2026-11-10):
+`test/operation_store_test.dart` weryfikuje, że brak trwałego kursora
+poprzednika aktora nie pozwala na kompaktację zależności.
 
 Regresja kompaktacji (2026-11-10): `OperationFeedPage.verifiedVisiblePrefix` jest ustawiane wyłącznie przez walidowany transport REST i pozwala `SyncEngine._pull` przyjąć globalne luki niewidoczne dla autoryzowanego feedu, lecz tylko do pierwszego błędu aplikacji. `OperationStore` zapisuje kursory zdalnych aktorów pod kluczem obejmującym zakres konta/share. Regresje: `test/sync_engine_test.dart`, `test/operation_store_test.dart`.
 

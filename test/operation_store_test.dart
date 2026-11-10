@@ -1297,7 +1297,7 @@ void main() {
     expect(await store.pending(), isEmpty);
   });
 
-  test('remote predecessor requires its durable cursor before compaction', () async {
+  test('compact predecessor requires persisted receipt', () async {
     store = OperationStore(database, checkpointScope: 'account:test');
     final first = OperationEnvelope(
       operationId: const Uuid().v4(),
