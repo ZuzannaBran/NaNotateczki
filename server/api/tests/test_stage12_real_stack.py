@@ -221,6 +221,17 @@ def test_300_independent_parents_commit_over_real_http_and_postgresql(client):
     assert snapshot(client, token, document)["revision"] == 302
     assert snapshot(client, token, document)["cursor"] == before_cursor
 
+    compact = Actor(document, "frontier-cursor-" + uuid.uuid4().hex, clock=302)
+    compacted = compact.next(
+        "document.set", payload={"properties": {"title": "compacted"}},
+    )
+    compacted["causalCursor"] = before_cursor
+    assert compacted["dependencies"] == []
+    receipt = submit(client, token, [compacted])
+    assert receipt["acknowledgements"][0]["status"] == "applied"
+    assert snapshot(client, token, document)["revision"] == 303
+    assert snapshot(client, token, document)["state"]["properties"]["title"] == "compacted"
+
 
 def test_global_cursor_tracks_commit_order_of_competing_transactions():
     """Real PostgreSQL serializes the v2 cursor before either commit."""

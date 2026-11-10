@@ -267,13 +267,15 @@ class OperationStore {
     final compactCursor = checkpointScope == null
         ? 0
         : await checkpoint(checkpointScope!);
-    final coveredByCursor = <String>{
-      for (final row in observed)
-        if ((row.read<String>('source') == 'local'
-                    ? row.readNullable<int>('ack_cursor')
-                    : row.readNullable<int>('remote_cursor')) case final int seq)
-          if (seq <= compactCursor) row.read<String>('last_operation_id'),
-    };
+    final coveredByCursor = <String>{};
+    for (final row in observed) {
+      final receipt = row.read<String>('source') == 'local'
+          ? row.readNullable<int>('ack_cursor')
+          : row.readNullable<int>('remote_cursor');
+      if (receipt != null && receipt <= compactCursor) {
+        coveredByCursor.add(row.read<String>('last_operation_id'));
+      }
+    }
     final requiredIds = <String>{
       ...dependencies,
       if (revertsOperationId != null) revertsOperationId,
