@@ -1240,6 +1240,63 @@ void main() {
     expect(next.logicalClock, 306);
   });
 
+  test('compact remote rejects future and self-referencing cursors', () async {
+    final remote = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'future-peer',
+      actorSeq: 1,
+      logicalClock: 3,
+      documentId: 'document-one',
+      pageId: 'page-one',
+      objectId: 'future-object',
+      kind: OperationKind.objectCreate,
+      payload: const {'value': {'x': 1}},
+      dependencies: const [],
+      causalCursor: 3,
+    );
+    await expectLater(
+      store.applyRemote(
+        remote,
+        serverSequence: 3,
+        coveredCursor: 3,
+        apply: () async {},
+      ),
+      throwsStateError,
+    );
+    expect(await store.operation(remote.operationId), isNull);
+    expect(await store.pending(), isEmpty);
+  });
+
+  test('remote actor cursor keys are scoped to account and document', () async {
+    store = OperationStore(database, checkpointScope: 'account:first');
+    final remote = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'shared-peer',
+      actorSeq: 1,
+      logicalClock: 1,
+      documentId: 'document-one',
+      pageId: 'page-one',
+      objectId: 'shared-peer',
+      kind: OperationKind.objectCreate,
+      payload: const {'value': {'x': 1}},
+      dependencies: const [],
+    );
+    await store.applyRemote(
+      remote,
+      serverSequence: 12,
+      apply: () async {},
+    );
+    final records = await database.customSelect(
+      "SELECT scope FROM sync_checkpoints WHERE scope LIKE 'remote-actor:%'",
+    ).get();
+    expect(records, hasLength(1));
+    final remoteScope = records.single.read<String>('scope');
+    expect(remoteScope, contains('account:first'));
+    expect(remoteScope, contains('document-one'));
+    expect(remoteScope, contains('shared-peer'));
+    expect(remoteScope, isNot(contains('account:second')));
+  });
+
   test('compact remote cannot bypass an unresolved feed gap', () async {
     store = OperationStore(database, checkpointScope: 'account:test');
     final remote = OperationEnvelope(
