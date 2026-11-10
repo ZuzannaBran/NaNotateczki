@@ -53,6 +53,7 @@ class OperationStore {
   OperationStore(this.database, {this.checkpointScope});
 
   final NotesDatabase database;
+
   /// The account feed checkpoint used for safe compact causal frontiers.
   final String? checkpointScope;
   final Map<String, Future<void>> _documentTails = {};
@@ -374,7 +375,10 @@ class OperationStore {
           coveredCursor: coveredCursor ??
               (checkpointScope == null ? 0 : await checkpoint(checkpointScope)),
         );
-        final actorScope = _remoteActorScope(operation.documentId, operation.actorId);
+        final actorScope = _remoteActorScope(
+          operation.documentId,
+          operation.actorId,
+        );
         if (serverSequence > await checkpoint(actorScope)) {
           await _advanceCheckpoint(actorScope, serverSequence);
         }
