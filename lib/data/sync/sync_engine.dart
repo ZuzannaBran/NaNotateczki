@@ -427,7 +427,7 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
             // to this principal between the requested and returned cursors.
             // Global cursor holes may belong to other accounts/documents.
             // Custom gateways cannot assert that coverage implicitly.
-            coveredCursor: !gap && gateway is HttpOperationGateway
+            coveredCursor: !gap && page.verifiedVisiblePrefix
                 ? item.cursor - 1
                 : contiguous,
             apply: () async {
