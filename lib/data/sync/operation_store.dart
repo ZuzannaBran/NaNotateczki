@@ -369,6 +369,10 @@ class OperationStore {
   }) {
     return _perDocument(operation.documentId, () {
       return database.transaction(() async {
+        if (operation.causalCursor != null &&
+            operation.causalCursor! >= serverSequence) {
+          throw StateError('Compact cursor cannot cover its own operation.');
+        }
         final changed = await _commit(
           operation,
           source: 'remote',
