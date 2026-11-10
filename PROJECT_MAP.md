@@ -1,5 +1,7 @@
 # PROJECT_MAP.md
 
+Regresja kompaktacji (2026-11-10): `OperationFeedPage.verifiedVisiblePrefix` jest ustawiane wyłącznie przez walidowany transport REST i pozwala `SyncEngine._pull` przyjąć globalne luki niewidoczne dla autoryzowanego feedu, lecz tylko do pierwszego błędu aplikacji. `OperationStore` zapisuje kursory zdalnych aktorów pod kluczem obejmującym zakres konta/share. Regresje: `test/sync_engine_test.dart`, `test/operation_store_test.dart`.
+
 Skrócony indeks projektu **NaNotateczki** (`pubspec.yaml`:
 `name: program`). Stan sprawdzony względem repozytorium 2026-10-27.
 
