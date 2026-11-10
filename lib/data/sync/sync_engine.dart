@@ -423,7 +423,13 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
           await store.applyRemote(
             item.operation,
             serverSequence: item.cursor,
-            coveredCursor: contiguous,
+            // The authenticated REST feed includes every operation visible
+            // to this principal between the requested and returned cursors.
+            // Global cursor holes may belong to other accounts/documents.
+            // Custom gateways cannot assert that coverage implicitly.
+            coveredCursor: !gap && gateway is HttpOperationGateway
+                ? item.cursor - 1
+                : contiguous,
             apply: () async {
               // No replacement of the whole document or optimistic edits.
               final pending = <OperationEnvelope>[];
