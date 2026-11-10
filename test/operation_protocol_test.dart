@@ -101,6 +101,18 @@ void main() {
     expect(restored.toJson(), original.toJson());
   });
 
+  test('thousands of explicit UUIDs round-trip before compaction', () {
+    final dependencies = [
+      for (var i = 0; i < 3000; i++)
+        '${i.toRadixString(16).padLeft(8, '0')}'
+            '-1111-4111-8111-111111111111',
+    ];
+    final entry = operation(dependencies: dependencies, causalCursor: 42);
+    final restored = OperationEnvelope.fromJson(entry.toJson());
+    expect(restored.dependencies, dependencies);
+    expect(restored.causalCursor, 42);
+  });
+
   test('oversized dependency list is rejected without truncation', () {
     final count = OperationEnvelope.maxDependencyBytes ~/ 39 + 1;
     final dependencies = [
