@@ -2,7 +2,9 @@
 
 Dokumentacja kompaktacji: filtrowany feed jest uznawany za kompletny tylko wtedy, gdy brama REST oznaczy stronę jako zweryfikowany widoczny prefiks. Luki globalnych numerów mogą reprezentować prywatne operacje innych dokumentów lub kont; błąd zastosowania dowolnej widocznej operacji zatrzymuje postęp checkpointu. Niestandardowe bramy bez tego potwierdzenia nie mogą kompresować przez nieudokumentowane luki.
 
-Trwałe checkpointy zdalnych aktorów w SQLite używają klucza `remote-actor:[<scope>,<actorId>]` (JSON). Chroni to przed kolizją kont i udziałów przy tym samym actorId. Backend ogranicza kursor gościa do ostatniej widocznej operacji udostępnionego dokumentu. Produkcyjne v1 pozostaje aktywne, cutover jest wyłączony.
+Trwałe checkpointy zdalnych aktorów w SQLite używają klucza `remote-actor:[<scope>,<actorId>]` (JSON). Chroni to przed kolizją kont i udziałów przy tym samym actorId. Backend ogranicza kursor gościa do widocznego dokumentu i weryfikuje istnienie dokładnego numeru operacji w tym zakresie. Numery pominięte przez transakcje PostgreSQL nie są poprawnymi kursorami przyczynowymi. Produkcyjne v1 pozostaje aktywne, cutover jest wyłączony.
+
+Testy protokołu obejmują 3000 jawnych UUID, a testy backendu odrzucają nieistniejące numery kursora oraz kursory z innych zakresów widoczności.
 
 ## Kompaktacja frontiera przez trwały kursor (2026-11-10)
 
