@@ -256,6 +256,69 @@ void main() {
     );
   }
 
+  test('filtered shared feed accepts private cursor skips', () async {
+    final first = _remote('peer-one', 'visible-100');
+    final second = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'peer-two',
+      actorSeq: 1,
+      documentId: 'document-one',
+      pageId: 'page-one',
+      objectId: 'visible-105',
+      kind: OperationKind.objectCreate,
+      payload: const {
+        'value': {'name': 'visible-105'},
+      },
+      dependencies: [first.operationId],
+      logicalClock: 2,
+      causalCursor: 104,
+    );
+    gateway.accepted.addAll([
+      SequencedOperation(100, first),
+      SequencedOperation(105, second),
+    ]);
+    await engine.start();
+    expect(await store.operation(second.operationId), isNotNull);
+    expect(await store.checkpoint('user-A-v2'), 105);
+    expect(engine.lastError, isNull);
+  });
+
+  test('filtered feed never skips a failed visible predecessor', () async {
+    final missing = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'peer-one',
+      actorSeq: 1,
+      documentId: 'document-one',
+      pageId: 'page-one',
+      objectId: 'failed-visible',
+      kind: OperationKind.objectCreate,
+      payload: const {'value': {'name': 'failed-visible'}},
+      dependencies: [const Uuid().v4()],
+      logicalClock: 2,
+    );
+    final later = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'peer-two',
+      actorSeq: 1,
+      documentId: 'document-one',
+      pageId: 'page-one',
+      objectId: 'later-visible',
+      kind: OperationKind.objectCreate,
+      payload: const {'value': {'name': 'later-visible'}},
+      dependencies: const [],
+      logicalClock: 3,
+      causalCursor: 104,
+    );
+    gateway.accepted.addAll([
+      SequencedOperation(100, missing),
+      SequencedOperation(105, later),
+    ]);
+    await engine.start();
+    expect(await store.operation(later.operationId), isNull);
+    expect(await store.checkpoint('user-A-v2'), 0);
+    expect(engine.lastError, isNotNull);
+  });
+
   test('malformed feed pages cannot commit valid-looking prefixes', () async {
     final first = _remote('remote-peer', 'bad-feed-first');
     final second = _remote('remote-peer', 'bad-feed-second');
