@@ -1189,6 +1189,85 @@ void main() {
     },
   );
 
+  test('compact cursor covers 300 committed remote actor heads', () async {
+    store = OperationStore(database, checkpointScope: 'account:test');
+    for (var i = 0; i < 300; i++) {
+      final id = '${(i + 4000).toRadixString(16).padLeft(8, '0')}'
+          '-1111-4111-8111-111111111111';
+      final remote = OperationEnvelope(
+        operationId: id,
+        actorId: 'peer-$i',
+        actorSeq: 1,
+        logicalClock: i + 1,
+        documentId: 'document-one',
+        pageId: 'page-one',
+        objectId: 'peer-$i',
+        kind: OperationKind.objectCreate,
+        payload: const {'value': {'x': 1}},
+        dependencies: const [],
+      );
+      await store.applyRemote(
+        remote,
+        serverSequence: i + 1,
+        checkpointScope: 'account:test',
+        apply: () async {},
+      );
+    }
+    final local = await add('compact-after-300');
+    expect(local.dependencies, isEmpty);
+    expect(local.causalCursor, 300);
+    expect(local.logicalClock, 301);
+    const laterId = '00002000-1111-4111-8111-111111111111';
+    await store.applyRemote(
+      OperationEnvelope(
+        operationId: laterId,
+        actorId: 'late-peer',
+        actorSeq: 1,
+        logicalClock: 305,
+        documentId: 'document-one',
+        pageId: 'page-one',
+        objectId: 'late-peer',
+        kind: OperationKind.objectCreate,
+        payload: const {'value': {'x': 2}},
+        dependencies: const [],
+      ),
+      serverSequence: 302,
+      apply: () async {},
+    );
+    final next = await add('after-uncheckpointed-peer');
+    expect(next.causalCursor, 300);
+    expect(next.dependencies, contains(laterId));
+    expect(next.logicalClock, 306);
+  });
+
+  test('compact remote cannot bypass an unresolved feed gap', () async {
+    store = OperationStore(database, checkpointScope: 'account:test');
+    final remote = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'compact-peer',
+      actorSeq: 1,
+      logicalClock: 3,
+      documentId: 'document-one',
+      pageId: 'page-one',
+      objectId: 'compact-remote',
+      kind: OperationKind.objectCreate,
+      payload: const {'value': {'x': 1}},
+      dependencies: const [],
+      causalCursor: 2,
+    );
+    await expectLater(
+      store.applyRemote(
+        remote,
+        serverSequence: 3,
+        coveredCursor: 1,
+        apply: () async {},
+      ),
+      throwsStateError,
+    );
+    expect(await store.operation(remote.operationId), isNull);
+    expect(await store.checkpoint('remote-actor:compact-peer'), 0);
+  });
+
   test(
     'local journal prunes implied frontiers but keeps causal order',
     () async {

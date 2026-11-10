@@ -788,12 +788,16 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `lib/data/sync/operation_store.dart`: `pending(includeDeferred)`,
   `isPending`, `isLocalOperation`, `advanceCheckpoint`; strzeże actorSeq także przy
   retry, lokalne operacje zależą od trwałych zdalnych frontierów,
+  skompaktowany `causalCursor` używa tylko trwałego globalnego checkpointu,
+  a głowy poza checkpointem zachowują jawne identyfikatory; SQLite trzyma
+  ostatni kursor zdalnego aktora w istniejącym `sync_checkpoints`,
   a zaakceptowane przez serwer opóźnione edycje usuniętego UID
   pozostają w dzienniku jako no-op.
 - `test/sync_engine_test.dart`, `test/operation_gateway_test.dart`:
   utracone ACK, echo, rebase, cursor gap, retry, kontrakt JSON.
 - `test/operation_store_test.dart`: dodatkowe regresje frontier i
-  tombstones po przyjętej operacji zdalnej.
+  tombstones po przyjętej operacji zdalnej, 300 skompaktowanych głów
+  oraz blokady cursor gap bez zmiany projekcji.
 - `pubspec.yaml`: hook sqlite3 `source: system` używa istniejących
   bibliotek sqlite3_flutter_libs 0.5.x na mobile/desktop,
   unikając pobierania drugiej kopii z GitHub Releases.

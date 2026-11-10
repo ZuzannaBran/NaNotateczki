@@ -14,6 +14,7 @@ OperationEnvelope operation({
   String documentId = 'document-1',
   List<String> dependencies = const [],
   int schemaVersion = 1,
+  int? causalCursor,
 }) {
   return OperationEnvelope(
     operationId: operationId,
@@ -31,6 +32,7 @@ OperationEnvelope operation({
     dependencies: dependencies,
     logicalClock: 7,
     schemaVersion: schemaVersion,
+    causalCursor: causalCursor,
   );
 }
 
@@ -71,6 +73,18 @@ void main() {
     expect(() => operation(dependencies: [firstId]), throwsFormatException);
     expect(
       () => operation(dependencies: [secondId, secondId]),
+      throwsFormatException,
+    );
+  });
+
+  test('compact cursor round-trips and rejects invalid bounds', () {
+    final compact = operation(causalCursor: 700);
+    expect(compact.toJson()['causalCursor'], 700);
+    expect(OperationEnvelope.fromJson(compact.toJson()).causalCursor, 700);
+    expect(operation().toJson().containsKey('causalCursor'), isFalse);
+    expect(() => operation(causalCursor: 0), throwsFormatException);
+    expect(
+      () => operation(causalCursor: OperationEnvelope.maxSafeInteger + 1),
       throwsFormatException,
     );
   });

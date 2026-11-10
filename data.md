@@ -1,5 +1,20 @@
 # Dane NaNotateczki
 
+## Kompaktacja frontiera przez trwały kursor (2026-11-10)
+
+Opcjonalne pole v2 `causalCursor` oznacza pełny, trwały prefiks
+strumienia danego konta. Serwer weryfikuje istnienie kursora,
+zegar logiczny oraz poprzednika aktora, także gdy jego UUID jest
+skompaktowany. Klient dołącza token tylko po zapisaniu checkpointu
+`account:<id>`; najnowszy serwerowy kursor każdego zdalnego aktora
+przechowuje w `sync_checkpoints` jako `remote-actor:<id>`.
+Nowsze operacje, lokalny outbox i jawne zależności Undo zachowują
+pełne UUID. Odbiorca nie może zastosować operacji z `causalCursor`
+wyższym niż ciągły, lokalnie zatwierdzony prefiks; po luce nie
+podnosi checkpointu. Maksymalnie 128 KiB nadal obowiązuje dla
+niepokrytych UUID. Wdrożyć backend przed klientem generującym to pole.
+
+
 ## Pakiet 1: kontrola kontraktów i testy realnego stosu (2026-11-09)
 
 Regresje porównawcze Darta i Pythona mają identyczne przypadki
