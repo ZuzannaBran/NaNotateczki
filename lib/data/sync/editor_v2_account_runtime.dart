@@ -39,7 +39,10 @@ class EditorV2AccountRuntime {
     if (accountId.isEmpty || actorId.isEmpty) {
       throw ArgumentError('V2 account and persistent actor IDs are required.');
     }
-    final store = OperationStore(repository.database);
+    final store = OperationStore(
+      repository.database,
+      checkpointScope: 'account:$accountId',
+    );
     final buffer = VerifiedEditorAssetBuffer();
     final projector = EditorSqliteProjector(
       repository.database,

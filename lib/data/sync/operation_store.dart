@@ -50,9 +50,11 @@ class LocalOperationDraft {
 /// flushed and checksummed before the transaction; a transaction only commits
 /// their references. Legacy snapshot writers are migrated in later stages.
 class OperationStore {
-  OperationStore(this.database);
+  OperationStore(this.database, {this.checkpointScope});
 
   final NotesDatabase database;
+  /// The account feed checkpoint used for safe compact causal frontiers.
+  final String? checkpointScope;
   final Map<String, Future<void>> _documentTails = {};
   static const _uuid = Uuid();
   static final _checksumPattern = RegExp(r'^[a-f0-9]{64}$');
@@ -244,9 +246,16 @@ class OperationStore {
     // This must be read inside the same transaction as actorSeq.
     final observed = await database
         .customSelect(
-          'SELECT actor.last_operation_id FROM operation_actor_state actor '
+          'SELECT actor.last_operation_id, latest.source, '
+          'ack.server_sequence AS ack_cursor, '
+          'remote.server_sequence AS remote_cursor '
+          'FROM operation_actor_state actor '
           'JOIN operations latest '
           'ON latest.operation_id = actor.last_operation_id '
+          'LEFT JOIN operation_ack ack '
+          'ON ack.operation_id = actor.last_operation_id '
+          'LEFT JOIN sync_checkpoints remote '
+          "ON remote.scope = 'remote-actor:' || actor.actor_id "
           'WHERE actor.actor_id != ? AND latest.document_id = ? '
           'ORDER BY actor.actor_id',
           variables: [Variable<String>(actorId), Variable<String>(documentId)],
@@ -254,6 +263,16 @@ class OperationStore {
         .get();
     final observedIds = <String>{
       for (final row in observed) row.read<String>('last_operation_id'),
+    };
+    final compactCursor = checkpointScope == null
+        ? 0
+        : await checkpoint(checkpointScope!);
+    final coveredByCursor = <String>{
+      for (final row in observed)
+        if ((row.read<String>('source') == 'local'
+                    ? row.readNullable<int>('ack_cursor')
+                    : row.readNullable<int>('remote_cursor')) case final int seq)
+          if (seq <= compactCursor) row.read<String>('last_operation_id'),
     };
     final requiredIds = <String>{
       ...dependencies,
@@ -282,10 +301,10 @@ class OperationStore {
     final causalIds = <String>{
       ...requiredIds,
       for (final id in observedIds)
-        if (!coveredIds.contains(id)) id,
+        if (!coveredIds.contains(id) && !coveredByCursor.contains(id)) id,
     }.toList()..sort();
-    if (causalIds.length > 256) {
-      throw StateError('Too many independent causal actor frontiers.');
+    if (causalIds.length * 39 > OperationEnvelope.maxDependencyBytes) {
+      throw StateError('Uncovered causal frontier exceeds wire budget.');
     }
     final nextSeq = (state?['last_seq'] as int? ?? 0) + 1;
     if (nextSeq > OperationEnvelope.maxSafeInteger ||
@@ -304,6 +323,7 @@ class OperationStore {
       payload: payload,
       dependencies: causalIds,
       revertsOperationId: revertsOperationId,
+      causalCursor: compactCursor == 0 ? null : compactCursor,
     );
     await _commit(next, source: 'local', apply: () => apply(next));
     return next;
@@ -326,6 +346,7 @@ class OperationStore {
     OperationEnvelope operation, {
     String? checkpointScope,
     required int serverSequence,
+    int? coveredCursor,
     required Future<void> Function() apply,
   }) {
     return _perDocument(operation.documentId, () {
@@ -334,7 +355,13 @@ class OperationStore {
           operation,
           source: 'remote',
           apply: apply,
+          coveredCursor: coveredCursor ??
+              (checkpointScope == null ? 0 : await checkpoint(checkpointScope)),
         );
+        final actorScope = 'remote-actor:${operation.actorId}';
+        if (serverSequence > await checkpoint(actorScope)) {
+          await _advanceCheckpoint(actorScope, serverSequence);
+        }
         if (checkpointScope != null) {
           await _advanceCheckpoint(checkpointScope, serverSequence);
         }
@@ -347,7 +374,15 @@ class OperationStore {
     OperationEnvelope entry, {
     required String source,
     required Future<void> Function() apply,
+    int? coveredCursor,
   }) async {
+    if (entry.causalCursor != null) {
+      final appliedCursor = coveredCursor ??
+          (checkpointScope == null ? 0 : await checkpoint(checkpointScope!));
+      if (appliedCursor < entry.causalCursor!) {
+        throw StateError('Compact causal frontier has not been applied.');
+      }
+    }
     if (source == 'local') {
       entry.validateForV2Projection();
     }
@@ -373,7 +408,23 @@ class OperationStore {
     }
     final previous = state?['last_operation_id'] as String?;
     if (previous != null && !entry.dependencies.contains(previous)) {
-      throw StateError('Actor predecessor was omitted.');
+      final previousReceipt = await _row(
+        'SELECT o.source, ack.server_sequence AS ack_cursor, '
+        'remote.server_sequence AS remote_cursor '
+        'FROM operations o LEFT JOIN operation_ack ack '
+        'ON ack.operation_id = o.operation_id '
+        'LEFT JOIN sync_checkpoints remote ON remote.scope = ? '
+        'WHERE o.operation_id = ?',
+        ['remote-actor:${entry.actorId}', previous],
+      );
+      final covered = previousReceipt?['source'] == 'local'
+          ? previousReceipt?['ack_cursor'] as int?
+          : previousReceipt?['remote_cursor'] as int?;
+      if (covered == null ||
+          entry.causalCursor == null ||
+          covered > entry.causalCursor!) {
+        throw StateError('Actor predecessor was omitted.');
+      }
     }
     for (final id in entry.dependencies) {
       final dependency = await operation(id);

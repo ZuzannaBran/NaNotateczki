@@ -423,6 +423,7 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
           await store.applyRemote(
             item.operation,
             serverSequence: item.cursor,
+            coveredCursor: contiguous,
             apply: () async {
               // No replacement of the whole document or optimistic edits.
               final pending = <OperationEnvelope>[];

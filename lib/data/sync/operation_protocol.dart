@@ -64,6 +64,7 @@ class OperationEnvelope {
     this.objectId,
     this.pageId,
     this.revertsOperationId,
+    this.causalCursor,
     this.schemaVersion = currentSchemaVersion,
   }) : payload = _immutablePayload(payload),
        dependencies = List.unmodifiable(dependencies) {
@@ -93,6 +94,8 @@ class OperationEnvelope {
   final Map<String, dynamic> payload;
   final List<String> dependencies;
   final int logicalClock;
+  /// A contiguous, durably applied server feed prefix covering older parents.
+  final int? causalCursor;
   final String? revertsOperationId;
   final int schemaVersion;
 
@@ -108,6 +111,7 @@ class OperationEnvelope {
       payload: Map<String, dynamic>.from(json['payload'] as Map),
       dependencies: List<String>.from(json['dependencies'] as List),
       logicalClock: json['logicalClock'] as int,
+      causalCursor: json['causalCursor'] as int?,
       revertsOperationId: json['revertsOperationId'] as String?,
       schemaVersion: json['schemaVersion'] as int,
     );
@@ -374,6 +378,7 @@ class OperationEnvelope {
     'payload': _copyPayload(),
     'dependencies': List<String>.of(dependencies),
     'logicalClock': logicalClock,
+    if (causalCursor != null) 'causalCursor': causalCursor,
     if (revertsOperationId != null) 'revertsOperationId': revertsOperationId,
   };
 
@@ -424,6 +429,10 @@ class OperationEnvelope {
         logicalClock < 1 ||
         logicalClock > maxSafeInteger) {
       throw const FormatException('Invalid actor, sequence, or clock.');
+    }
+    if (causalCursor != null &&
+        (causalCursor! < 1 || causalCursor! > maxSafeInteger)) {
+      throw const FormatException('Invalid compact causal cursor.');
     }
     if (dependencies.length * 39 > maxDependencyBytes ||
         dependencies.toSet().length != dependencies.length ||
