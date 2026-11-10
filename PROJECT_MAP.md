@@ -790,14 +790,17 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   retry, lokalne operacje zależą od trwałych zdalnych frontierów,
   skompaktowany `causalCursor` używa tylko trwałego globalnego checkpointu,
   a głowy poza checkpointem zachowują jawne identyfikatory; SQLite trzyma
-  ostatni kursor zdalnego aktora w istniejącym `sync_checkpoints`,
+  ostatni kursor zdalnego aktora w istniejącym `sync_checkpoints`
+  pod kluczem obejmującym konto oraz dokument,
   a zaakceptowane przez serwer opóźnione edycje usuniętego UID
   pozostają w dzienniku jako no-op.
 - `test/sync_engine_test.dart`, `test/operation_gateway_test.dart`:
-  utracone ACK, echo, rebase, cursor gap, retry, kontrakt JSON.
+  utracone ACK, echo, rebase, cursor gap, filtrowany feed udostępniania,
+  retry i kontrakt JSON.
 - `test/operation_store_test.dart`: dodatkowe regresje frontier i
   tombstones po przyjętej operacji zdalnej, 300 skompaktowanych głów
-  oraz blokady cursor gap bez zmiany projekcji.
+  oraz blokady cursor gap i nieprawidłowego zakresu
+  checkpointu bez zmiany projekcji.
 - `pubspec.yaml`: hook sqlite3 `source: system` używa istniejących
   bibliotek sqlite3_flutter_libs 0.5.x na mobile/desktop,
   unikając pobierania drugiej kopii z GitHub Releases.
