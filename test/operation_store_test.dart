@@ -1257,8 +1257,8 @@ void main() {
       objectId: 'remote-peer',
       kind: OperationKind.objectCreate,
       payload: const {
-          'value': {'x': 1},
-        },
+        'value': {'x': 1},
+      },
       dependencies: const [],
     );
     await store.applyRemote(remote, serverSequence: 42, apply: () async {});
@@ -1280,8 +1280,8 @@ void main() {
       objectId: 'future-object',
       kind: OperationKind.objectCreate,
       payload: const {
-          'value': {'x': 1},
-        },
+        'value': {'x': 1},
+      },
       dependencies: const [],
       causalCursor: 3,
     );
@@ -1310,8 +1310,8 @@ void main() {
       objectId: 'first-remote',
       kind: OperationKind.objectCreate,
       payload: const {
-          'value': {'x': 1},
-        },
+        'value': {'x': 1},
+      },
       dependencies: const [],
     );
     await store.applyRemote(
@@ -1330,8 +1330,8 @@ void main() {
       objectId: 'second-remote',
       kind: OperationKind.objectCreate,
       payload: const {
-          'value': {'x': 2},
-        },
+        'value': {'x': 2},
+      },
       dependencies: const [],
       causalCursor: 50,
     );
@@ -1375,8 +1375,8 @@ void main() {
       objectId: 'compact-remote',
       kind: OperationKind.objectCreate,
       payload: const {
-          'value': {'x': 1},
-        },
+        'value': {'x': 1},
+      },
       dependencies: const [],
       causalCursor: 2,
     );
