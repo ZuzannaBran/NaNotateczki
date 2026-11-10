@@ -23,11 +23,16 @@ class OperationFeedPage {
     required this.cursor,
     required this.hasMore,
     required this.operations,
+    this.verifiedVisiblePrefix = false,
   });
 
   final int cursor;
   final bool hasMore;
   final List<SequencedOperation> operations;
+
+  /// True only if the server queried the entire authorized visible feed.
+  /// Skipped global cursor values then represent invisible operations.
+  final bool verifiedVisiblePrefix;
 }
 
 /// Transport boundary; tests can emulate lost responses and reconnects.
@@ -185,6 +190,7 @@ class HttpOperationGateway implements OperationGateway {
       cursor: pageCursor,
       hasMore: hasMore,
       operations: operations,
+      verifiedVisiblePrefix: true,
     );
   }
 
