@@ -15,6 +15,27 @@ podnosi checkpointu. Maksymalnie 128 KiB nadal obowiązuje dla
 niepokrytych UUID. Wdrożyć backend przed klientem generującym to pole.
 
 
+## Ochrona widocznego frontiera i zakresu kursora (2026-11-10)
+
+Kursor operacji PostgreSQL jest globalny, ale feed gościa obejmuje
+wyłącznie udostępniony dokument. Braki numerów przypisanych prywatnym
+dokumentom właściciela nie są brakującymi operacjami gościa.
+SyncEngine może weryfikować kompaktowany prefiks do wartości
+`serverSequence - 1` dopiero dla kompletnej, uporządkowanej strony
+z uwierzytelnionego feedu. Po nieudanym zastosowaniu wcześniejszej
+widocznej operacji zachowuje ostatni ciągły checkpoint i nie zakłada
+pokrycia późniejszymi numerami.
+
+Serwer akceptuje `causalCursor` tylko wtedy, gdy konkretny cursor
+istnieje w historii właściciela (dla gościa: w historii widocznego
+dokumentu). Nieistniejący numer historyczny jest błędem 422, przyszły
+jest retryable. SQLite zapisuje `remote-actor` pod kluczem
+obejmującym namespace checkpointu oraz documentId; legacy klucze bez
+zakresu nie służą do potwierdzania przyczynowości. Kursor nie może
+obejmować samej operacji. Testy obejmują filtrowany feed,
+niezastosowany widoczny prefiks, brak historycznego kursora, przyszły
+kursor i izolację checkpointów. Bez aktywowania produkcyjnego v2.
+
 ## Pakiet 1: kontrola kontraktów i testy realnego stosu (2026-11-09)
 
 Regresje porównawcze Darta i Pythona mają identyczne przypadki
