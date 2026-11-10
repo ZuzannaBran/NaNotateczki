@@ -262,10 +262,7 @@ class OperationStore {
           'LEFT JOIN operation_ack ack '
           'ON ack.operation_id = actor.last_operation_id '
           'LEFT JOIN sync_checkpoints remote '
-          checkpointScope == null
-              ? "ON remote.scope = 'remote-actor:' || actor.actor_id "
-              : "ON remote.scope = 'remote-actor:' || "
-                    "json_array(?, actor.actor_id) "
+          "${checkpointScope == null ? "ON remote.scope = 'remote-actor:' || actor.actor_id " : "ON remote.scope = 'remote-actor:' || json_array(?, actor.actor_id) "}"
           'WHERE actor.actor_id != ? AND latest.document_id = ? '
           'ORDER BY actor.actor_id',
           variables: [
