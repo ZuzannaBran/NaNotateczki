@@ -13,7 +13,7 @@ strumienia danego konta. Serwer weryfikuje istnienie kursora,
 zegar logiczny oraz poprzednika aktora, także gdy jego UUID jest
 skompaktowany. Klient dołącza token tylko po zapisaniu checkpointu
 `account:<id>`; najnowszy serwerowy kursor każdego zdalnego aktora
-przechowuje w `sync_checkpoints` jako `remote-actor:<id>`.
+przechowuje w `sync_checkpoints` pod kluczem z zakresem konta/share i identyfikatorem aktora.
 Nowsze operacje, lokalny outbox i jawne zależności Undo zachowują
 pełne UUID. Odbiorca nie może zastosować operacji z `causalCursor`
 wyższym niż ciągły, lokalnie zatwierdzony prefiks; po luce nie
