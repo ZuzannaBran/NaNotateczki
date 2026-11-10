@@ -56,6 +56,12 @@ class OperationStore {
   /// The account feed checkpoint used for safe compact causal frontiers.
   final String? checkpointScope;
   final Map<String, Future<void>> _documentTails = {};
+  String _remoteActorPrefix(String documentId) =>
+      'remote-actor:${jsonEncode([checkpointScope, documentId])}:';
+
+  String _remoteActorScope(String documentId, String actorId) =>
+      '${_remoteActorPrefix(documentId)}$actorId';
+
   static const _uuid = Uuid();
   static final _checksumPattern = RegExp(r'^[a-f0-9]{64}$');
 
@@ -255,10 +261,14 @@ class OperationStore {
           'LEFT JOIN operation_ack ack '
           'ON ack.operation_id = actor.last_operation_id '
           'LEFT JOIN sync_checkpoints remote '
-          "ON remote.scope = 'remote-actor:' || actor.actor_id "
+          "ON remote.scope = ? || actor.actor_id "
           'WHERE actor.actor_id != ? AND latest.document_id = ? '
           'ORDER BY actor.actor_id',
-          variables: [Variable<String>(actorId), Variable<String>(documentId)],
+          variables: [
+            Variable<String>(_remoteActorPrefix(documentId)),
+            Variable<String>(actorId),
+            Variable<String>(documentId),
+          ],
         )
         .get();
     final observedIds = <String>{
@@ -353,6 +363,10 @@ class OperationStore {
   }) {
     return _perDocument(operation.documentId, () {
       return database.transaction(() async {
+        if (operation.causalCursor != null &&
+            operation.causalCursor! >= serverSequence) {
+          throw StateError('Compact cursor cannot cover its own operation.');
+        }
         final changed = await _commit(
           operation,
           source: 'remote',
@@ -360,7 +374,7 @@ class OperationStore {
           coveredCursor: coveredCursor ??
               (checkpointScope == null ? 0 : await checkpoint(checkpointScope)),
         );
-        final actorScope = 'remote-actor:${operation.actorId}';
+        final actorScope = _remoteActorScope(operation.documentId, operation.actorId);
         if (serverSequence > await checkpoint(actorScope)) {
           await _advanceCheckpoint(actorScope, serverSequence);
         }
@@ -417,7 +431,7 @@ class OperationStore {
         'ON ack.operation_id = o.operation_id '
         'LEFT JOIN sync_checkpoints remote ON remote.scope = ? '
         'WHERE o.operation_id = ?',
-        ['remote-actor:${entry.actorId}', previous],
+        [_remoteActorScope(entry.documentId, entry.actorId), previous],
       );
       final covered = previousReceipt?['source'] == 'local'
           ? previousReceipt?['ack_cursor'] as int?
