@@ -53,6 +53,7 @@ class OperationStore {
   OperationStore(this.database, {this.checkpointScope});
 
   final NotesDatabase database;
+
   /// The account feed checkpoint used for safe compact causal frontiers.
   final String? checkpointScope;
 
@@ -270,8 +271,7 @@ class OperationStore {
           'WHERE actor.actor_id != ? AND latest.document_id = ? '
           'ORDER BY actor.actor_id',
           variables: [
-            if (checkpointScope != null)
-              Variable<String>(checkpointScope!),
+            if (checkpointScope != null) Variable<String>(checkpointScope!),
             Variable<String>(actorId),
             Variable<String>(documentId),
           ],
@@ -377,7 +377,8 @@ class OperationStore {
           operation,
           source: 'remote',
           apply: apply,
-          coveredCursor: coveredCursor ??
+          coveredCursor:
+              coveredCursor ??
               (checkpointScope == null ? 0 : await checkpoint(checkpointScope)),
         );
         final actorScope = _remoteActorScope(operation.actorId);
@@ -399,7 +400,8 @@ class OperationStore {
     int? coveredCursor,
   }) async {
     if (entry.causalCursor != null) {
-      final appliedCursor = coveredCursor ??
+      final appliedCursor =
+          coveredCursor ??
           (checkpointScope == null ? 0 : await checkpoint(checkpointScope!));
       if (appliedCursor < entry.causalCursor!) {
         throw StateError('Compact causal frontier has not been applied.');

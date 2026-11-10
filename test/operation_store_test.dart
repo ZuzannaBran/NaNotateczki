@@ -1204,7 +1204,9 @@ void main() {
         pageId: 'page-one',
         objectId: 'peer-$i',
         kind: OperationKind.objectCreate,
-        payload: const {'value': {'x': 1}},
+        payload: const {
+          'value': {'x': 1},
+        },
         dependencies: const [],
       );
       await store.applyRemote(
@@ -1229,7 +1231,9 @@ void main() {
         pageId: 'page-one',
         objectId: 'late-peer',
         kind: OperationKind.objectCreate,
-        payload: const {'value': {'x': 2}},
+        payload: const {
+          'value': {'x': 2},
+        },
         dependencies: const [],
       ),
       serverSequence: 302,
@@ -1252,18 +1256,13 @@ void main() {
       pageId: 'page-one',
       objectId: 'remote-peer',
       kind: OperationKind.objectCreate,
-      payload: const {'value': {'x': 1}},
+      payload: const {
+          'value': {'x': 1},
+        },
       dependencies: const [],
     );
-    await store.applyRemote(
-      remote,
-      serverSequence: 42,
-      apply: () async {},
-    );
-    expect(
-      await store.checkpoint('remote-actor:["account:test","peer"]'),
-      42,
-    );
+    await store.applyRemote(remote, serverSequence: 42, apply: () async {});
+    expect(await store.checkpoint('remote-actor:["account:test","peer"]'), 42);
     expect(await store.checkpoint('remote-actor:peer'), 0);
     final local = await add('after-scoped-remote');
     expect(local.dependencies, contains(remote.operationId));
@@ -1280,7 +1279,9 @@ void main() {
       pageId: 'page-one',
       objectId: 'future-object',
       kind: OperationKind.objectCreate,
-      payload: const {'value': {'x': 1}},
+      payload: const {
+          'value': {'x': 1},
+        },
       dependencies: const [],
       causalCursor: 3,
     );
@@ -1308,7 +1309,9 @@ void main() {
       pageId: 'page-one',
       objectId: 'first-remote',
       kind: OperationKind.objectCreate,
-      payload: const {'value': {'x': 1}},
+      payload: const {
+          'value': {'x': 1},
+        },
       dependencies: const [],
     );
     await store.applyRemote(
@@ -1326,7 +1329,9 @@ void main() {
       pageId: first.pageId,
       objectId: 'second-remote',
       kind: OperationKind.objectCreate,
-      payload: const {'value': {'x': 2}},
+      payload: const {
+          'value': {'x': 2},
+        },
       dependencies: const [],
       causalCursor: 50,
     );
@@ -1369,7 +1374,9 @@ void main() {
       pageId: 'page-one',
       objectId: 'compact-remote',
       kind: OperationKind.objectCreate,
-      payload: const {'value': {'x': 1}},
+      payload: const {
+          'value': {'x': 1},
+        },
       dependencies: const [],
       causalCursor: 2,
     );
