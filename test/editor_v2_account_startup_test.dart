@@ -1360,7 +1360,10 @@ void main() {
     f.accepted.add(conflicting.toJson());
     await f.runtime.engine.syncNow();
     expect(await f.runtime.store.checkpoint('account:startup-account'), 4);
-    expect((await f.repository.getNotebook(note.uid))!.title, 'Remote conflict');
+    expect(
+      (await f.repository.getNotebook(note.uid))!.title,
+      'Remote conflict',
+    );
     expect(
       (await f.runtime.store.pending(
         includeDeferred: true,
