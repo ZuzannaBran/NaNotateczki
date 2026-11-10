@@ -1240,6 +1240,35 @@ void main() {
     expect(next.logicalClock, 306);
   });
 
+  test('remote receipts are scoped to the account feed', () async {
+    store = OperationStore(database, checkpointScope: 'account:test');
+    final remote = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'peer',
+      actorSeq: 1,
+      logicalClock: 1,
+      documentId: 'document-one',
+      pageId: 'page-one',
+      objectId: 'remote-peer',
+      kind: OperationKind.objectCreate,
+      payload: const {'value': {'x': 1}},
+      dependencies: const [],
+    );
+    await store.applyRemote(
+      remote,
+      serverSequence: 42,
+      apply: () async {},
+    );
+    expect(
+      await store.checkpoint('remote-actor:["account:test","peer"]'),
+      42,
+    );
+    expect(await store.checkpoint('remote-actor:peer'), 0);
+    final local = await add('after-scoped-remote');
+    expect(local.dependencies, contains(remote.operationId));
+    expect(local.causalCursor, isNull);
+  });
+
   test('compact remote cannot bypass an unresolved feed gap', () async {
     store = OperationStore(database, checkpointScope: 'account:test');
     final remote = OperationEnvelope(
