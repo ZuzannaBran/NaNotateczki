@@ -1269,6 +1269,33 @@ void main() {
     expect(local.causalCursor, isNull);
   });
 
+  test('compact remote cannot cover its own or future cursor', () async {
+    final remote = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'future-peer',
+      actorSeq: 1,
+      logicalClock: 3,
+      documentId: 'document-one',
+      pageId: 'page-one',
+      objectId: 'future-object',
+      kind: OperationKind.objectCreate,
+      payload: const {'value': {'x': 1}},
+      dependencies: const [],
+      causalCursor: 3,
+    );
+    await expectLater(
+      store.applyRemote(
+        remote,
+        serverSequence: 3,
+        coveredCursor: 3,
+        apply: () async {},
+      ),
+      throwsStateError,
+    );
+    expect(await store.operation(remote.operationId), isNull);
+    expect(await store.pending(), isEmpty);
+  });
+
   test('compact remote cannot bypass an unresolved feed gap', () async {
     store = OperationStore(database, checkpointScope: 'account:test');
     final remote = OperationEnvelope(
