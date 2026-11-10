@@ -423,7 +423,10 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
           await store.applyRemote(
             item.operation,
             serverSequence: item.cursor,
-            coveredCursor: contiguous,
+            // The authenticated feed is complete for its visibility scope.
+            // A shared-document feed legitimately skips private owner rows.
+            // Only a successfully applied visible prefix may advance here.
+            coveredCursor: gap ? contiguous : item.cursor - 1,
             apply: () async {
               // No replacement of the whole document or optimistic edits.
               final pending = <OperationEnvelope>[];
