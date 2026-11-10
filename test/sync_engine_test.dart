@@ -307,6 +307,49 @@ void main() {
     }
   });
 
+  test('filtered REST prefix covers invisible cursors, not unverified gaps',
+      () async {
+    final remote = OperationEnvelope.fromJson({
+      ..._remote('share-peer', 'share-object').toJson(),
+      'causalCursor': 4,
+      'logicalClock': 5,
+    });
+    Future<void> usePage(bool verified) async {
+      await engine.stop();
+      engine.dispose();
+      gateway = _MalformedFeedGateway(OperationFeedPage(
+        cursor: 5,
+        hasMore: false,
+        operations: [SequencedOperation(5, remote)],
+        verifiedVisiblePrefix: verified,
+      ));
+      engine = SyncEngine(
+        store: store,
+        gateway: gateway,
+        actorId: 'share-client',
+        checkpointScope: 'user-A-v2',
+        enableRealtime: false,
+        applyRemote: (op, _) async {
+          await database.customStatement(
+            'INSERT INTO projection_probe VALUES (?, ?)',
+            [op.objectId, 'remote'],
+          );
+        },
+      );
+      await engine.start();
+    }
+
+    await usePage(false);
+    expect(await store.operation(remote.operationId), isNull);
+    expect(await store.checkpoint('user-A-v2'), 0);
+    expect(engine.lastError, contains('gap'));
+
+    await usePage(true);
+    expect(await store.operation(remote.operationId), isNotNull);
+    expect(await store.checkpoint('user-A-v2'), 5);
+    expect(engine.lastError, isNull);
+  });
+
   test(
     'stopping during asset preparation cannot send old account edits',
     () async {
