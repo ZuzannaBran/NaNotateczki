@@ -4,6 +4,10 @@ Regresja kompaktacji (2026-11-10):
 `test/operation_store_test.dart` weryfikuje, że brak trwałego kursora
 poprzednika aktora nie pozwala na kompaktację zależności.
 
+Regresja kompaktacji (2026-11-10): test zweryfikowanego prefiksu
+w `test/sync_engine_test.dart` używa feedu, który po checkpointcie
+zwraca pustą stronę, zamiast błędnie odtwarzać już przyjętą operację.
+
 Regresja kompaktacji (2026-11-10): `OperationFeedPage.verifiedVisiblePrefix` jest ustawiane wyłącznie przez walidowany transport REST i pozwala `SyncEngine._pull` przyjąć globalne luki niewidoczne dla autoryzowanego feedu, lecz tylko do pierwszego błędu aplikacji. `OperationStore` zapisuje kursory zdalnych aktorów pod kluczem obejmującym zakres konta/share. Regresje: `test/sync_engine_test.dart`, `test/operation_store_test.dart`.
 
 Skrócony indeks projektu **NaNotateczki** (`pubspec.yaml`:

@@ -125,6 +125,25 @@ class _MalformedFeedGateway extends _FakeGateway {
   }
 }
 
+/// A complete visible feed must not replay its last row after checkpointing.
+class _FilteredFeedGateway extends _MalformedFeedGateway {
+  _FilteredFeedGateway(super.page);
+
+  @override
+  Future<OperationFeedPage> readAfter(int cursor) async {
+    if (cursor >= page.cursor) {
+      reads++;
+      return OperationFeedPage(
+        cursor: cursor,
+        hasMore: false,
+        operations: const [],
+        verifiedVisiblePrefix: page.verifiedVisiblePrefix,
+      );
+    }
+    return super.readAfter(cursor);
+  }
+}
+
 class _ReversedAckGateway extends _QuietFeedGateway {
   @override
   Future<List<OperationReceipt>> send(
@@ -318,7 +337,7 @@ void main() {
       Future<void> usePage(bool verified) async {
         await engine.stop();
         engine.dispose();
-        gateway = _MalformedFeedGateway(
+        gateway = _FilteredFeedGateway(
           OperationFeedPage(
             cursor: 5,
             hasMore: false,
@@ -351,6 +370,9 @@ void main() {
       expect(await store.operation(remote.operationId), isNotNull);
       expect(await store.checkpoint('user-A-v2'), 5);
       expect(engine.lastError, isNull);
+      final completedPage = await gateway.readAfter(5);
+      expect(completedPage.cursor, 5);
+      expect(completedPage.operations, isEmpty);
     },
   );
 
