@@ -88,6 +88,10 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
   final RemoteOperationPreparer? prepareRemoteOperation;
   final Future<void> Function(List<OperationEnvelope>)? prepareLocalOperations;
   final RemoteOperationCommitted? onRemoteCommitted;
+
+  /// UI-only hints; never feed these to the journal, reducer or outbox.
+  void Function(Map<String, dynamic>)? onSharePreview;
+
   final ApiClient? apiClient;
   final String? shareId;
 
@@ -119,7 +123,19 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
   DateTime? _retryDueAt;
   Timer? _socketRetry;
   WebSocketChannel? _socket;
+  bool _socketAuthenticated = false;
   StreamSubscription<dynamic>? _socketSubscription;
+
+  void publishSharePreview(Map<String, dynamic> preview) {
+    if (!_started ||
+        _disposed ||
+        !_socketAuthenticated ||
+        preview['type'] != 'share_preview' ||
+        (shareId != null && preview['shareId'] != shareId)) {
+      return;
+    }
+    _socket?.sink.add(jsonEncode(preview));
+  }
 
   String? lastError;
   DateTime? lastSuccessfulSync;
@@ -287,6 +303,7 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     final active = _active;
     _socketSubscription = null;
     _socket = null;
+    _socketAuthenticated = false;
     await subscription?.cancel();
     if (socket != null) {
       requestRealtimeChannelClose(socket);
@@ -800,12 +817,16 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
       (event) {
         try {
           final message = jsonDecode(event as String);
-          if (message is Map &&
-              (message['type'] == 'operations_changed' ||
-                  message['type'] == 'authenticated')) {
-            // Catch up the gap between the initial pull and subscription,
-            // including changes missed while a socket was disconnected.
+          if (message is Map && message['type'] == 'authenticated') {
+            _socketAuthenticated = true;
             requestSync();
+          } else if (message is Map &&
+              message['type'] == 'operations_changed') {
+            requestSync();
+          } else if (message is Map &&
+              message['type'] == 'share_preview' &&
+              message['senderId'] != actorId) {
+            onSharePreview?.call(Map<String, dynamic>.from(message));
           } else if (shareId != null &&
               message is Map &&
               message['type'] == 'ended') {
