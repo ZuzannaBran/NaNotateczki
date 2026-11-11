@@ -19,8 +19,11 @@ void main() {
   );
   test('preview uses a bounded non-operational wire representation', () {
     final encoded = ShareInkPreviewCodec.encode(
-      shareId: 'share', documentUid: 'doc', pageId: 'page',
-      senderId: sender, stroke: stroke,
+      shareId: 'share',
+      documentUid: 'doc',
+      pageId: 'page',
+      senderId: sender,
+      stroke: stroke,
     );
     expect(encoded.containsKey('operationId'), isFalse);
     expect(encoded['type'], 'share_preview');
@@ -32,7 +35,9 @@ void main() {
 
   test('clear preview does not create a durable operation', () {
     final clear = ShareInkPreviewCodec.encode(
-      shareId: 'share', documentUid: 'doc', pageId: 'page',
+      shareId: 'share',
+      documentUid: 'doc',
+      pageId: 'page',
       senderId: sender,
     );
     expect(clear['stroke'], isNull);
@@ -41,8 +46,11 @@ void main() {
 
   test('overlarge and malicious coordinates are rejected', () {
     final encoded = ShareInkPreviewCodec.encode(
-      shareId: 'share', documentUid: 'doc', pageId: 'page',
-      senderId: sender, stroke: stroke,
+      shareId: 'share',
+      documentUid: 'doc',
+      pageId: 'page',
+      senderId: sender,
+      stroke: stroke,
     );
     final invalid = {...encoded, 'senderId': 'not-a-uuid'};
     expect(ShareInkPreviewCodec.decode(invalid), isNull);

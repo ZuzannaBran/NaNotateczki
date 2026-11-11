@@ -9,8 +9,8 @@ import 'package:program/core/storage/text_storage.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/data/sync/account_session_controller.dart';
 import 'package:program/data/sync/api_client.dart';
-import 'package:program/data/sync/live_web_sync_service.dart';
 import 'package:program/data/sync/editor_v2_account_runtime.dart';
+import 'package:program/data/sync/live_web_sync_service.dart';
 import 'package:program/data/sync/study_share_service.dart';
 import 'package:program/features/editor/state/page_background.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
@@ -618,93 +618,94 @@ void main() {
   });
 
 
-  test('v2 share creation waits for operation ACK, not legacy upload',
-      () async {
-    final requests = <String>[];
-    var cursor = 0;
-    final harness = await _makeOwner((request) async {
-      requests.add('${request.method} ${request.url.path}');
-      if (request.method == 'GET' &&
-          request.url.path == '/v2/operations') {
-        return http.Response(
-          jsonEncode({
-            'cursor': int.parse(request.url.queryParameters['after']!),
-            'hasMore': false,
-            'operations': <Object>[],
-          }),
-          200,
-        );
-      }
-      if (request.method == 'POST' &&
-          request.url.path == '/v2/operations/batch') {
-        final operations =
-            (jsonDecode(request.body) as Map)['operations'] as List;
-        final acknowledgements = <Map<String, dynamic>>[];
-        for (final raw in operations) {
-          cursor++;
-          acknowledgements.add({
-            'operationId': (raw as Map)['operationId'],
-            'cursor': cursor,
-            'status': 'applied',
-          });
+  test(
+    'v2 share creation waits for operation ACK, not legacy upload',
+    () async {
+      final requests = <String>[];
+      var cursor = 0;
+      final harness = await _makeOwner((request) async {
+        requests.add('${request.method} ${request.url.path}');
+        if (request.method == 'GET' && request.url.path == '/v2/operations') {
+          return http.Response(
+            jsonEncode({
+              'cursor': int.parse(request.url.queryParameters['after']!),
+              'hasMore': false,
+              'operations': <Object>[],
+            }),
+            200,
+          );
         }
-        return http.Response(
-          jsonEncode({
-            'cursor': cursor,
-            'acknowledgements': acknowledgements,
-          }),
-          200,
-        );
-      }
-      if (request.method == 'POST' &&
-          request.url.path == '/v2/study-shares') {
-        return http.Response(
-          jsonEncode({
-            'id': _sessionId,
-            'expiresAt': '2027-01-01T00:00:00Z',
-          }),
-          201,
-        );
-      }
-      fail('Unexpected HTTP call: ${request.method} ${request.url}');
-    });
-    final runtime = EditorV2AccountRuntime(
-      repository: harness.repository,
-      apiClient: harness.session.apiClient,
-      accountId: 'account-v2',
-      actorId: '11111111-1111-4111-8111-111111111111',
-      enableRealtime: false,
-    );
-    addTearDown(() async {
-      await runtime.stop();
-      runtime.dispose();
-    });
-    await harness.repository.enableAccountOperations(runtime.writer);
-    final notebook = await harness.repository.createNotebook();
-    await runtime.engine.start();
+        if (request.method == 'POST' &&
+            request.url.path == '/v2/operations/batch') {
+          final operations =
+              (jsonDecode(request.body) as Map)['operations'] as List;
+          final acknowledgements = <Map<String, dynamic>>[];
+          for (final raw in operations) {
+            cursor++;
+            acknowledgements.add({
+              'operationId': (raw as Map)['operationId'],
+              'cursor': cursor,
+              'status': 'applied',
+            });
+          }
+          return http.Response(
+            jsonEncode({
+              'cursor': cursor,
+              'acknowledgements': acknowledgements,
+            }),
+            200,
+          );
+        }
+        if (request.method == 'POST' &&
+            request.url.path == '/v2/study-shares') {
+          return http.Response(
+            jsonEncode({
+              'id': _sessionId,
+              'expiresAt': '2027-01-01T00:00:00Z',
+            }),
+            201,
+          );
+        }
+        fail('Unexpected HTTP call: ${request.method} ${request.url}');
+      });
+      final runtime = EditorV2AccountRuntime(
+        repository: harness.repository,
+        apiClient: harness.session.apiClient,
+        accountId: 'account-v2',
+        actorId: '11111111-1111-4111-8111-111111111111',
+        enableRealtime: false,
+      );
+      addTearDown(() async {
+        await runtime.stop();
+        runtime.dispose();
+      });
+      await harness.repository.enableAccountOperations(runtime.writer);
+      final notebook = await harness.repository.createNotebook();
+      await runtime.engine.start();
 
-    final service = StudyShareService(
-      session: harness.session,
-      v2Runtime: runtime,
-      repository: harness.repository,
-    );
-    final active = await service.create(
-      documentUid: notebook.uid,
-      title: notebook.title,
-      password: 'shared-operation-password',
-    );
-    expect(active.protocol, 'v2');
-    expect(active.documentUid, notebook.uid);
-    expect(
-      requests.where((path) => path == 'POST /v2/operations/batch'),
-      isNotEmpty,
-    );
-    expect(requests.last, 'POST /v2/study-shares');
-    expect(
-      requests.any((path) => path.startsWith('PUT /v1/sync')),
-      isFalse,
-    );
-  });
+      final service = StudyShareService(
+        session: harness.session,
+        v2Runtime: runtime,
+        repository: harness.repository,
+      );
+      final active = await service.create(
+        documentUid: notebook.uid,
+        title: notebook.title,
+        password: 'shared-operation-password',
+      );
+      expect(active.protocol, 'v2');
+      expect(active.documentUid, notebook.uid);
+      expect(
+        requests.where((path) => path == 'POST /v2/operations/batch'),
+        isNotEmpty,
+      );
+      expect(requests.last, 'POST /v2/study-shares');
+      expect(
+        requests.any((path) => path.startsWith('PUT /v1/sync')),
+        isFalse,
+      );
+    },
+  );
 
   test('failed owner upload prevents creating a guest link', () async {
     var linkRequests = 0;
