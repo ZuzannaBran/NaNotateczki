@@ -310,7 +310,7 @@ class EditorController extends ChangeNotifier {
   DrawingTool? _toolBeforeShapeEdit;
   ({String pageId, InkStroke stroke})? _shapeStrokePreview;
   final Map<String, ({String pageId, InkStroke stroke, Timer expiry})>
-      _remoteShareInk = {};
+  _remoteShareInk = {};
 
   /// Optional live hint: only completed gestures enter the v2 journal.
   void Function(String pageId, InkStroke? stroke)? sendShareInkPreview;
