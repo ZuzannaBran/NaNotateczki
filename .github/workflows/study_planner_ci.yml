@@ -1,8 +1,6 @@
 name: Study planner - dev_planer validation
 
 on:
-  push:
-    branches: [dev_planer]
   workflow_dispatch:
 
 permissions:
