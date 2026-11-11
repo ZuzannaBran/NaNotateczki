@@ -617,7 +617,6 @@ void main() {
     expect(await harness.repository.getNotebook(original.uid), isNotNull);
   });
 
-
   test(
     'v2 share creation waits for operation ACK, not legacy upload',
     () async {
@@ -659,10 +658,7 @@ void main() {
         if (request.method == 'POST' &&
             request.url.path == '/v2/study-shares') {
           return http.Response(
-            jsonEncode({
-              'id': _sessionId,
-              'expiresAt': '2027-01-01T00:00:00Z',
-            }),
+            jsonEncode({'id': _sessionId, 'expiresAt': '2027-01-01T00:00:00Z'}),
             201,
           );
         }
@@ -700,10 +696,7 @@ void main() {
         isNotEmpty,
       );
       expect(requests.last, 'POST /v2/study-shares');
-      expect(
-        requests.any((path) => path.startsWith('PUT /v1/sync')),
-        isFalse,
-      );
+      expect(requests.any((path) => path.startsWith('PUT /v1/sync')), isFalse);
     },
   );
 
