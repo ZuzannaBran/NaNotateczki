@@ -105,6 +105,38 @@ class LocalAccountImportService {
     }
     final sourceLibrary = decodeLocalImportMetadata(localLibraryText);
     final sourcePlanner = decodeLocalImportMetadata(localPlannerText);
+    if (repository.usesAccountOperations) {
+      // Folder, task and planner account operations belong to package 5.
+      // Do not mark an import complete when its metadata could never sync.
+      final sourceFolders = sourceLibrary['folders'];
+      final allFolderPaths = <String>{};
+      for (final document in local) {
+        var folder = document.folder;
+        while (folder.isNotEmpty) {
+          allFolderPaths.add(folder);
+          final separator = folder.lastIndexOf('/');
+          if (separator < 0) {
+            break;
+          }
+          folder = folder.substring(0, separator);
+        }
+      }
+      if ((sourcePlanner['sessions'] is List &&
+              (sourcePlanner['sessions'] as List).isNotEmpty) ||
+          (sourceLibrary['plannerTasks'] is Map &&
+              (sourceLibrary['plannerTasks'] as Map).isNotEmpty) ||
+          (sourceLibrary['covers'] is Map &&
+              (sourceLibrary['covers'] as Map).isNotEmpty) ||
+          (sourceFolders is List &&
+              sourceFolders.whereType<String>().any(
+                (folder) => !allFolderPaths.contains(folder),
+              ))) {
+        throw UnsupportedError(
+          'Planner, tasks and standalone folder metadata must be '
+          'migrated after package 5 enables their v2 synchronization.',
+        );
+      }
+    }
     final destinationLibrary = decodeLocalImportMetadata(
       await readStoredText('library_folders.json'),
     );
@@ -176,9 +208,12 @@ class LocalAccountImportService {
       }
     }
     _requireCurrent();
-    if (jsonEncode(destinationLibrary) != jsonEncode(remappedLibrary)) {
-      await writeStoredText('library_folders.json',
-          jsonEncode(remappedLibrary));
+    if (!repository.usesAccountOperations &&
+        jsonEncode(destinationLibrary) != jsonEncode(remappedLibrary)) {
+      await writeStoredText(
+        'library_folders.json',
+        jsonEncode(remappedLibrary),
+      );
     }
     await onLibraryChanged();
     _requireCurrent();

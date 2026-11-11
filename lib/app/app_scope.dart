@@ -491,7 +491,9 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   }
 
   void _scheduleAccountSettingsSync() {
-    if (_accountSettingsSync?.isApplying ?? false) {
+    if (_accountSession?.hasPendingLocalImport(_accountSession?.userId ?? '')
+            == true ||
+        (_accountSettingsSync?.isApplying ?? false)) {
       return;
     }
     _settingsDebounce?.cancel();
@@ -530,6 +532,10 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   }
 
   void _schedulePlannerSync() {
+    if (_accountSession?.hasPendingLocalImport(_accountSession?.userId ?? '')
+        == true) {
+      return;
+    }
     _plannerDebounce?.cancel();
     _plannerDebounce = Timer(const Duration(milliseconds: 200), () {
       unawaited(_syncPlanner());
@@ -648,6 +654,45 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     ).run();
     if (!current()) {
       return;
+    }
+    final runtime = _v2AccountRuntime;
+    if (runtime != null) {
+      await runtime.engine.syncNow();
+      if (!current()) {
+        return;
+      }
+      if (runtime.engine.lastError != null ||
+          (await runtime.store.pending()).isNotEmpty) {
+        throw StateError(
+          'Imported v2 document operations are still waiting for ACK.',
+        );
+      }
+    } else {
+      final sync = _liveSync;
+      if (sync == null || !sync.isStarted) {
+        throw StateError('Account synchronization is not ready for import.');
+      }
+      await sync.syncNow();
+      if (!current()) {
+        return;
+      }
+      if (sync.lastError != null || sync.hasPendingChanges) {
+        throw StateError('Imported documents have not synchronized.');
+      }
+      await _accountSettingsSync?.syncNow();
+      if (!current()) {
+        return;
+      }
+      if (_accountSettingsSync?.lastError != null) {
+        throw StateError('Imported folders and tasks have not synchronized.');
+      }
+      await _plannerSync?.syncNow();
+      if (!current()) {
+        return;
+      }
+      if (_plannerSync?.lastError != null) {
+        throw StateError('Imported study entries have not synchronized.');
+      }
     }
     await session.completeLocalImport(userId);
     if (mounted) {

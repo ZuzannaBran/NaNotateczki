@@ -956,6 +956,16 @@ class StudyPlannerController extends ChangeNotifier {
       );
     }
     if (additions.isEmpty) {
+      if (error != null) {
+        // An earlier disk write may have failed after the in-memory update.
+        // Retry the same snapshot before declaring the transfer durable.
+        error = null;
+        _persist();
+        await flush();
+        if (error != null) {
+          throw StateError(error!);
+        }
+      }
       return 0;
     }
     _sessions.addAll(additions);
