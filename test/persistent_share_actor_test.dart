@@ -59,7 +59,9 @@ void main() {
     addTearDown(database.close);
     final store = OperationStore(database);
     final actor = await loadPersistentShareActor(
-      store, shareId: firstShare, guestActorId: guest,
+      store,
+      shareId: firstShare,
+      guestActorId: guest,
     );
     final operation = await store.writeLocal(
       actorId: actor,
@@ -71,9 +73,7 @@ void main() {
     final key = StorageNamespace.share(firstShare, guest).fileKey('actor.json');
     storage.remove(key);
     await expectLater(
-      loadPersistentShareActor(
-        store, shareId: firstShare, guestActorId: guest,
-      ),
+      loadPersistentShareActor(store, shareId: firstShare, guestActorId: guest),
       throwsStateError,
     );
     expect(
