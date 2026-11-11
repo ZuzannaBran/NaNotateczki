@@ -657,54 +657,54 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     }
     try {
       await LocalAccountImportService(
-      accountId: userId,
-      repository: repository,
-      planner: planner,
-      isCurrentAccount: current,
-      onLibraryChanged: library.reloadFromAccount,
-    ).run();
-    if (!current()) {
-      return;
-    }
-    final runtime = _v2AccountRuntime;
-    if (runtime != null) {
-      await runtime.engine.syncNow();
+        accountId: userId,
+        repository: repository,
+        planner: planner,
+        isCurrentAccount: current,
+        onLibraryChanged: library.reloadFromAccount,
+      ).run();
       if (!current()) {
         return;
       }
-      if (runtime.engine.lastError != null ||
-          (await runtime.store.pending()).isNotEmpty) {
-        throw StateError(
-          'Imported v2 document operations are still waiting for ACK.',
-        );
+      final runtime = _v2AccountRuntime;
+      if (runtime != null) {
+        await runtime.engine.syncNow();
+        if (!current()) {
+          return;
+        }
+        if (runtime.engine.lastError != null ||
+            (await runtime.store.pending()).isNotEmpty) {
+          throw StateError(
+            'Imported v2 document operations are still waiting for ACK.',
+          );
+        }
+      } else {
+        final sync = _liveSync;
+        if (sync == null || !sync.isStarted) {
+          throw StateError('Account synchronization is not ready for import.');
+        }
+        await sync.syncNow();
+        if (!current()) {
+          return;
+        }
+        if (sync.lastError != null || sync.hasPendingChanges) {
+          throw StateError('Imported documents have not synchronized.');
+        }
+        await _accountSettingsSync?.syncNow();
+        if (!current()) {
+          return;
+        }
+        if (_accountSettingsSync?.lastError != null) {
+          throw StateError('Imported folders and tasks have not synchronized.');
+        }
+        await _plannerSync?.syncNow();
+        if (!current()) {
+          return;
+        }
+        if (_plannerSync?.lastError != null) {
+          throw StateError('Imported study entries have not synchronized.');
+        }
       }
-    } else {
-      final sync = _liveSync;
-      if (sync == null || !sync.isStarted) {
-        throw StateError('Account synchronization is not ready for import.');
-      }
-      await sync.syncNow();
-      if (!current()) {
-        return;
-      }
-      if (sync.lastError != null || sync.hasPendingChanges) {
-        throw StateError('Imported documents have not synchronized.');
-      }
-      await _accountSettingsSync?.syncNow();
-      if (!current()) {
-        return;
-      }
-      if (_accountSettingsSync?.lastError != null) {
-        throw StateError('Imported folders and tasks have not synchronized.');
-      }
-      await _plannerSync?.syncNow();
-      if (!current()) {
-        return;
-      }
-      if (_plannerSync?.lastError != null) {
-        throw StateError('Imported study entries have not synchronized.');
-      }
-    }
       await session.completeLocalImport(userId);
       if (mounted) {
         setState(() => _localImportFailure = null);

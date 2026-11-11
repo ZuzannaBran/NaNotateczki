@@ -45,8 +45,11 @@ class LocalAccountImportService {
           : namespace.nativeDatabaseName,
     );
     try {
-      if (result.wasReset) {
-        throw StateError('Local SQLite recovery must finish before import.');
+      if (result.wasReset || result.freshFile) {
+        throw StateError(
+          'Local SQLite could not be verified as an existing source. '
+          'No new account import was started.',
+        );
       }
       return await runWithSource(
         sourceRepository: NotebookRepository(result.database),
