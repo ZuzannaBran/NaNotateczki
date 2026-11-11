@@ -14,6 +14,7 @@ import '../../../../core/diagnostics/optimization_log.dart';
 import '../../../../core/input/ink_activity_tracker.dart';
 import '../../../../core/input/stylus_button_state.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../data/sync/share_ink_preview_codec.dart';
 import '../../../notebook/domain/drawing_tool.dart';
 import '../../../notebook/domain/ink_eraser_engine.dart';
 import '../../../notebook/domain/ink_stroke.dart';
@@ -902,6 +903,8 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
   final ValueNotifier<int> _inkRepaint = ValueNotifier<int>(0);
   final _InkPerfLog _inkPerf = _InkPerfLog();
   bool _inkRepaintScheduled = false;
+  DateTime? _lastSharePreview;
+  String? _lastSharePreviewPage;
   bool _handoffRepaintScheduled = false;
   final Set<String> _eraseStrokeIds = <String>{};
   final Set<int> _activePointers = <int>{};
@@ -1728,7 +1731,52 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     InkActivityTracker.instance.endContact();
   }
 
+  void _emitSharePreview() {
+    if (!mounted) {
+      return;
+    }
+    final controller = context.read<EditorController>();
+    final sender = controller.sendShareInkPreview;
+    if (sender == null) {
+      return;
+    }
+    final tool = _activeTool(controller);
+    final active = _primaryPointer != null &&
+        !_suspendInk &&
+        _currentPoints.isNotEmpty &&
+        ShareInkPreviewCodec.supported(tool);
+    if (!active) {
+      final page = _lastSharePreviewPage;
+      _lastSharePreviewPage = null;
+      _lastSharePreview = null;
+      if (page != null) {
+        sender(page, null);
+      }
+      return;
+    }
+    final now = DateTime.now();
+    if (_lastSharePreview != null &&
+        now.difference(_lastSharePreview!) <
+            const Duration(milliseconds: 80)) {
+      return;
+    }
+    final page = _resolvedPage(controller);
+    sender(
+      page.id,
+      InkStroke(
+        id: 'share-preview-local',
+        points: List<InkPoint>.from(_currentPoints),
+        color: controller.inkColor,
+        width: _effectiveStrokeWidth(tool, controller.inkStrokeWidth),
+        tool: tool,
+      ),
+    );
+    _lastSharePreview = now;
+    _lastSharePreviewPage = page.id;
+  }
+
   void _notifyInkChanged() {
+    _emitSharePreview();
     final scheduledAt = _inkPerf.recordNotify(scheduled: !_inkRepaintScheduled);
     if (!_inkRepaintScheduled) {
       _inkRepaintScheduled = true;
@@ -2297,6 +2345,8 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
   final ValueNotifier<int> _inkRepaint = ValueNotifier<int>(0);
   final _InkPerfLog _inkPerf = _InkPerfLog();
   bool _inkRepaintScheduled = false;
+  DateTime? _lastSharePreview;
+  String? _lastSharePreviewPage;
   bool _handoffRepaintScheduled = false;
   final Set<String> _eraseStrokeIds = <String>{};
   final Set<int> _activePointers = <int>{};
@@ -3232,7 +3282,54 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     InkActivityTracker.instance.endContact();
   }
 
+  void _emitSharePreview() {
+    if (!mounted) {
+      return;
+    }
+    final controller = context.read<EditorController>();
+    final sender = controller.sendShareInkPreview;
+    if (sender == null) {
+      return;
+    }
+    final tool = _activeTool(controller);
+    final index = _activePageIndex;
+    final active = _primaryPointer != null &&
+        index != null &&
+        !_suspendInk &&
+        _currentPoints.isNotEmpty &&
+        ShareInkPreviewCodec.supported(tool);
+    if (!active) {
+      final page = _lastSharePreviewPage;
+      _lastSharePreviewPage = null;
+      _lastSharePreview = null;
+      if (page != null) {
+        sender(page, null);
+      }
+      return;
+    }
+    final now = DateTime.now();
+    if (_lastSharePreview != null &&
+        now.difference(_lastSharePreview!) <
+            const Duration(milliseconds: 80)) {
+      return;
+    }
+    final pageId = controller.pageAt(index).id;
+    sender(
+      pageId,
+      InkStroke(
+        id: 'share-preview-local',
+        points: _toPageLocalPoints(_currentPoints, index),
+        color: controller.inkColor,
+        width: _effectiveStrokeWidth(tool, controller.inkStrokeWidth),
+        tool: tool,
+      ),
+    );
+    _lastSharePreview = now;
+    _lastSharePreviewPage = pageId;
+  }
+
   void _notifyInkChanged() {
+    _emitSharePreview();
     final scheduledAt = _inkPerf.recordNotify(scheduled: !_inkRepaintScheduled);
     if (!_inkRepaintScheduled) {
       _inkRepaintScheduled = true;
