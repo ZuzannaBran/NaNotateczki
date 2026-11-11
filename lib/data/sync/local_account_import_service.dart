@@ -4,9 +4,9 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/storage/storage_namespace_manager.dart';
 import '../../core/storage/text_storage.dart';
-import '../drift/notes_database.dart';
 import '../../features/notebook/data/notebook_repository.dart';
 import '../../features/planner/state/study_planner_controller.dart';
+import '../drift/notes_database.dart';
 import 'local_import_plan.dart';
 
 /// Copies one explicitly authorized Local library into the active account.
@@ -95,6 +95,17 @@ class LocalAccountImportService {
       local: local,
       account: account,
     );
+    // v2 cannot yet represent the legacy Planner document kind. Reject the
+    // entire batch before writing anything, rather than silently dropping it.
+    final hasV2Journal = await repository.database.customSelect(
+      'SELECT 1 FROM operations LIMIT 1',
+    ).getSingleOrNull();
+    if (hasV2Journal != null &&
+        local.any((item) => item.kind.index > 1)) {
+      throw UnsupportedError(
+        'Planner documents must be migrated after v2 planner cutover.',
+      );
+    }
     final sourceLibrary = decodeLocalImportMetadata(localLibraryText);
     final sourcePlanner = decodeLocalImportMetadata(localPlannerText);
     final destinationLibrary = decodeLocalImportMetadata(

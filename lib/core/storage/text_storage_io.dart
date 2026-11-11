@@ -58,7 +58,7 @@ Future<String?> readStoredTextForNamespace(
   namespace.fileKey(key);
   return readStoredText(
     key,
-    directoryPath: '\${await getRootAppDataPath()}/\${namespace.relativePath}',
+    directoryPath: '${await getRootAppDataPath()}/${namespace.relativePath}',
   );
 }
 

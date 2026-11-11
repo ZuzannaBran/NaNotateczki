@@ -1,0 +1,188 @@
+import 'dart:convert';
+
+import 'package:drift/native.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:program/core/storage/text_storage.dart';
+import 'package:program/data/drift/notes_database.dart';
+import 'package:program/data/sync/local_account_import_service.dart';
+import 'package:program/data/sync/local_import_plan.dart';
+import 'package:program/features/notebook/data/notebook_repository.dart';
+import 'package:program/features/notebook/domain/notebook.dart';
+import 'package:program/features/notebook/domain/notebook_kind.dart';
+import 'package:program/features/notebook/domain/note_page.dart';
+import 'package:program/features/planner/state/study_planner_controller.dart';
+
+Notebook _note() => Notebook(
+  uid: 'local-document',
+  title: 'Physics',
+  kind: NotebookKind.notebook,
+  folder: 'School',
+  createdAt: DateTime.utc(2026, 11, 1),
+  updatedAt: DateTime.utc(2026, 11, 1),
+  pages: [
+    NotePage(
+      id: 'local-page',
+      title: 'Page',
+      textBlocks: [],
+      imageBlocks: [],
+      inkStrokes: [],
+      isBookmarked: false,
+    ),
+  ],
+);
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  late NotesDatabase localDb;
+  late NotesDatabase accountDb;
+  late NotebookRepository local;
+  late NotebookRepository account;
+  late StudyPlannerController planner;
+  late Map<String, String> files;
+  late Map<String, String> plannerFiles;
+  late LocalAccountImportService service;
+  var libraryReloads = 0;
+  var active = true;
+
+  setUp(() async {
+    localDb = NotesDatabase(NativeDatabase.memory());
+    accountDb = NotesDatabase(NativeDatabase.memory());
+    local = NotebookRepository(localDb);
+    account = NotebookRepository(accountDb);
+    files = {};
+    plannerFiles = {};
+    libraryReloads = 0;
+    active = true;
+    textStorageReadOverride = (key) async => files[key];
+    textStorageWriteOverride = (key, value) async { files[key] = value; };
+    planner = StudyPlannerController(
+      autoTick: false,
+      read: (key) async => plannerFiles[key],
+      write: (key, value) async { plannerFiles[key] = value; },
+    );
+    await planner.load();
+    await local.saveNotebook(_note());
+    service = LocalAccountImportService(
+      accountId: 'account-a',
+      repository: account,
+      planner: planner,
+      isCurrentAccount: () => active,
+      onLibraryChanged: () async { libraryReloads++; },
+    );
+  });
+
+  tearDown(() async {
+    await planner.flush();
+    planner.dispose();
+    await localDb.close();
+    await accountDb.close();
+    textStorageReadOverride = null;
+    textStorageWriteOverride = null;
+  });
+
+  test('copies notebooks, folders, tasks, study sessions once', () async {
+    final session = StudySession(
+      id: 'source-study',
+      title: 'Revision',
+      scheduledAt: DateTime.utc(2026, 11, 12),
+      minutes: 45,
+      repeat: StudyRepeat.weekly,
+      status: StudyStatus.completed,
+    );
+    final localLibrary = jsonEncode({
+      'folders': ['School'],
+      'covers': {'School': {'shape': 'star'}},
+      'plannerTasks': {'local-document': [
+        {'id':'source-task','title':'Chapter 1','completed':true},
+      ]},
+    });
+    final localPlanner = jsonEncode({
+      'version': 2,
+      'sessions': [session.toJson()],
+    });
+    files['library_folders.json'] = jsonEncode({
+      'folders': ['School'],
+      'covers': {'School': {'shape': 'heart'}},
+      'recentCoverColors': [123],
+    });
+
+    expect(await service.runWithSource(
+      sourceRepository: local,
+      localLibraryText: localLibrary,
+      localPlannerText: localPlanner,
+    ), 1);
+    expect(await service.runWithSource(
+      sourceRepository: local,
+      localLibraryText: localLibrary,
+      localPlannerText: localPlanner,
+    ), 0);
+    final importedId = importedLocalUid(
+      'account-a', 'document', 'local-document');
+    final copied = await account.getNotebook(importedId);
+    expect(copied, isNotNull);
+    expect(copied!.pages.single.id, isNot('local-page'));
+    expect(await local.getNotebook('local-document'), isNotNull);
+    expect((await local.fetchNotebooks()).single.uid, 'local-document');
+    final metadata = jsonDecode(files['library_folders.json']!);
+    expect(metadata['covers']['School']['shape'], 'heart');
+    expect(metadata['recentCoverColors'], [123]);
+    expect(metadata['plannerTasks'][importedId], hasLength(1));
+    expect(planner.sessions, hasLength(1));
+    expect(planner.sessions.single.repeat, StudyRepeat.weekly);
+    expect(planner.sessions.single.status, StudyStatus.completed);
+    expect(libraryReloads, 1);
+    expect(jsonDecode(files[LocalAccountImportService.checkpointKey]!)
+        ['state'], 'complete');
+  });
+
+  test('resumes after a post-document failure without duplicating UID',
+      () async {
+    var failOnce = true;
+    final interrupted = LocalAccountImportService(
+      accountId: 'account-a',
+      repository: account,
+      planner: planner,
+      isCurrentAccount: () => active,
+      onLibraryChanged: () async {
+        if (failOnce) {
+          failOnce = false;
+          throw StateError('Interrupted after document commit');
+        }
+      },
+    );
+    await expectLater(interrupted.runWithSource(
+      sourceRepository: local,
+      localLibraryText: '{"folders":["School"]}',
+      localPlannerText: null,
+    ), throwsStateError);
+    expect(jsonDecode(files[LocalAccountImportService.checkpointKey]!)
+        ['state'], 'pending');
+    expect(await account.fetchNotebooks(), hasLength(1));
+    expect(await interrupted.runWithSource(
+      sourceRepository: local,
+      localLibraryText: '{"folders":["School"]}',
+      localPlannerText: null,
+    ), 0);
+    expect(await account.fetchNotebooks(), hasLength(1));
+    expect(await local.fetchNotebooks(), hasLength(1));
+  });
+
+  test('account switch fence retains pending import and Local source',
+      () async {
+    active = false;
+    await expectLater(service.runWithSource(
+      sourceRepository: local,
+      localLibraryText: null,
+      localPlannerText: null,
+    ), throwsStateError);
+    expect(await account.fetchNotebooks(), isEmpty);
+    expect(await local.fetchNotebooks(), hasLength(1));
+    active = true;
+    expect(await service.runWithSource(
+      sourceRepository: local,
+      localLibraryText: null,
+      localPlannerText: null,
+    ), 1);
+  });
+}

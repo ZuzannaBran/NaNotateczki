@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../features/notebook/domain/image_block.dart';
 import '../../features/notebook/domain/notebook.dart';
 import '../../features/notebook/domain/note_page.dart';
 
@@ -82,9 +83,6 @@ class LocalImportPlan {
         ));
         continue;
       }
-      if (account.any((item) => item.uid == notebook.uid)) {
-        // Source UID collisions must never overwrite an account document.
-      }
       var title = notebook.title;
       if (titles.contains(_titleKey(notebook.folder, title))) {
         var suffix = 1;
@@ -120,7 +118,7 @@ class LocalImportPlan {
     final source = entry.source;
     final pages = <NotePage>[];
     for (final page in source.pages) {
-      final images = <dynamic>[];
+      final images = <ImageBlock>[];
       for (final image in page.imageBlocks) {
         final original = image.bytes;
         final Uint8List bytes;
@@ -158,7 +156,7 @@ class LocalImportPlan {
                 accountId, 'text:${source.uid}', block.id),
             ),
         ],
-        imageBlocks: images.cast(),
+        imageBlocks: images,
         inkStrokes: [
           for (final stroke in page.inkStrokes)
             stroke.copyWith(
