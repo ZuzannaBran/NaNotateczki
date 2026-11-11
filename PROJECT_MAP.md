@@ -920,6 +920,29 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 
 ### Share v2 — przyrostowe operacje (etap 6, opt-in)
 
+- `lib/data/sync/persistent_share_actor.dart`: stały aktor przeglądarkowego
+  gościa per zaproszenie, nie jest przechowywany w koncie użytkownika.
+  Brak aktora z istniejącym journalem kończy się blokadą, nie utratą kolejki.
+  Regresja: `test/persistent_share_actor_test.dart`.
+- `lib/features/share/presentation/study_share_v2_guest_editor.dart`:
+  oddzielny SQLite WASM IndexedDB, `OperationStore`, `SyncEngine`,
+  `EditorV2OperationWriter`, weryfikacja assetów i Quill, bez przesyłania
+  całego JSON notebooka. `EditorV2RemotePatchDispatcher` zmienia tylko
+  odpowiedni obiekt/stronę, bez remount `EditorController`.
+- `lib/features/share/presentation/study_share_guest_screen.dart`: protokół
+  z odpowiedzi join decyduje o wersji edytora. v1 nadal jest obsługiwany
+  osobno, v2 odtwarza niewysłany outbox i umożliwia rejoin po wygaśnięciu
+  biletu. Transport przekazuje też sygnały `operations_changed`.
+- `lib/data/sync/study_share_service.dart`, `library_screen.dart`:
+  host v2 tworzy link tylko po potwierdzonym opróżnieniu kolejki.
+  `server/api/app/routers/study_shares.py`: `POST /v2/study-shares`
+  wymaga potwierdzonego `DocumentState`, prawidłowego protokołu konta
+  i braku aktywnej sesji. Kontrakt jest lustrzany w serwerze kanonicznym.
+- `server/api/app/routers/operations.py`: żaden bilet v1 nie otrzyma
+  dostępu do operacji v2. Ponowne dołączenie z odnowionym biletem nie
+  gubi starej tożsamości aktora w granicach tego samego linku.
+
+
 - `lib/data/sync/share_operation_projection.dart`: `ShareOperationProjection`
   redukuje dokument/strony/obiekty i tombstones według stabilnych ID,
   bez pełnych snapshotów; `PendingShareProjection` nakłada oczekujące
@@ -956,9 +979,11 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   `api/tests/test_text_sequence.py`,
   `api/tests/test_operations_share_auth.py` (wygaśnięcie v2 Share).
 - `docs/ETAP_6_SHARE_OPERATIONS.md`: stan wdrożenia i scenariusze E2E.
-  **Nie podłączono jeszcze do legacy hosta/gościa.** `StudyShareGuestEditor`
-  i `LiveWebSyncService` pozostają w v1 do migracji UID (etap 11);
-  preview strokes, assety i Quill rich-text wymagają dalszej integracji.
+  **Share v2 jest dostępny tylko w koncie jawnie zatwierdzonym jako v2.**
+  `StudyShareGuestEditor` i `LiveWebSyncService` pozostają w v1;
+  v2 ma odrębny edytor, trwały outbox, Quill i assety. Weryfikacja
+  end-to-end na dwóch urządzeniach oraz podgląd ulotnej kreski są
+  osobnymi warunkami domknięcia etapu 6.
 
 ### Nowa synchronizacja serwerowa
 

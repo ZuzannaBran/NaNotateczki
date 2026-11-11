@@ -149,3 +149,25 @@ klientów Share, poprawna migracja UID v1 na v2 bez dwóch writerów,
 transport assetów, obsługa formatowania Quill, emitowanie wszystkich
 akcji edytora, podgląd niedokończonych kresek i pełne E2E. Do tego czasu
 kod pozostaje opt-in; produkcyjny Share wciąż używa starego protokołu.
+
+
+## Integracja produkcyjnego interfejsu dla kont v2 (11.11.2026)
+
+- Host uruchamia tworzenie linku Share v2 dopiero po zapisaniu lokalnych
+  operacji i sprawdzeniu kolejki. Backend wymaga w bazie rzeczywistego
+  dokumentu operacyjnego, a nie kopii legacy, i tylko jednej aktywnej
+  sesji na dokument.
+- Odpowiedź join zawiera wersję protokołu i UID. Zaproszenia v1 działają
+  ze starym edytorem, v2 uruchamia izolowany SQLite WASM/IndexedDB.
+- Gość utrwala `operationId`, `actorSeq` i outbox w izolowanym journalu
+  przed wysłaniem operacji. Quill i obrazy/PDF korzystają z istniejących
+  operacyjnych adapterów i zweryfikowanych bajtów. Żaden snapshot v1
+  nie nadpisuje tego dokumentu.
+- Po restarcie i po ponownym dołączeniu ten sam aktor może wznowić
+  operacje dzięki trwałemu identyfikatorowi niezależnemu od krótkiego
+  biletu sesji. Wygaśnięcie lub revoke nie kasują outboxu.
+- Serwer odrzuca legacy bilet z nagłówkiem v2 i zachowuje odrębne
+  uprawnienia dostępu do obiektów oraz mediów.
+- **Bez migracji UID nie wolno przełączać dokumentów v1**. Do ostatecznej
+  akceptacji wymagane jest jeszcze E2E dwóch rzeczywistych klientów oraz
+  ulotny, nieutrwalany podgląd w trakcie aktywnego rysowania.
