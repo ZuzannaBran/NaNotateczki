@@ -2,6 +2,12 @@ name: Study planner - dev_planer validation
 
 on:
   workflow_dispatch:
+  # Explicit one-shot CI request: ordinary pushes on dev remain untested.
+  # To request another full check, edit only this marker.
+  push:
+    branches: [dev]
+    paths:
+      - .github/ci/manual_validation_trigger.txt
 
 permissions:
   contents: read
