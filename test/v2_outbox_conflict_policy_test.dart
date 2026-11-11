@@ -1705,4 +1705,51 @@ void main() {
     expect(_allowed(pageTitle, oldSnapshot), isFalse);
     expect(_allowed(oldSnapshot, pageTitle), isFalse);
   });
+  test('page creation and removal commute with unrelated moves', () {
+    final move = _operation(
+      OperationKind.objectMove,
+      remote: true,
+      objectId: 'stroke-a',
+      pageId: 'page-a',
+      payload: const {'toPageId': 'page-b', 'sortIndex': 1},
+    );
+    final created = _operation(
+      OperationKind.pageCreate,
+      objectId: 'page-c',
+      payload: const {
+        'value': {'title': 'New', 'isBookmarked': false},
+      },
+    );
+    final deleted = _operation(
+      OperationKind.pageDelete,
+      objectId: 'page-c',
+      payload: const {},
+    );
+    expect(_allowed(move, created), isTrue);
+    expect(_allowed(created, move), isTrue);
+    expect(_allowed(move, deleted), isTrue);
+    expect(_allowed(deleted, move), isTrue);
+    final deleteSource = _operation(
+      OperationKind.pageDelete,
+      objectId: 'page-a',
+      payload: const {},
+    );
+    final deleteDestination = _operation(
+      OperationKind.pageDelete,
+      objectId: 'page-b',
+      payload: const {},
+    );
+    final createDestination = _operation(
+      OperationKind.pageCreate,
+      objectId: 'page-b',
+      payload: const {
+        'value': {'title': 'Destination', 'isBookmarked': false},
+      },
+    );
+    expect(_allowed(move, deleteSource), isFalse);
+    expect(_allowed(deleteDestination, move), isFalse);
+    expect(_allowed(move, createDestination), isFalse);
+    expect(_allowed(createDestination, move), isFalse);
+  });
+
 }

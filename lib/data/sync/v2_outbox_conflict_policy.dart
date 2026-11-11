@@ -96,6 +96,9 @@ class V2OutboxConflictPolicy {
     if (other.kind == OperationKind.documentSet) {
       return true;
     }
+    if (other.kind == OperationKind.objectMove) {
+      return _moveAvoidsPage(other, created.objectId!);
+    }
     if (other.kind == OperationKind.pageSet) {
       return other.objectId != created.objectId;
     }
@@ -131,6 +134,9 @@ class V2OutboxConflictPolicy {
     if (other.kind == OperationKind.documentSet) {
       return true;
     }
+    if (other.kind == OperationKind.objectMove) {
+      return _moveAvoidsPage(other, removed.objectId!);
+    }
     if (other.kind == OperationKind.pageSet) {
       return other.objectId != removed.objectId;
     }
@@ -149,6 +155,18 @@ class V2OutboxConflictPolicy {
         independentObjects.contains(other.kind) &&
         assets != null &&
         assets.isEmpty;
+  }
+
+  /// A page lifecycle change cannot affect a move between other pages.
+  /// Moves touching the created/deleted page still require causal rebase.
+  static bool _moveAvoidsPage(OperationEnvelope move, String pageId) {
+    final destinationId = move.payload['toPageId'];
+    return move.objectId != null &&
+        move.pageId != null &&
+        move.pageId != pageId &&
+        destinationId is String &&
+        destinationId.isNotEmpty &&
+        destinationId != pageId;
   }
 
   static bool _independentMetadata(

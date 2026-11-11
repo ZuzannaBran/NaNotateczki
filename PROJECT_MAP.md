@@ -1,5 +1,10 @@
 # PROJECT_MAP.md
 
+Regresja rebase (2026-11-11):
+`V2OutboxConflictPolicy` dopuszcza `object.move` przy tworzeniu/usuwaniu
+niepowiązanej strony, lecz blokuje operacje dotyczące strony źródłowej
+lub docelowej. Test: `test/v2_outbox_conflict_policy_test.dart`.
+
 Regresja kompaktacji (2026-11-10):
 `test/operation_store_test.dart` weryfikuje, że brak trwałego kursora
 poprzednika aktora nie pozwala na kompaktację zależności.
