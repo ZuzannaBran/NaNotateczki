@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../features/editor/state/editor_operation_bridge.dart';
 import '../../features/notebook/domain/image_block.dart';
 import '../../features/notebook/domain/notebook.dart';
 import '../../features/notebook/domain/note_page.dart';
@@ -133,15 +134,26 @@ class LocalImportPlan {
         if (bytes.isEmpty) {
           throw StateError('Local media is empty.');
         }
-        images.add(image.copyWith(
-          id: importedLocalUid(accountId, 'image:${source.uid}', image.id),
-          path: '',
-          bytes: bytes,
-        ));
+        // The source file extension must survive clearing the Local path:
+        // the v2 asset uploader uses it when mediaType was not persisted.
+        final extension = (image.imageExt ?? image.path.split('.').last)
+            .toLowerCase();
+        images.add(
+          image.copyWith(
+            id: importedLocalUid(
+              accountId,
+              'image:${source.uid}',
+              image.id,
+            ),
+            path: '',
+            bytes: bytes,
+            imageExt: extension.isEmpty ? null : extension,
+          ),
+        );
       }
       for (final block in page.textBlocks) {
         // An embed cannot be safely copied without its verified asset bytes.
-        if (block.deltaJson?.contains('asset:') == true) {
+        if (EditorOperationBridge.quillEmbeds(block.deltaJson).isNotEmpty) {
           throw UnsupportedError(
             'Local Quill embeds require verified asset migration.',
           );

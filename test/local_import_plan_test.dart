@@ -134,6 +134,26 @@ void main() {
     expect(() => importedLocalUid('', 'doc', 'x'), throwsArgumentError);
   });
 
+  test('literal asset text does not trigger a false embed rejection',
+      () async {
+    final source = notebook('source', 'Text');
+    final text = source.pages.single.textBlocks.single;
+    final rich = source.copyWith(pages: [
+      source.pages.single.copyWith(textBlocks: [
+        text.copyWith(
+          text: 'asset:token is plain text',
+          deltaJson: '[{"insert":"asset:token is plain text"}]',
+        ),
+      ]),
+    ]);
+    final plan = LocalImportPlan(
+      accountId: 'A', local: [rich], account: [],
+    );
+    final copy = await plan.materialize(plan.documents.single);
+    expect(copy.pages.single.textBlocks.single.text,
+        'asset:token is plain text');
+  });
+
   test('unverified Quill embed is not silently imported', () async {
     final source = notebook('source', 'Text');
     final original = source.pages.single.textBlocks.single;
