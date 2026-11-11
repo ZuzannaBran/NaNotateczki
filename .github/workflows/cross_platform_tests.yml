@@ -40,6 +40,8 @@ jobs:
         run: |
           dart format lib test integration_test test_driver
           git diff --exit-code -- lib test integration_test test_driver
+      - name: Verify two offline v2 SQLite clients before external downloads
+        run: flutter test test/v2_two_client_rebase_test.dart
       - name: Install native PDF import test dependency
         run: |
           for attempt in 1 2 3; do

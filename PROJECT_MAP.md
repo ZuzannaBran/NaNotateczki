@@ -597,6 +597,9 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   co serwer; nowy import nie ufa nazwie pliku ani deklarowanemu MIME.
 - `test/verified_editor_asset_buffer_test.dart`: checksuma, ochrona
   zmiany ID i niemutowalność skopiowanych bajtów.
+- `test/v2_two_client_rebase_test.dart`: dwa niezależne plikowe SQLite
+  testują move kontra offline color/width, niezmienność UID, operationId
+  i actorSeq po ACK oraz identyczne projekcje po ponownym otwarciu baz.
 - `test/editor_sqlite_projector_test.dart`: atomowość, rollback,
   Quill CRDT, tombstones, ACK, restart i ochrona usunięć, w tym odmowa
   formatowania z uszkodzonym embedem Quill, a także
