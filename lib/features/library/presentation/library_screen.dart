@@ -2131,7 +2131,8 @@ class _PersistentWorkspaceEditorState
     final share = widget.share;
     runtime.configureSharePreview(
       _editor,
-      shareId: kIsWeb &&
+      shareId:
+          kIsWeb &&
               share?.protocol == 'v2' &&
               share?.documentUid == widget.item.uid
           ? share!.id
