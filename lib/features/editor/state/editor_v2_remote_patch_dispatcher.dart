@@ -190,8 +190,7 @@ class EditorV2RemotePatchDispatcher {
     }
     if (owners.isNotEmpty) {
       final destination = owners.single;
-      if (visibleOwners.isNotEmpty &&
-          visibleOwners.single != destination.id) {
+      if (visibleOwners.isNotEmpty && visibleOwners.single != destination.id) {
         final source = _page(notebook.pages, visibleOwners.single);
         if (source == null ||
             !editor.applyConfirmedV2PageMovePatch(

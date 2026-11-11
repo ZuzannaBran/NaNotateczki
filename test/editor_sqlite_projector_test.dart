@@ -2796,9 +2796,12 @@ void main() {
       expect(stroke.color.toARGB32(), 0xFF778899);
       expect(await store.checkpoint('rebase-style'), 2);
       expect((await store.operation(style.operationId))!.pageId, pageId);
-      expect((await store.pending(includeDeferred: true)).map(
-        (item) => item.operationId,
-      ), setup.map((item) => item.operationId));
+      expect(
+        (await store.pending(
+          includeDeferred: true,
+        )).map((item) => item.operationId),
+        setup.map((item) => item.operationId),
+      );
       expect(
         await store.applyRemote(
           delivered.last,
@@ -2847,12 +2850,10 @@ void main() {
         payload: payload,
         dependencies: [setup.last.operationId],
       );
-      final move = event(
-        OperationKind.objectMove,
-        'move-device',
-        40,
-        const {'toPageId': destination, 'sortIndex': 1},
-      );
+      final move = event(OperationKind.objectMove, 'move-device', 40, const {
+        'toPageId': destination,
+        'sortIndex': 1,
+      });
       final delete = event(
         OperationKind.objectDelete,
         'delete-device',
@@ -2870,7 +2871,8 @@ void main() {
       }
       final notebook = (await notebooks.getNotebook(documentId))!;
       expect(
-        notebook.pages.expand((page) => page.inkStrokes)
+        notebook.pages
+            .expand((page) => page.inkStrokes)
             .where((stroke) => stroke.id == objectId),
         isEmpty,
       );
@@ -2883,7 +2885,6 @@ void main() {
       );
     });
   }
-
 
   for (final moveFirst in [false, true]) {
     test('image replacement after a concurrent move preserves assets, '
@@ -3019,11 +3020,13 @@ void main() {
       final image = notebook.pages.last.imageBlocks.single;
       expect(image.id, objectId);
       expect(image.bytes, orderedEquals(nextBytes));
-      final refs = await database.customSelect(
-        'SELECT object_id, asset_id FROM asset_references '
-        'WHERE document_id = ?',
-        variables: [Variable<String>(documentId)],
-      ).get();
+      final refs = await database
+          .customSelect(
+            'SELECT object_id, asset_id FROM asset_references '
+            'WHERE document_id = ?',
+            variables: [Variable<String>(documentId)],
+          )
+          .get();
       expect(refs, hasLength(1));
       expect(refs.single.read<String>('asset_id'), 'media-replacement');
       expect(
@@ -3097,12 +3100,10 @@ void main() {
         payload: payload,
         dependencies: [setup.last.operationId],
       );
-      final move = envelope(
-        OperationKind.objectMove,
-        'quill-mover',
-        40,
-        const {'toPageId': destination, 'sortIndex': 1},
-      );
+      final move = envelope(OperationKind.objectMove, 'quill-mover', 40, const {
+        'toPageId': destination,
+        'sortIndex': 1,
+      });
       final format = envelope(
         OperationKind.textFormat,
         'quill-formatter',
@@ -3146,8 +3147,10 @@ void main() {
       expect((atoms[atomId] as Map)['attributes'], {'bold': true});
       expect((await store.operation(format.operationId))!.pageId, pageId);
       expect(await store.checkpoint('quill-move-rebase'), 3);
-      expect(await store.pending(includeDeferred: true),
-          hasLength(setup.length));
+      expect(
+        await store.pending(includeDeferred: true),
+        hasLength(setup.length),
+      );
     });
   }
 
@@ -3187,13 +3190,10 @@ void main() {
       payload: payload,
       dependencies: [setup.last.operationId],
     );
-    final move = event(
-      OperationKind.objectMove,
-      'mover',
-      40,
-      pageId,
-      const {'toPageId': destination, 'sortIndex': 1},
-    );
+    final move = event(OperationKind.objectMove, 'mover', 40, pageId, const {
+      'toPageId': destination,
+      'sortIndex': 1,
+    });
     final delete = event(
       OperationKind.objectDelete,
       'deleter',
@@ -3225,79 +3225,82 @@ void main() {
     expect(await store.checkpoint('tombstoned-move'), 3);
     final notebook = (await notebooks.getNotebook(documentId))!;
     expect(
-      notebook.pages.expand((page) => page.inkStrokes)
+      notebook.pages
+          .expand((page) => page.inkStrokes)
           .where((stroke) => stroke.id == objectId),
       isEmpty,
     );
   });
 
-  test('late object.delete after page.delete records a safe tombstone',
-      () async {
-    const destination = 'page-remaining-after-delete';
-    const objectId = 'deleted-with-source-page';
-    final setup = await write([
-      const LocalOperationDraft(
-        kind: OperationKind.pageCreate,
-        objectId: destination,
-        payload: {
-          'value': {'title': 'Remaining', 'isBookmarked': false},
-        },
-      ),
-      LocalOperationDraft(
-        kind: OperationKind.strokeCreate,
+  test(
+    'late object.delete after page.delete records a safe tombstone',
+    () async {
+      const destination = 'page-remaining-after-delete';
+      const objectId = 'deleted-with-source-page';
+      final setup = await write([
+        const LocalOperationDraft(
+          kind: OperationKind.pageCreate,
+          objectId: destination,
+          payload: {
+            'value': {'title': 'Remaining', 'isBookmarked': false},
+          },
+        ),
+        LocalOperationDraft(
+          kind: OperationKind.strokeCreate,
+          pageId: pageId,
+          objectId: objectId,
+          payload: {'value': _stroke()},
+        ),
+      ]);
+      final removed = OperationEnvelope(
+        operationId: const Uuid().v4(),
+        actorId: 'delete-page-actor',
+        actorSeq: 1,
+        logicalClock: 50,
+        documentId: documentId,
+        objectId: pageId,
+        kind: OperationKind.pageDelete,
+        payload: const {},
+        dependencies: [setup.last.operationId],
+      );
+      final late = OperationEnvelope(
+        operationId: const Uuid().v4(),
+        actorId: 'delete-object-actor',
+        actorSeq: 1,
+        logicalClock: 51,
+        documentId: documentId,
         pageId: pageId,
         objectId: objectId,
-        payload: {'value': _stroke()},
-      ),
-    ]);
-    final removed = OperationEnvelope(
-      operationId: const Uuid().v4(),
-      actorId: 'delete-page-actor',
-      actorSeq: 1,
-      logicalClock: 50,
-      documentId: documentId,
-      objectId: pageId,
-      kind: OperationKind.pageDelete,
-      payload: const {},
-      dependencies: [setup.last.operationId],
-    );
-    final late = OperationEnvelope(
-      operationId: const Uuid().v4(),
-      actorId: 'delete-object-actor',
-      actorSeq: 1,
-      logicalClock: 51,
-      documentId: documentId,
-      pageId: pageId,
-      objectId: objectId,
-      kind: OperationKind.objectDelete,
-      payload: const {},
-      dependencies: [setup.last.operationId],
-    );
-    await store.applyRemote(
-      removed,
-      serverSequence: 1,
-      checkpointScope: 'deleted-page-object',
-      apply: () => projector.apply(removed),
-    );
-    expect(
+        kind: OperationKind.objectDelete,
+        payload: const {},
+        dependencies: [setup.last.operationId],
+      );
       await store.applyRemote(
-        late,
-        serverSequence: 2,
+        removed,
+        serverSequence: 1,
         checkpointScope: 'deleted-page-object',
-        apply: () => projector.apply(late),
-      ),
-      isTrue,
-    );
-    expect(await store.checkpoint('deleted-page-object'), 2);
-    expect(
-      await store.wasObjectDeleted(
-        documentId: documentId,
-        objectId: objectId,
-      ),
-      isTrue,
-    );
-    final notebook = (await notebooks.getNotebook(documentId))!;
-    expect(notebook.pages, hasLength(1));
-    expect(notebook.pages.single.inkStrokes, isEmpty);
-  });
+        apply: () => projector.apply(removed),
+      );
+      expect(
+        await store.applyRemote(
+          late,
+          serverSequence: 2,
+          checkpointScope: 'deleted-page-object',
+          apply: () => projector.apply(late),
+        ),
+        isTrue,
+      );
+      expect(await store.checkpoint('deleted-page-object'), 2);
+      expect(
+        await store.wasObjectDeleted(
+          documentId: documentId,
+          objectId: objectId,
+        ),
+        isTrue,
+      );
+      final notebook = (await notebooks.getNotebook(documentId))!;
+      expect(notebook.pages, hasLength(1));
+      expect(notebook.pages.single.inkStrokes, isEmpty);
+    },
+  );
 }

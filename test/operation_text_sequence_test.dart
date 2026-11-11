@@ -648,5 +648,4 @@ void main() {
     expect((left[firstId] as Map)['deleted'], isTrue);
     expect((left[firstId] as Map)['attributes'], {'bold': true});
   });
-
 }

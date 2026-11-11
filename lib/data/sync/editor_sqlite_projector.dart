@@ -118,16 +118,18 @@ class EditorSqliteProjector {
         operation.pageId == null) {
       return operation;
     }
-    final rows = await database.customSelect(
-      'SELECT page_uid FROM ink_stroke_rows WHERE uid = ? '
-      'UNION ALL SELECT page_uid FROM image_block_rows WHERE uid = ? '
-      'UNION ALL SELECT page_uid FROM text_block_rows WHERE uid = ?',
-      variables: [
-        Variable<String>(operation.objectId!),
-        Variable<String>(operation.objectId!),
-        Variable<String>(operation.objectId!),
-      ],
-    ).get();
+    final rows = await database
+        .customSelect(
+          'SELECT page_uid FROM ink_stroke_rows WHERE uid = ? '
+          'UNION ALL SELECT page_uid FROM image_block_rows WHERE uid = ? '
+          'UNION ALL SELECT page_uid FROM text_block_rows WHERE uid = ?',
+          variables: [
+            Variable<String>(operation.objectId!),
+            Variable<String>(operation.objectId!),
+            Variable<String>(operation.objectId!),
+          ],
+        )
+        .get();
     if (rows.length != 1) {
       return operation;
     }
@@ -135,14 +137,16 @@ class EditorSqliteProjector {
     if (actualPage == operation.pageId) {
       return operation;
     }
-    final history = await database.customSelect(
-      'SELECT envelope_json FROM operations WHERE document_id = ? '
-      "AND object_id = ? AND kind = 'object.move'",
-      variables: [
-        Variable<String>(operation.documentId),
-        Variable<String>(operation.objectId!),
-      ],
-    ).get();
+    final history = await database
+        .customSelect(
+          'SELECT envelope_json FROM operations WHERE document_id = ? '
+          "AND object_id = ? AND kind = 'object.move'",
+          variables: [
+            Variable<String>(operation.documentId),
+            Variable<String>(operation.objectId!),
+          ],
+        )
+        .get();
     if (history.length > 50000) {
       throw StateError('Move history requires a durable checkpoint.');
     }
@@ -152,9 +156,7 @@ class EditorSqliteProjector {
       if (json is! Map) {
         throw const FormatException('Corrupt move history.');
       }
-      final move = OperationEnvelope.fromJson(
-        Map<String, dynamic>.from(json),
-      );
+      final move = OperationEnvelope.fromJson(Map<String, dynamic>.from(json));
       if (winner == null || _compareRank(move, winner) > 0) {
         winner = move;
       }
@@ -880,16 +882,18 @@ class EditorSqliteProjector {
     // Still record the signed object.delete as a document-wide tombstone,
     // provided no owner on another page remains unaccounted for.
     if (await _store.isTombstoned(op.documentId, 'page', op.pageId!)) {
-      final liveOwners = await database.customSelect(
-        'SELECT page_uid FROM ink_stroke_rows WHERE uid = ? '
-        'UNION ALL SELECT page_uid FROM image_block_rows WHERE uid = ? '
-        'UNION ALL SELECT page_uid FROM text_block_rows WHERE uid = ?',
-        variables: [
-          Variable<String>(op.objectId!),
-          Variable<String>(op.objectId!),
-          Variable<String>(op.objectId!),
-        ],
-      ).get();
+      final liveOwners = await database
+          .customSelect(
+            'SELECT page_uid FROM ink_stroke_rows WHERE uid = ? '
+            'UNION ALL SELECT page_uid FROM image_block_rows WHERE uid = ? '
+            'UNION ALL SELECT page_uid FROM text_block_rows WHERE uid = ?',
+            variables: [
+              Variable<String>(op.objectId!),
+              Variable<String>(op.objectId!),
+              Variable<String>(op.objectId!),
+            ],
+          )
+          .get();
       if (liveOwners.isEmpty) {
         return;
       }
@@ -1479,10 +1483,7 @@ class EditorSqliteProjector {
       'SELECT envelope_json FROM operations '
       'WHERE document_id = ? AND object_id = ? '
       "AND kind = 'object.create' ORDER BY rowid LIMIT 1",
-      [
-        Variable<String>(operation.documentId),
-        Variable<String>(objectId),
-      ],
+      [Variable<String>(operation.documentId), Variable<String>(objectId)],
     );
     if (original == null) {
       throw StateError('Image must have an authenticated create operation.');

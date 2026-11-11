@@ -517,9 +517,7 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     // but the durable global checkpoint stays before the first gap.
     _requested = true;
     if (firstFailure != null) {
-      throw StateError(
-        'Operation feed has an unresolved gap: $firstFailure',
-      );
+      throw StateError('Operation feed has an unresolved gap: $firstFailure');
     }
   }
 
