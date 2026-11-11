@@ -97,10 +97,7 @@ class LocalAccountImportService {
     );
     // v2 cannot yet represent the legacy Planner document kind. Reject the
     // entire batch before writing anything, rather than silently dropping it.
-    final hasV2Journal = await repository.database.customSelect(
-      'SELECT 1 FROM operations LIMIT 1',
-    ).getSingleOrNull();
-    if (hasV2Journal != null &&
+    if (repository.usesAccountOperations &&
         local.any((item) => item.kind.index > 1)) {
       throw UnsupportedError(
         'Planner documents must be migrated after v2 planner cutover.',
@@ -149,6 +146,21 @@ class LocalAccountImportService {
           for (final page in entry.source.pages)
             '${entry.source.uid}/${page.id}': importedLocalUid(
               accountId, 'page:${entry.source.uid}', page.id),
+      },
+      'objects': {
+        for (final entry in plan.documents)
+          for (final page in entry.source.pages)
+            ...{
+              for (final block in page.textBlocks)
+                '${entry.source.uid}/text/${block.id}': importedLocalUid(
+                  accountId, 'text:${entry.source.uid}', block.id),
+              for (final block in page.imageBlocks)
+                '${entry.source.uid}/image/${block.id}': importedLocalUid(
+                  accountId, 'image:${entry.source.uid}', block.id),
+              for (final stroke in page.inkStrokes)
+                '${entry.source.uid}/ink/${stroke.id}': importedLocalUid(
+                  accountId, 'ink:${entry.source.uid}', stroke.id),
+            },
       },
     }));
     var inserted = 0;

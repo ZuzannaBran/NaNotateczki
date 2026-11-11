@@ -132,8 +132,11 @@ void main() {
     expect(planner.sessions.single.repeat, StudyRepeat.weekly);
     expect(planner.sessions.single.status, StudyStatus.completed);
     expect(libraryReloads, 1);
-    expect(jsonDecode(files[LocalAccountImportService.checkpointKey]!)
-        ['state'], 'complete');
+    expect(
+      (jsonDecode(files[LocalAccountImportService.checkpointKey]!)
+          as Map<String, dynamic>)['state'],
+      'complete',
+    );
   });
 
   test('resumes after a post-document failure without duplicating UID',
@@ -156,8 +159,11 @@ void main() {
       localLibraryText: '{"folders":["School"]}',
       localPlannerText: null,
     ), throwsStateError);
-    expect(jsonDecode(files[LocalAccountImportService.checkpointKey]!)
-        ['state'], 'pending');
+    expect(
+      (jsonDecode(files[LocalAccountImportService.checkpointKey]!)
+          as Map<String, dynamic>)['state'],
+      'pending',
+    );
     expect(await account.fetchNotebooks(), hasLength(1));
     expect(await interrupted.runWithSource(
       sourceRepository: local,

@@ -826,14 +826,14 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         if (!isCurrent()) {
           return;
         }
-        await _importPendingLocalData(userId, generation);
-        if (!isCurrent()) {
-          return;
-        }
         if (recoveryFailure != null) {
           // Keep live sync available but do not upload a potentially
           // incomplete replacement snapshot. Retry recovery on resume.
           sync.reportStartupFailure(recoveryFailure);
+          return;
+        }
+        await _importPendingLocalData(userId, generation);
+        if (!isCurrent()) {
           return;
         }
         await backup.markDatabaseInitialized(userId);

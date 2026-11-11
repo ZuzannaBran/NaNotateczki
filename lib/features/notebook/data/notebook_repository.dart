@@ -168,6 +168,7 @@ class NotebookRepository {
 
   bool get lastFetchSkippedCorruptRows => _lastFetchSkippedCorruptRows;
   bool get hasPendingSaves => _saveTails.isNotEmpty;
+  bool get usesAccountOperations => _accountOperationWriter != null;
 
   /// Fences an opt-in v2 editor against every legacy repository writer.
   ///
