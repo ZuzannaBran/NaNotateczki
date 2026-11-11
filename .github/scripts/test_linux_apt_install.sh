@@ -61,7 +61,11 @@ export NN_TEST_ALREADY_INSTALLED=0
 
 # The mocked sudo is deliberately not root; production signatures are
 # verified by apt using the existing Ubuntu archive keyring.
-bash "$repo_root/.github/scripts/install_ubuntu_native_prerequisites.sh" \
+test -f "$repo_root/.github/scripts/install_linux_prerequisites.sh" || {
+  echo "Native dependency installer is missing." >&2
+  exit 1
+}
+bash "$repo_root/.github/scripts/install_linux_prerequisites.sh" \
   poppler-utils || {
     echo "Signed mirror helper unexpectedly failed." >&2
     exit 1
@@ -74,14 +78,14 @@ grep -q 'poppler-utils' "$NN_TEST_LOG"
 
 : > "$NN_TEST_LOG"
 export NN_TEST_ALREADY_INSTALLED=1
-bash "$repo_root/.github/scripts/install_ubuntu_native_prerequisites.sh" \
+bash "$repo_root/.github/scripts/install_linux_prerequisites.sh" \
   poppler-utils
 test ! -s "$NN_TEST_LOG"
 
 export NN_TEST_ALREADY_INSTALLED=0
 rm -f "$NN_TEST_LOG.installed"
 export NN_TEST_FAIL_MIRRORS=1
-if bash "$repo_root/.github/scripts/install_ubuntu_native_prerequisites.sh" \
+if bash "$repo_root/.github/scripts/install_linux_prerequisites.sh" \
   poppler-utils; then
   echo "Missing packages were incorrectly accepted." >&2
   exit 1
@@ -89,11 +93,11 @@ fi
 
 unset NN_TEST_FAIL_MIRRORS
 export NN_TEST_FAIL_FIRST=1
-bash "$repo_root/.github/scripts/install_ubuntu_native_prerequisites.sh" \
+bash "$repo_root/.github/scripts/install_linux_prerequisites.sh" \
   poppler-utils
 grep -q 'mirrors.edge.kernel.org/ubuntu noble' "$NN_TEST_SOURCES"
 
-if bash "$repo_root/.github/scripts/install_ubuntu_native_prerequisites.sh" \
+if bash "$repo_root/.github/scripts/install_linux_prerequisites.sh" \
   'poppler-utils;rm'; then
   echo "Unsafe package parameter was accepted." >&2
   exit 1
