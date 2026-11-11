@@ -27,6 +27,47 @@ void main() {
     planner.dispose();
   });
 
+  test('Local import retries an interrupted planner snapshot write',
+      () async {
+    final disk = <String, String>{};
+    var failNext = true;
+    final imported = StudyPlannerController(
+      autoTick: false,
+      read: (key) async => disk[key],
+      write: (key, value) async {
+        if (failNext) {
+          failNext = false;
+          throw StateError('No space left');
+        }
+        disk[key] = value;
+      },
+    );
+    await imported.load();
+    final source = StudySession(
+      id: 'imported-uuid',
+      title: 'Revision',
+      scheduledAt: DateTime.utc(2026, 11, 12),
+      minutes: 50,
+    );
+    await expectLater(
+      imported.importLocalEntries([source.toJson()]),
+      throwsStateError,
+    );
+    expect(imported.sessions, hasLength(1));
+    expect(disk, isEmpty);
+    expect(await imported.importLocalEntries([source.toJson()]), 0);
+    expect(disk[StudyPlannerController.storageKey], isNotNull);
+    imported.dispose();
+    final restarted = StudyPlannerController(
+      autoTick: false,
+      read: (key) async => disk[key],
+      write: (key, value) async => disk[key] = value,
+    );
+    await restarted.load();
+    expect(restarted.sessions.single.id, 'imported-uuid');
+    restarted.dispose();
+  });
+
   for (final readFails in [false, true]) {
     test(
       'late planner load is ignored after dispose, failure=$readFails',
