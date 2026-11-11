@@ -8,6 +8,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../data/sync/api_client.dart';
 import '../../../data/sync/study_share_service.dart';
 import 'study_share_guest_editor.dart';
+import 'study_share_v2_guest_editor.dart';
 
 /// An invalidated ticket cannot be recovered by transport reconnects.
 bool isTerminalShareSocketClose(int? code) =>
@@ -68,6 +69,8 @@ class _StudyShareGuestScreenState extends State<_StudyShareGuestScreen> {
   Timer? _reconnectTimer;
   Timer? _clockTimer;
   String? _ticket;
+  String? _documentUid;
+  String _protocol = 'v1';
   String? _title;
   String? _error;
   DateTime? _expiresAt;
@@ -98,7 +101,14 @@ class _StudyShareGuestScreenState extends State<_StudyShareGuestScreen> {
       if (!mounted) {
         return;
       }
+      final v2 = response['protocol'] == 'v2';
+      final documentUid = response['documentUid'];
+      if (v2 && (documentUid is! String || documentUid.isEmpty)) {
+        throw const FormatException('V2 invitation has no document identity.');
+      }
       setState(() {
+        _protocol = v2 ? 'v2' : 'v1';
+        _documentUid = documentUid is String ? documentUid : null;
         _ticket = response['ticket'] as String;
         _title = response['title'] as String;
         _expiresAt = DateTime.tryParse(response['expiresAt'] as String? ?? '');
@@ -145,6 +155,7 @@ class _StudyShareGuestScreenState extends State<_StudyShareGuestScreen> {
                 setState(() => _documentUpdates++);
                 break;
               case 'document_changed':
+              case 'operations_changed':
               case 'appearance_changed':
                 setState(() => _documentUpdates++);
                 break;
@@ -193,6 +204,20 @@ class _StudyShareGuestScreenState extends State<_StudyShareGuestScreen> {
     _reconnectTimer = Timer(const Duration(seconds: 1), () {
       _reconnectTimer = null;
       _connect();
+    });
+  }
+
+  void _rejoinView() {
+    if (!mounted) {
+      return;
+    }
+    _reconnectTimer?.cancel();
+    unawaited(_subscription?.cancel());
+    unawaited(_channel?.sink.close());
+    setState(() {
+      _ticket = null;
+      _ended = false;
+      _error = 'Sign in again to resume saved guest edits.';
     });
   }
 
@@ -296,15 +321,27 @@ class _StudyShareGuestScreenState extends State<_StudyShareGuestScreen> {
                       child: Text(_error!),
                     ),
                   Expanded(
-                    child: StudyShareGuestEditor(
-                      shareId: widget.sessionId,
-                      ticket: _ticket!,
-                      client: _client,
-                      updateRevision: _documentUpdates,
-                      onEnded: () =>
-                          _endView('This session is no longer available.'),
-                      onHostDarkMode: widget.onHostDarkMode,
-                    ),
+                    child: _protocol == 'v2'
+                        ? StudyShareV2GuestEditor(
+                            shareId: widget.sessionId,
+                            documentUid: _documentUid!,
+                            ticket: _ticket!,
+                            updateRevision: _documentUpdates,
+                            onEnded: () => _endView(
+                              'This session is no longer available.',
+                            ),
+                            onRejoin: _rejoinView,
+                          )
+                        : StudyShareGuestEditor(
+                            shareId: widget.sessionId,
+                            ticket: _ticket!,
+                            client: _client,
+                            updateRevision: _documentUpdates,
+                            onEnded: () => _endView(
+                              'This session is no longer available.',
+                            ),
+                            onHostDarkMode: widget.onHostDarkMode,
+                          ),
                   ),
                 ],
               ),
