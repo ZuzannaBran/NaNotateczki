@@ -620,6 +620,29 @@ class NotebookRepository {
     }
   }
 
+  /// Imports one isolated Local copy without overwriting account content.
+  ///
+  /// A retry finds the same deterministic UID and never replays its snapshot
+  /// over edits made on the account after the first successful insertion.
+  Future<bool> importLocalNotebook(Notebook notebook) async {
+    if (await getNotebook(notebook.uid) != null) {
+      return false;
+    }
+    final writer = _accountOperationWriter;
+    if (writer == null) {
+      await importNotebooksAtomically([notebook]);
+    } else {
+      if (notebook.kind.index > 1) {
+        throw UnsupportedError('Planner documents need v2 planner cutover.');
+      }
+      final committed = await writer.writeCreateNotebook(notebook: notebook);
+      if (writer.onCommitted == null) {
+        reportOperationCommit(notebook.uid, committed);
+      }
+    }
+    return true;
+  }
+
   Future<Notebook> createNotebook({String? title, String? folder}) async {
     final now = DateTime.now();
     final notebook = Notebook(

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'app_data_directory.dart';
+import 'storage_namespace_manager.dart';
 
 final Map<String, Future<void>> _operationTails = <String, Future<void>>{};
 
@@ -46,6 +47,18 @@ Future<String?> readStoredText(String key, {String? directoryPath}) {
       }
       return file.readAsString();
     },
+  );
+}
+
+/// Cross-namespace reads do not switch the current AppScope or its writers.
+Future<String?> readStoredTextForNamespace(
+  StorageNamespace namespace,
+  String key,
+) async {
+  namespace.fileKey(key);
+  return readStoredText(
+    key,
+    directoryPath: '\${await getRootAppDataPath()}/\${namespace.relativePath}',
   );
 }
 

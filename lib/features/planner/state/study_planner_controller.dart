@@ -924,6 +924,49 @@ class StudyPlannerController extends ChangeNotifier {
     }
   }
 
+  /// Adds explicitly imported Local entries without modifying account edits
+  /// or resurrecting IDs already deleted on this account.
+  Future<int> importLocalEntries(
+    Iterable<Map<String, dynamic>> entries,
+  ) async {
+    if (_disposed || !isLoaded) {
+      throw StateError('Planner must be loaded before importing Local data.');
+    }
+    final known = syncRecords.keys.toSet();
+    final additions = <StudySession>[];
+    var activeCount = active == null ? 0 : 1;
+    for (final value in entries) {
+      final candidate = StudySession.fromJson(value);
+      if (!known.add(candidate.id)) {
+        continue;
+      }
+      if (candidate.status == StudyStatus.running ||
+          candidate.status == StudyStatus.paused) {
+        activeCount++;
+      }
+      additions.add(candidate);
+    }
+    if (activeCount > 1) {
+      throw StateError(
+        'Conflicting active study sessions require manual resolution.',
+      );
+    }
+    if (additions.isEmpty) {
+      return 0;
+    }
+    _sessions.addAll(additions);
+    for (final entry in additions) {
+      _knownContents[entry.id] = _contentSignature(entry);
+    }
+    error = null;
+    _persist();
+    await flush();
+    if (error != null) {
+      throw StateError(error!);
+    }
+    return additions.length;
+  }
+
   void _persist() {
     notifyListeners();
     final snapshot = jsonEncode({

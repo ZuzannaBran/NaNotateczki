@@ -1,6 +1,7 @@
 import 'package:web/web.dart' as web;
 
 import 'active_storage_namespace.dart';
+import 'storage_namespace_manager.dart';
 
 String _scopedKey(String key) => key.startsWith('account_profile.json')
     ? key
@@ -9,6 +10,12 @@ String _scopedKey(String key) => key.startsWith('account_profile.json')
 Future<String?> readStoredText(String key, {String? directoryPath}) async {
   return web.window.localStorage.getItem(_scopedKey(key));
 }
+
+/// Explicitly read a different IndexedDB/localStorage identity.
+Future<String?> readStoredTextForNamespace(
+  StorageNamespace namespace,
+  String key,
+) async => web.window.localStorage.getItem(namespace.fileKey(key));
 
 Future<void> writeStoredText(
   String key,
