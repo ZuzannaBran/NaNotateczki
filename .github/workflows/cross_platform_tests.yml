@@ -1,13 +1,7 @@
 name: NaNotateczki - cross-platform verification
 
 on:
-  push:
-    branches: [dev]
-  pull_request:
-    branches: [dev]
   workflow_dispatch:
-  schedule:
-    - cron: '15 3 * * *' # Runs only after this workflow is on default branch
 
 permissions:
   contents: read
