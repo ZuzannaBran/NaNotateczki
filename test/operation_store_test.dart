@@ -715,78 +715,75 @@ void main() {
     expect((await add('new-identity')).actorSeq, 3);
   });
 
-  test(
-    'deleted object UID cannot be reused on a different page',
-    () async {
-      final first = await add('same-id');
-      final deleted = await store.writeLocal(
+  test('deleted object UID cannot be reused on a different page', () async {
+    final first = await add('same-id');
+    final deleted = await store.writeLocal(
+      actorId: 'device-one',
+      documentId: 'document-one',
+      pageId: 'page-one',
+      objectId: 'same-id',
+      kind: OperationKind.objectDelete,
+      payload: const {},
+      apply: (_) async {},
+    );
+    expect(
+      await store.isTombstoned(
+        'document-one',
+        'object',
+        'same-id',
+        pageId: 'page-one',
+      ),
+      isTrue,
+    );
+    // The stored tombstone retains its original page for legacy lookups,
+    // but a moved UID cannot be recreated elsewhere in this document.
+    expect(
+      await store.isTombstoned(
+        'document-one',
+        'object',
+        'same-id',
+        pageId: 'page-two',
+      ),
+      isFalse,
+    );
+    expect(
+      await store.wasObjectDeleted(
+        documentId: 'document-one',
+        objectId: 'same-id',
+      ),
+      isTrue,
+    );
+    final queuedBefore = (await store.pending())
+        .map((operation) => operation.operationId)
+        .toList();
+    var projectionCalled = false;
+    await expectLater(
+      store.writeLocal(
         actorId: 'device-one',
         documentId: 'document-one',
-        pageId: 'page-one',
+        pageId: 'page-two',
         objectId: 'same-id',
-        kind: OperationKind.objectDelete,
-        payload: const {},
-        apply: (_) async {},
-      );
-      expect(
-        await store.isTombstoned(
-          'document-one',
-          'object',
-          'same-id',
-          pageId: 'page-one',
-        ),
-        isTrue,
-      );
-      // The stored tombstone retains its original page for legacy lookups,
-      // but a moved UID cannot be recreated elsewhere in this document.
-      expect(
-        await store.isTombstoned(
-          'document-one',
-          'object',
-          'same-id',
-          pageId: 'page-two',
-        ),
-        isFalse,
-      );
-      expect(
-        await store.wasObjectDeleted(
-          documentId: 'document-one',
-          objectId: 'same-id',
-        ),
-        isTrue,
-      );
-      final queuedBefore = (await store.pending())
-          .map((operation) => operation.operationId)
-          .toList();
-      var projectionCalled = false;
-      await expectLater(
-        store.writeLocal(
-          actorId: 'device-one',
-          documentId: 'document-one',
-          pageId: 'page-two',
-          objectId: 'same-id',
-          kind: OperationKind.objectCreate,
-          payload: const {
-            'value': {'name': 'on another page'},
-          },
-          apply: (_) async {
-            projectionCalled = true;
-          },
-        ),
-        throwsStateError,
-      );
-      expect(projectionCalled, isFalse);
-      expect(
-        (await store.pending()).map((operation) => operation.operationId),
-        queuedBefore,
-      );
-      expect((await store.operation(first.operationId))?.actorSeq, 1);
-      expect((await store.operation(deleted.operationId))?.actorSeq, 2);
-      final fresh = await add('new-identity');
-      expect(fresh.actorSeq, 3);
-      expect(fresh.dependencies, contains(deleted.operationId));
-    },
-  );
+        kind: OperationKind.objectCreate,
+        payload: const {
+          'value': {'name': 'on another page'},
+        },
+        apply: (_) async {
+          projectionCalled = true;
+        },
+      ),
+      throwsStateError,
+    );
+    expect(projectionCalled, isFalse);
+    expect(
+      (await store.pending()).map((operation) => operation.operationId),
+      queuedBefore,
+    );
+    expect((await store.operation(first.operationId))?.actorSeq, 1);
+    expect((await store.operation(deleted.operationId))?.actorSeq, 2);
+    final fresh = await add('new-identity');
+    expect(fresh.actorSeq, 3);
+    expect(fresh.dependencies, contains(deleted.operationId));
+  });
 
   test('object tombstone is isolated to its document', () async {
     await add('shared-uid');
