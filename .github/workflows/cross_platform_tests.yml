@@ -36,7 +36,10 @@ jobs:
           cache: true
       - run: flutter pub get
       - name: Validate Dart formatting before native package downloads
-        run: dart format --output=none --set-exit-if-changed lib test integration_test test_driver
+        shell: bash
+        run: |
+          dart format lib test integration_test test_driver
+          git diff --exit-code -- lib test integration_test test_driver
       - name: Install native PDF import test dependency
         run: |
           for attempt in 1 2 3; do
