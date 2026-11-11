@@ -52,23 +52,13 @@ jobs:
             test/operation_text_sequence_test.dart \
             test/editor_v2_account_startup_test.dart \
             test/editor_v2_remote_patch_dispatcher_test.dart
+      - name: Verify signed-mirror dependency installer
+        run: bash .github/scripts/test_linux_apt_install.sh
       - name: Install native PDF import test dependency
         run: |
-          if command -v pdftoppm >/dev/null 2>&1; then
-            pdftoppm -v
-            exit 0
-          fi
-          for attempt in 1 2 3; do
-            if sudo apt-get update -o Acquire::Retries=2 &&
-              sudo apt-get install -o Acquire::Retries=2 \
-                --no-install-recommends -y poppler-utils; then
-              break
-            fi
-            if [ "$attempt" -eq 3 ]; then
-              exit 1
-            fi
-            sleep 10
-          done
+          bash .github/scripts/install_linux_prerequisites.sh poppler-utils
+          command -v pdftoppm
+          pdftoppm -v
       - name: Verify generated Drift mappings after schema migration
         run: |
           dart run build_runner build --delete-conflicting-outputs
@@ -202,8 +192,7 @@ jobs:
           python-version: '3.12'
       - name: Install Linux native prerequisites
         run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y \
+          bash .github/scripts/install_linux_prerequisites.sh \
             clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
             libsqlite3-dev libsecret-1-dev xvfb xauth poppler-utils zenity
       - uses: subosito/flutter-action@v2
@@ -406,10 +395,9 @@ jobs:
       - name: Install Linux native prerequisites
         if: matrix.platform == 'linux'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config \
-            libgtk-3-dev liblzma-dev libsqlite3-dev libsecret-1-dev \
-            xvfb poppler-utils zenity
+          bash .github/scripts/install_linux_prerequisites.sh \
+            clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
+            libsqlite3-dev libsecret-1-dev xvfb poppler-utils zenity
       - uses: subosito/flutter-action@v2
         id: flutter-setup
         continue-on-error: ${{ matrix.platform == 'macos' }}

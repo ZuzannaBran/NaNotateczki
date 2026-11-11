@@ -9,6 +9,24 @@ przyjęta jako jawny no-op bez wskrzeszenia. Regresje obejmują asset
 replacement, Quill i delete w obu kolejnościach dostarczenia.
 
 
+## Uzupełnienie konkurencyjnych ruchów i CI (2026-11-11)
+
+Dwa niezależne `object.move` tego samego UID z tego samego źródła
+mogą przejść obok lokalnego outboxu, jeżeli mają różne `actorId`,
+nie zależą przyczynowo od siebie i mają poprawne `toPageId`/`sortIndex`.
+Rozstrzyga trwały ranking `(logicalClock, actorId, actorSeq, operationId)`;
+przegrana operacja zachowuje kopertę, nie przenosi obiektu z powrotem.
+Test regresyjny odtwarza dwa lokalne plikowe SQLite i restart.
+Ruch versus `page.delete` źródła/docelowej strony nadal nie jest
+automatycznie scalany, bo usunięcie kontenera nie jest przemienne;
+jego błąd pozostaje jawny i nie może usunąć outboxu.
+
+Weryfikacja na Ubuntu wymaga podpisanych pakietów: skrypt CI
+`install_linux_prerequisites.sh` próbuje najpierw niezależne HTTPS
+mirrory, a przy awarii kończy się błędem w ograniczonym czasie,
+zamiast blokować cały runner przez godzinę. Nie pomija testów PDF ani
+testów Linux.
+
 ## Pakiet 2: rebase operacyjny v2 (2026-11-11)
 
 - Przeniesiony obiekt zachowuje UID. Edycje jego wcześniejszej strony

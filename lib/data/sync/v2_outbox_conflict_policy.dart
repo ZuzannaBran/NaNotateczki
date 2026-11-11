@@ -53,7 +53,8 @@ class V2OutboxConflictPolicy {
         return _identicalAssetReceiptForIndependentOwners(remote, local);
       }
       if (remote.objectId == local.objectId) {
-        return _independentConcurrentMove(remote, local) ||
+        return _rankResolvedConcurrentMoves(remote, local) ||
+            _independentConcurrentMove(remote, local) ||
             _independentProperties(remote, local) ||
             _independentText(remote, local) ||
             _independentTextAndGeometry(remote, local);
@@ -191,6 +192,39 @@ class V2OutboxConflictPolicy {
       return _rankResolvedMetadata(remote, local);
     }
     return false;
+  }
+
+  /// Competing moves of one immutable UID converge through the move
+  /// rank recorded by both reducers. A losing move cannot restore the
+  /// previous container; causal moves from one actor still need ordering.
+  static bool _rankResolvedConcurrentMoves(
+    OperationEnvelope remote,
+    OperationEnvelope local,
+  ) {
+    if (remote.kind != OperationKind.objectMove ||
+        local.kind != OperationKind.objectMove ||
+        remote.objectId == null ||
+        remote.pageId == null ||
+        remote.pageId != local.pageId ||
+        remote.actorId == local.actorId ||
+        remote.dependencies.contains(local.operationId) ||
+        local.dependencies.contains(remote.operationId)) {
+      return false;
+    }
+    for (final move in [remote, local]) {
+      final destination = move.payload['toPageId'];
+      final index = move.payload['sortIndex'];
+      if (move.payload.length != 2 ||
+          destination is! String ||
+          destination.isEmpty ||
+          destination == move.pageId ||
+          index is! int ||
+          index < 0 ||
+          index >= 1000000) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /// Two operations on one UID may coexist across a page move only when

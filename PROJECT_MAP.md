@@ -19,10 +19,11 @@ oraz `server/api/tests/test_operation_projection.py`.
 
 
 Regresja rebase (2026-11-11):
-`V2OutboxConflictPolicy` dopuszcza `object.move` w obrębie tej samej strony
-obok bezpiecznych zmian pól i atomów Quill. Przeniesienie między stronami
-pozostaje blokowane do trwałego rebase. Test:
-`test/v2_outbox_conflict_policy_test.dart`.
+`V2OutboxConflictPolicy` dopuszcza niezależne `object.move` tego samego UID
+dzięki zapisanej randze LWW w projektorach Dart/Python. Przyczynowo
+zależne ruchy i kolizje `page.delete` nadal blokuje bezstratnie;
+testy: `test/v2_outbox_conflict_policy_test.dart` oraz
+`test/v2_two_client_rebase_test.dart`.
 
 Regresja rebase (2026-11-11):
 `V2OutboxConflictPolicy` dopuszcza `object.move` przy tworzeniu/usuwaniu
@@ -598,8 +599,9 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `test/verified_editor_asset_buffer_test.dart`: checksuma, ochrona
   zmiany ID i niemutowalność skopiowanych bajtów.
 - `test/v2_two_client_rebase_test.dart`: dwa niezależne plikowe SQLite
-  testują move kontra offline color/width, niezmienność UID, operationId
-  i actorSeq po ACK oraz identyczne projekcje po ponownym otwarciu baz.
+  testują move kontra offline color/width oraz dwa konkurencyjne ruchy
+  jednego UID (LWW), niezmienność operationId/actorSeq po ACK,
+  brak duplikatów i zgodność po ponownym otwarciu baz.
 - `test/editor_sqlite_projector_test.dart`: atomowość, rollback,
   Quill CRDT, tombstones, ACK, restart i ochrona usunięć, w tym odmowa
   formatowania z uszkodzonym embedem Quill, a także
@@ -883,6 +885,11 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `test/editor_sqlite_projector_test.dart`: permutacje odbioru
   document/page title, object.set width i object.transform points,
   z zapisem rank, checkpointu i zachowaniem outboxu.
+- `.github/scripts/install_linux_prerequisites.sh`: instalacja natywnych
+  zależności Ubuntu przez dwa niezależne HTTPS mirrory z weryfikacją
+  podpisanego repozytorium, limitem czasu i bez omijania błędów.
+  Regresja Bash: `.github/scripts/test_linux_apt_install.sh`.
+  Używany przez Dart CI, Linux v2 E2E i Linux desktop.
 - `.github/scripts/flutter_transient_network_retry.sh`:
   maksymalnie trzy próby tylko dla błędów pobierania sqlite3
   lub HTTP 502/503/504. Nie ignoruje błędów testów.

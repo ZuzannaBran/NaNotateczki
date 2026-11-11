@@ -1327,6 +1327,43 @@ void main() {
     expect(_allowed(pendingMove, move), isFalse);
   });
 
+  test('independent concurrent moves use rank rather than pending gate', () {
+    final remote = _operation(
+      OperationKind.objectMove,
+      remote: true,
+      pageId: 'source',
+      objectId: 'same-stroke',
+      payload: const {'toPageId': 'remote-page', 'sortIndex': 2},
+    );
+    final local = _operation(
+      OperationKind.objectMove,
+      pageId: 'source',
+      objectId: 'same-stroke',
+      payload: const {'toPageId': 'local-page', 'sortIndex': 3},
+    );
+    expect(_allowed(remote, local), isTrue);
+    expect(_allowed(local, remote), isTrue);
+
+    final dependent = OperationEnvelope.fromJson({
+      ...remote.toJson(),
+      'dependencies': [local.operationId],
+    });
+    expect(_allowed(dependent, local), isFalse);
+    final movedAgain = OperationEnvelope.fromJson({
+      ...local.toJson(),
+      'pageId': 'other-source',
+    });
+    expect(_allowed(remote, movedAgain), isFalse);
+
+    final invalid = _operation(
+      OperationKind.objectMove,
+      pageId: 'source',
+      objectId: 'same-stroke',
+      payload: const {'toPageId': 'local-page', 'sortIndex': 1000000},
+    );
+    expect(_allowed(remote, invalid), isFalse);
+  });
+
   test('move cannot race with deleting its source or destination', () {
     final move = _operation(
       OperationKind.objectMove,
