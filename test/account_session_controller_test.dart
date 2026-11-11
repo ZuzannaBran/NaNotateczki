@@ -967,6 +967,109 @@ void main() {
     session.dispose();
     client.close();
   });
+
+  test('explicit Local import choice survives restart and clears on commit',
+      () async {
+    final stored = <String, String>{};
+    textStorageReadOverride = (key) async => stored[key];
+    textStorageWriteOverride = (key, value) async {
+      stored[key] = value;
+    };
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/v1/auth/login') {
+          final username = (jsonDecode(request.body) as Map)['username'];
+          return http.Response(jsonEncode({
+            'accessToken': 'access',
+            'refreshToken': 'refresh',
+            'expiresIn': 600,
+            'userId': 'account-a',
+            'username': username,
+          }), 200);
+        }
+        if (request.url.path == '/v1/auth/refresh') {
+          return http.Response(jsonEncode({
+            'accessToken': 'access-refreshed',
+            'refreshToken': 'refresh-rotated',
+            'expiresIn': 600,
+            'userId': 'account-a',
+            'username': 'account_a',
+          }), 200);
+        }
+        fail('Unexpected API: ${request.url.path}');
+      }),
+    );
+    final session = AccountSessionController(
+      client,
+      credentialStore: credentials,
+    );
+    await session.loadProfile();
+    await session.useLocalProfile('Local');
+    await session.login('account_a', 'password', importLocalData: true);
+    expect(session.hasPendingLocalImport('account-a'), isTrue);
+    final saved = jsonDecode(
+      stored[AccountSessionController.profileStorageKey]!,
+    ) as Map<String, dynamic>;
+    expect(saved['pendingLocalImports'], ['account-a']);
+    expect(saved['localDisplayName'], 'Local');
+
+    final restarted = AccountSessionController(
+      client,
+      credentialStore: credentials,
+    );
+    await restarted.loadProfile();
+    expect(restarted.isSignedIn, isTrue);
+    expect(restarted.hasPendingLocalImport('account-a'), isTrue);
+    await restarted.completeLocalImport('account-a');
+    expect(restarted.hasPendingLocalImport('account-a'), isFalse);
+    expect(
+      (jsonDecode(
+        stored[AccountSessionController.profileStorageKey]!,
+      ) as Map<String, dynamic>)['pendingLocalImports'],
+      isEmpty,
+    );
+    await expectLater(
+      restarted.completeLocalImport('account-b'),
+      throwsStateError,
+    );
+    session.dispose();
+    restarted.dispose();
+    client.close();
+  });
+
+  test('keeping Local separate does not request a transfer', () async {
+    final stored = <String, String>{};
+    textStorageReadOverride = (key) async => stored[key];
+    textStorageWriteOverride = (key, value) async {
+      stored[key] = value;
+    };
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((_) async => http.Response(jsonEncode({
+        'accessToken': 'access',
+        'refreshToken': 'refresh',
+        'expiresIn': 600,
+        'userId': 'account-a',
+        'username': 'account_a',
+      }), 200)),
+    );
+    final session = AccountSessionController(
+      client,
+      credentialStore: credentials,
+    );
+    await session.loadProfile();
+    await session.useLocalProfile('Local');
+    await session.login('account_a', 'password');
+    expect(session.hasPendingLocalImport('account-a'), isFalse);
+    expect(
+      (jsonDecode(stored[AccountSessionController.profileStorageKey]!)
+          as Map<String, dynamic>)['pendingLocalImports'],
+      isEmpty,
+    );
+    session.dispose();
+    client.close();
+  });
 }
 
 class _MemoryAccountCredentialStore implements AccountCredentialStore {

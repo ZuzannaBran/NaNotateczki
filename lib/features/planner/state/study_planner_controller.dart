@@ -151,6 +151,7 @@ class StudySession {
     'eventEndDate': eventEndDate?.toIso8601String(),
     'repeat': repeat.name,
     'repeatEvery': repeatEvery,
+    'seriesId': seriesId,
   };
 
   static StudySession fromJson(Map<String, dynamic> json) {
@@ -212,6 +213,9 @@ class StudySession {
       allDay: json['allDay'] == true,
       eventEndDate: date(json['eventEndDate']),
       repeat: parseEnum(StudyRepeat.values, json['repeat'], StudyRepeat.none),
+      seriesId: json['seriesId'] is String
+          ? json['seriesId'] as String
+          : null,
       repeatEvery: ((json['repeatEvery'] as num?)?.toInt() ?? 1)
           .clamp(1, 365)
           .toInt(),

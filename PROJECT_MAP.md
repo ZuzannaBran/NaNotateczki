@@ -1,3 +1,21 @@
+Pakiet 4 — Local → konto (2026-11-11): `lib/data/sync/local_import_plan.dart`
+ustala deterministyczne mapowanie UID dokumentów, stron, obiektów, zadań
+i wpisów planera, rozwiązuje kolizje tytułu i odrzuca media bez bajtów
+oraz niezweryfikowane embedy. `lib/data/sync/local_account_import_service.dart`
+wczytuje wyłącznie Local SQLite i metadane, przenosi przyrostowo do aktywnego
+konta i zatwierdza trwały checkpoint dopiero po pełnym transferze.
+`AccountSessionController` przechowuje jawny wybór importu do wznowienia
+po restarcie, a `AppScope` blokuje edytor do czasu ukończenia importu
+i nie nadpisuje ustawień konta. Native/Web `text_storage` wspierają
+odczyt z jawnego namespace bez przełączania bieżącej tożsamości.
+Testy: `test/local_import_plan_test.dart`,
+`test/local_account_import_service_test.dart`,
+`test/account_session_controller_test.dart` oraz
+`test/storage_namespace_manager_test.dart`.
+Nieobsługiwane dokumenty Planner v2 i embedy bez zweryfikowanych bajtów
+blokują transfer, nie są po cichu gubione.
+
+
 # PROJECT_MAP.md
 
 Regresja mediów rebase (2026-11-11): weryfikowane `asset.attach`,

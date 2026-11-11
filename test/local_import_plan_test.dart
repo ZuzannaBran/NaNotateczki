@@ -1,8 +1,10 @@
+import 'dart:typed_data';
 import 'dart:convert';
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:program/data/sync/local_import_plan.dart';
+import 'package:program/features/notebook/domain/image_block.dart';
 import 'package:program/features/notebook/domain/notebook.dart';
 import 'package:program/features/notebook/domain/notebook_kind.dart';
 import 'package:program/features/notebook/domain/note_page.dart';
@@ -148,5 +150,33 @@ void main() {
       plan.materialize(plan.documents.single),
       throwsUnsupportedError,
     );
+  });
+
+  test('materialized pages and images are detached from Local identity',
+      () async {
+    final source = notebook('image-source', 'Biology');
+    final localImage = ImageBlock(
+      id: 'image-source-id',
+      path: '',
+      ocrText: '',
+      position: Offset.zero,
+      width: 100,
+      height: 200,
+      bytes: Uint8List.fromList([1, 2, 3, 4]),
+      imageExt: 'png',
+    );
+    final rich = source.copyWith(pages: [
+      source.pages.single.copyWith(imageBlocks: [localImage]),
+    ]);
+    final plan = LocalImportPlan(
+      accountId: 'A', local: [rich], account: [],
+    );
+    final copy = await plan.materialize(plan.documents.single);
+    final importedImage = copy.pages.single.imageBlocks.single;
+    expect(importedImage.id, isNot(localImage.id));
+    expect(importedImage.path, isEmpty);
+    expect(importedImage.bytes, orderedEquals([1, 2, 3, 4]));
+    expect(importedImage.bytes, isNot(same(localImage.bytes)));
+    expect(rich.pages.single.imageBlocks.single.id, 'image-source-id');
   });
 }
