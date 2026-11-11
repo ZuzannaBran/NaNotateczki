@@ -628,7 +628,7 @@ void main() {
           request.url.path == '/v2/operations') {
         return http.Response(
           jsonEncode({
-            'cursor': cursor,
+            'cursor': int.parse(request.url.queryParameters['after']!),
             'hasMore': false,
             'operations': <Object>[],
           }),
