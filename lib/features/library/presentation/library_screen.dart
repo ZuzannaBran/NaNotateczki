@@ -139,7 +139,6 @@ class _LibraryScreenState extends State<LibraryScreen> {
       });
     }
     if (kIsWeb &&
-        context.read<EditorV2AccountRuntime?>() == null &&
         accountSession != null &&
         liveSync != null &&
         accountSession.isSignedIn &&
@@ -614,9 +613,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     AccountSessionController session,
     LiveWebSyncService sync,
   ) async {
-    if (context.read<EditorV2AccountRuntime?>() != null) {
-      return;
-    }
+    final runtime = context.read<EditorV2AccountRuntime?>();
     final userId = session.userId;
     if (_restoringShare ||
         userId == null ||
@@ -629,7 +626,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
     try {
       final service = StudyShareService(
         session: session,
-        liveSync: sync,
+        liveSync: runtime == null ? sync : null,
+        v2Runtime: runtime,
         repository: context.read<NotebookRepository>(),
       );
       final shares = await service.activeShares();
@@ -645,14 +643,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   Future<void> _shareItem(Notebook item) async {
-    if (context.read<EditorV2AccountRuntime?>() != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Sharing is not available in the v2 preview.'),
-        ),
-      );
-      return;
-    }
+    final runtime = context.read<EditorV2AccountRuntime?>();
     if (!kIsWeb || item.kind == NotebookKind.planner) {
       return;
     }
@@ -666,7 +657,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
     }
     final session = context.read<AccountSessionController?>();
     final sync = context.read<LiveWebSyncService?>();
-    if (session == null || sync == null || !session.isSignedIn) {
+    if (session == null ||
+        (runtime == null && sync == null) ||
+        !session.isSignedIn) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Sign in to share a study session.')),
       );
@@ -674,7 +667,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
     }
     final service = _studyShareService ??= StudyShareService(
       session: session,
-      liveSync: sync,
+      liveSync: runtime == null ? sync : null,
+      v2Runtime: runtime,
       repository: context.read<NotebookRepository>(),
     );
     await showStudyShareDialog(

@@ -24,6 +24,22 @@ void main() {
     expect(extended.title, original.title);
     expect(extended.expiresAt.isAfter(original.expiresAt), isTrue);
     expect(extended.link, original.link);
+    expect(extended.protocol, 'v1');
+  });
+
+  test('v2 invitation remains v2 when extended', () {
+    final v2 = ActiveStudyShare(
+      id: 'e5b63a5e-82f3-4a2a-9c57-16255f4e4431',
+      documentUid: 'shared-v2-uid',
+      title: 'Operational board',
+      expiresAt: DateTime.utc(2026, 11, 1, 18),
+      protocol: 'v2',
+    );
+
+    expect(
+      v2.copyWith(expiresAt: DateTime.utc(2026, 11, 1, 22)).protocol,
+      'v2',
+    );
   });
 
   testWidgets('sharing accepts a single character but rejects empty input', (

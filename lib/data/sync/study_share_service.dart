@@ -6,6 +6,7 @@ import '../../features/editor/state/page_background.dart';
 import '../../features/notebook/data/notebook_repository.dart';
 import 'account_session_controller.dart';
 import 'api_client.dart';
+import 'editor_v2_account_runtime.dart';
 import 'live_web_sync_service.dart';
 
 class ActiveStudyShare {
@@ -14,18 +15,21 @@ class ActiveStudyShare {
     required this.documentUid,
     required this.title,
     required this.expiresAt,
+    this.protocol = 'v1',
   });
 
   final String id;
   final String documentUid;
   final String title;
   final DateTime expiresAt;
+  final String protocol;
 
   ActiveStudyShare copyWith({DateTime? expiresAt}) => ActiveStudyShare(
     id: id,
     documentUid: documentUid,
     title: title,
     expiresAt: expiresAt ?? this.expiresAt,
+    protocol: protocol,
   );
 
   String get link => Uri.base
@@ -37,12 +41,14 @@ class ActiveStudyShare {
 class StudyShareService {
   StudyShareService({
     required this.session,
-    required this.liveSync,
+    this.liveSync,
+    this.v2Runtime,
     required this.repository,
   });
 
   final AccountSessionController session;
-  final LiveWebSyncService liveSync;
+  final LiveWebSyncService? liveSync;
+  final EditorV2AccountRuntime? v2Runtime;
   final NotebookRepository repository;
 
   Future<void> _refreshIfNeeded() async {
@@ -61,18 +67,37 @@ class StudyShareService {
   /// Refuse closure when the last changes have not reached the owner's account.
   Future<void> ensureSavedOnAccount(String uid) async {
     await _refreshIfNeeded();
-    if (!liveSync.isStarted) {
+    final runtime = v2Runtime;
+    final legacy = liveSync;
+    if (runtime == null && (legacy == null || !legacy.isStarted)) {
       throw StateError(
-        'Enable Web live synchronization in Account settings first.',
+        'Enable account synchronization before sharing a document.',
       );
+    }
+    if (runtime != null && !runtime.engine.isStarted) {
+      throw StateError('The v2 account is not ready to share.');
     }
     await AppSaveCoordinator.instance.flushPending();
     await repository.waitForPendingSaves();
     if (await repository.getNotebook(uid) == null) {
       throw StateError('The source document is no longer available.');
     }
-    await liveSync.syncNow();
-    if (liveSync.lastError != null || liveSync.hasPendingChanges) {
+    if (runtime != null) {
+      await runtime.engine.syncNow();
+      final pending = await runtime.store.pending(
+        documentId: uid,
+        limit: 1,
+        includeDeferred: true,
+      );
+      if (runtime.engine.lastError != null || pending.isNotEmpty) {
+        throw StateError(
+          'Commit pending v2 operations before creating a share link.',
+        );
+      }
+      return;
+    }
+    await legacy!.syncNow();
+    if (legacy.lastError != null || legacy.hasPendingChanges) {
       throw StateError(
         'The document is not saved on your account yet. Retry synchronization.',
       );
@@ -85,7 +110,10 @@ class StudyShareService {
     required String password,
   }) async {
     await ensureSavedOnAccount(documentUid);
-    final response = await session.apiClient.postJson('/v1/study-shares', {
+    final path = v2Runtime == null
+        ? '/v1/study-shares'
+        : '/v2/study-shares';
+    final response = await session.apiClient.postJson(path, {
       'documentUid': documentUid,
       'title': title,
       'password': password,
@@ -101,6 +129,7 @@ class StudyShareService {
       documentUid: documentUid,
       title: title,
       expiresAt: DateTime.parse(body['expiresAt'] as String),
+      protocol: v2Runtime == null ? 'v1' : 'v2',
     );
   }
 
@@ -120,6 +149,7 @@ class StudyShareService {
         documentUid: item['documentUid'] as String,
         title: item['title'] as String,
         expiresAt: DateTime.parse(item['expiresAt'] as String),
+        protocol: item['protocol'] == 'v2' ? 'v2' : 'v1',
       );
     }).toList();
   }
@@ -174,8 +204,10 @@ class StudyShareService {
     try {
       await AppSaveCoordinator.instance.flushPending();
       await repository.waitForPendingSaves();
-      if (liveSync.isStarted) {
-        await liveSync.syncNow();
+      if (v2Runtime != null) {
+        await v2Runtime!.engine.syncNow();
+      } else if (liveSync?.isStarted == true) {
+        await liveSync!.syncNow();
       }
     } catch (_) {
       // Owner data remains in the local repository for subsequent sync.
