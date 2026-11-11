@@ -30,6 +30,7 @@ import '../data/sync/cloud_sync_service.dart';
 import '../data/sync/diagnostics_upload_service.dart';
 import '../data/sync/device_clock_check.dart';
 import '../data/sync/editor_v2_account_runtime.dart';
+import '../data/sync/local_account_import_service.dart';
 import '../data/sync/live_web_sync_service.dart';
 import '../data/sync/operation_store.dart';
 import '../data/sync/persistent_operation_actor.dart';
@@ -207,8 +208,12 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         return AccountProtocolEditorGate(
           isSignedIn: session.isSignedIn,
           userId: session.userId,
-          legacyReadyUser: _legacyProtocolReadyUser,
-          v2ReadyUser: _v2AccountRuntime == null ? null : _bootstrappedAccount,
+          legacyReadyUser: session.hasPendingLocalImport(session.userId ?? '')
+              ? null
+              : _legacyProtocolReadyUser,
+          v2ReadyUser: session.hasPendingLocalImport(session.userId ?? '')
+              ? null
+              : (_v2AccountRuntime == null ? null : _bootstrappedAccount),
           onRetry: _startAccountSync,
           onLogOut: session.logout,
           child: const LibraryScreen(),
@@ -615,6 +620,41 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       _accountSession?.userId == userId &&
       _namespace == StorageNamespace.account(userId);
 
+  /// Completes a previously authorized Local import before enabling backups.
+  Future<void> _importPendingLocalData(
+    String userId,
+    int generation,
+  ) async {
+    final session = _accountSession;
+    if (session == null || !session.hasPendingLocalImport(userId)) {
+      return;
+    }
+    bool current() => _isCurrentAccountBootstrap(userId, generation);
+    if (!current()) {
+      return;
+    }
+    final repository = _repository;
+    final planner = _studyPlanner;
+    final library = _libraryController;
+    if (repository == null || planner == null || library == null) {
+      throw StateError('Local account import dependencies are unavailable.');
+    }
+    await LocalAccountImportService(
+      accountId: userId,
+      repository: repository,
+      planner: planner,
+      isCurrentAccount: current,
+      onLibraryChanged: library.reloadFromAccount,
+    ).run();
+    if (!current()) {
+      return;
+    }
+    await session.completeLocalImport(userId);
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
   /// Starts the operational engine for an explicitly confirmed v2 account.
   Future<void> _startV2Account(String userId, int generation) async {
     if (!_enableV2AccountPreview) {
@@ -650,6 +690,11 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       return;
     }
     await library.loadItems();
+    if (!isCurrent()) {
+      await runtime.stop();
+      return;
+    }
+    await _importPendingLocalData(userId, generation);
     if (!isCurrent()) {
       await runtime.stop();
       return;
@@ -712,7 +757,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         } on AccountProtocolNotSupported {
           try {
             await _startV2Account(userId, generation);
-          } catch (_) {
+          } on AccountProtocolNotSupported {
             if (isCurrent()) {
               setState(() => _incompatibleProtocolUser = userId);
             }
@@ -778,6 +823,10 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
             source: 'AppScope.initialPlannerSync',
           );
         }
+        if (!isCurrent()) {
+          return;
+        }
+        await _importPendingLocalData(userId, generation);
         if (!isCurrent()) {
           return;
         }

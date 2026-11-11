@@ -33,6 +33,7 @@ class AccountSessionController extends ChangeNotifier {
   String? localDisplayName;
   String? lastAccountUsername;
   String? _boundUserId;
+  final Set<String> _pendingLocalImports = <String>{};
   String? _refreshToken;
   DateTime? accessExpiresAt;
   bool profileLoaded = false;
@@ -50,6 +51,27 @@ class AccountSessionController extends ChangeNotifier {
     r'^[a-zA-Z0-9_]{3,32}' + String.fromCharCode(36),
   );
   bool get isSignedIn => mode == AccountDataMode.account && userId != null;
+
+  bool hasPendingLocalImport(String accountId) =>
+      _pendingLocalImports.contains(accountId);
+
+  /// Clear the request only after the account checkpoint is durable.
+  Future<void> completeLocalImport(String accountId) async {
+    if (!isSignedIn || userId != accountId) {
+      throw StateError('The Local import belongs to another account.');
+    }
+    if (!_pendingLocalImports.remove(accountId)) {
+      return;
+    }
+    try {
+      await _saveProfile();
+    } catch (_) {
+      _pendingLocalImports.add(accountId);
+      rethrow;
+    }
+    _notifyIfActive();
+  }
+
   bool get shouldShowStartupDialog =>
       profileLoaded && !accountDialogOpen && !onboardingComplete;
   bool get isLocalProfile => !isSignedIn && localDisplayName != null;
@@ -109,6 +131,10 @@ class AccountSessionController extends ChangeNotifier {
           raw['lastAccountEmail'],
         )?.split('@').first.toLowerCase();
         _boundUserId = _optionalNonEmptyString(raw['boundUserId']);
+        final pending = raw['pendingLocalImports'];
+        if (pending is List) {
+          _pendingLocalImports.addAll(pending.whereType<String>());
+        }
       }
       if (preferredMode == AccountDataMode.account &&
           onboardingComplete &&
@@ -128,19 +154,30 @@ class AccountSessionController extends ChangeNotifier {
     }
   }
 
-  Future<void> register(String username, String password) async {
-    await _authenticate('/v1/auth/register', username, password);
+  Future<void> register(
+    String username,
+    String password, {
+    bool importLocalData = false,
+  }) async {
+    await _authenticate('/v1/auth/register', username, password,
+        importLocalData: importLocalData);
   }
 
-  Future<void> login(String username, String password) async {
-    await _authenticate('/v1/auth/login', username, password);
+  Future<void> login(
+    String username,
+    String password, {
+    bool importLocalData = false,
+  }) async {
+    await _authenticate('/v1/auth/login', username, password,
+        importLocalData: importLocalData);
   }
 
   Future<void> _authenticate(
     String path,
     String rawUsername,
-    String password,
-  ) async {
+    String password, {
+    required bool importLocalData,
+  }) async {
     if (!apiClient.isConfigured) {
       throw StateError('BACKEND_URL is not configured.');
     }
@@ -179,6 +216,9 @@ class AccountSessionController extends ChangeNotifier {
       _applySession(incoming);
       // Account namespaces are isolated; an explicit new login selects its own.
       _boundUserId = incomingUserId;
+      if (importLocalData) {
+        _pendingLocalImports.add(incomingUserId);
+      }
       preferredMode = AccountDataMode.account;
       onboardingComplete = true;
       lastAccountUsername = normalizedUsername;
@@ -552,6 +592,7 @@ class AccountSessionController extends ChangeNotifier {
         'localDisplayName': localDisplayName,
         'lastAccountUsername': lastAccountUsername,
         'boundUserId': _boundUserId,
+        'pendingLocalImports': _pendingLocalImports.toList()..sort(),
       }),
     );
   }

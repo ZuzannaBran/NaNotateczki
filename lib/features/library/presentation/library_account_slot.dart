@@ -873,13 +873,55 @@ class _AccountDialogState extends State<_AccountDialog> {
     _startWorking();
     try {
       final session = context.read<AccountSessionController>();
+      var importLocalData = false;
+      if (session.isLocalProfile &&
+          session.preferredMode == AccountDataMode.localOnly) {
+        final decision = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Local data'),
+            content: const Text(
+              'Would you like to add a copy of your Local notebooks, '
+              'folders, tasks and study sessions to this account? '
+              'Your Local library will remain unchanged. '
+              'Account preferences will take priority.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                key: const ValueKey('account-keep-local-separate'),
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Keep local data separate'),
+              ),
+              FilledButton(
+                key: const ValueKey('account-import-local'),
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Add local data to this account'),
+              ),
+            ],
+          ),
+        );
+        if (decision == null || !mounted) {
+          return;
+        }
+        importLocalData = decision;
+      }
       if (register) {
         await session.register(
           _usernameController.text,
           _passwordController.text,
+          importLocalData: importLocalData,
         );
       } else {
-        await session.login(_usernameController.text, _passwordController.text);
+        await session.login(
+          _usernameController.text,
+          _passwordController.text,
+          importLocalData: importLocalData,
+        );
       }
       if (!mounted) {
         return;
