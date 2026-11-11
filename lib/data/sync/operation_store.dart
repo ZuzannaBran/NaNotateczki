@@ -520,6 +520,15 @@ class OperationStore {
       return true;
     }
     if (entry.kind.target == OperationTarget.object &&
+        await wasObjectDeleted(
+          documentId: document,
+          objectId: entry.objectId!,
+        )) {
+      return true;
+    }
+    // A delete from an earlier page must still reclaim a concurrently
+    // relocated UID, even if its source page has been removed.
+    if (entry.kind.target == OperationTarget.object &&
         entry.kind != OperationKind.objectDelete &&
         await isTombstoned(document, 'page', entry.pageId!)) {
       return true;

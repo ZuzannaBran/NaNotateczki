@@ -1,5 +1,12 @@
 # PROJECT_MAP.md
 
+Regresja mediów rebase (2026-11-11): weryfikowane `asset.attach`,
+`object.set(assetId)` i `asset.detach` po przeniesieniu obrazu
+rozpoznają historyczny `object.create` i receipt po UID dokumentu,
+nie po dawnej stronie. Współbieżne przenoszenie i atomy Quill mają
+regresje obu porządków w `test/editor_sqlite_projector_test.dart`.
+
+
 Pakiet 2 rebase (2026-11-11): współbieżne `object.move` i edycje
 tego samego UID są rozwiązywane na aktualnym kontenerze SQLite,
 bez przepisywania oryginalnej koperty operacji. `SyncEngine` przegląda

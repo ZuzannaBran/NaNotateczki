@@ -2884,4 +2884,350 @@ void main() {
     });
   }
 
+
+  for (final moveFirst in [false, true]) {
+    test('image replacement after a concurrent move preserves assets, '
+        'moveFirst=$moveFirst', () async {
+      const destination = 'concurrent-media-destination';
+      const objectId = 'concurrent-media-image';
+      final buffer = VerifiedEditorAssetBuffer();
+      final backed = EditorSqliteProjector(
+        database,
+        verifiedAssetBuffer: buffer,
+      );
+      final firstBytes = Uint8List.fromList([137, 80, 78, 71, 1, 2]);
+      final nextBytes = Uint8List.fromList([137, 80, 78, 71, 3, 4]);
+      Map<String, dynamic> receipt(String id, Uint8List bytes) => {
+        'assetId': id,
+        'sha256': crypto.sha256.convert(bytes).toString(),
+        'sizeBytes': bytes.length,
+        'mediaType': 'image/png',
+      };
+      final first = receipt('media-original', firstBytes);
+      final replacement = receipt('media-replacement', nextBytes);
+      buffer.stage(receipt: first, bytes: firstBytes);
+      buffer.stage(receipt: replacement, bytes: nextBytes);
+      final setup = await store.writeLocalBatch(
+        actorId: 'media-setup',
+        documentId: documentId,
+        operations: [
+          const LocalOperationDraft(
+            kind: OperationKind.pageCreate,
+            objectId: destination,
+            payload: {
+              'value': {'title': 'Images', 'isBookmarked': false},
+            },
+          ),
+          LocalOperationDraft(
+            kind: OperationKind.objectCreate,
+            pageId: pageId,
+            objectId: objectId,
+            payload: const {
+              'value': {
+                'objectType': 'image',
+                'assetId': 'media-original',
+                'dx': 1.0,
+                'dy': 2.0,
+                'width': 100.0,
+                'height': 80.0,
+                'rotation': 0.0,
+                'cropLeft': 0.0,
+                'cropTop': 0.0,
+                'cropRight': 1.0,
+                'cropBottom': 1.0,
+                'sortIndex': 0,
+              },
+            },
+          ),
+          LocalOperationDraft(
+            kind: OperationKind.assetAttach,
+            pageId: pageId,
+            objectId: objectId,
+            payload: first,
+          ),
+        ],
+        apply: backed.apply,
+      );
+      OperationEnvelope envelope(
+        OperationKind kind,
+        String actor,
+        int actorSeq,
+        int clock,
+        Map<String, dynamic> payload,
+        List<String> deps,
+      ) => OperationEnvelope(
+        operationId: const Uuid().v4(),
+        actorId: actor,
+        actorSeq: actorSeq,
+        logicalClock: clock,
+        documentId: documentId,
+        pageId: pageId,
+        objectId: objectId,
+        kind: kind,
+        payload: payload,
+        dependencies: deps,
+      );
+      final move = envelope(
+        OperationKind.objectMove,
+        'media-mover',
+        1,
+        49,
+        const {'toPageId': destination, 'sortIndex': 4},
+        [setup.last.operationId],
+      );
+      final attach = envelope(
+        OperationKind.assetAttach,
+        'media-editor',
+        1,
+        50,
+        replacement,
+        [setup.last.operationId],
+      );
+      final switchAsset = envelope(
+        OperationKind.objectSet,
+        'media-editor',
+        2,
+        51,
+        const {
+          'properties': {'assetId': 'media-replacement'},
+        },
+        [attach.operationId],
+      );
+      final detach = envelope(
+        OperationKind.assetDetach,
+        'media-editor',
+        3,
+        52,
+        const {'assetId': 'media-original'},
+        [switchAsset.operationId],
+      );
+      final operations = moveFirst
+          ? [move, attach, switchAsset, detach]
+          : [attach, switchAsset, detach, move];
+      for (var index = 0; index < operations.length; index++) {
+        final event = operations[index];
+        await store.applyRemote(
+          event,
+          serverSequence: index + 1,
+          checkpointScope: 'media-rebase',
+          apply: () => backed.apply(event),
+        );
+      }
+      final notebook = (await notebooks.getNotebook(documentId))!;
+      expect(notebook.pages.first.imageBlocks, isEmpty);
+      expect(notebook.pages.last.imageBlocks, hasLength(1));
+      final image = notebook.pages.last.imageBlocks.single;
+      expect(image.id, objectId);
+      expect(image.bytes, orderedEquals(nextBytes));
+      final refs = await database.customSelect(
+        'SELECT object_id, asset_id FROM asset_references '
+        'WHERE document_id = ?',
+        variables: [Variable<String>(documentId)],
+      ).get();
+      expect(refs, hasLength(1));
+      expect(refs.single.read<String>('asset_id'), 'media-replacement');
+      expect(
+        refs.single.read<String>('object_id'),
+        'page:${jsonEncode([destination, objectId])}',
+      );
+      expect((await store.operation(attach.operationId))!.pageId, pageId);
+      expect((await store.operation(switchAsset.operationId))!.pageId, pageId);
+      expect(await store.checkpoint('media-rebase'), 4);
+      expect(await store.pending(includeDeferred: true), hasLength(3));
+    });
+  }
+
+  for (final moveFirst in [false, true]) {
+    test('Quill atom tombstones and formatting survive a cross-page move, '
+        'moveFirst=$moveFirst', () async {
+      const destination = 'quill-rebased-destination';
+      const objectId = 'quill-rebased-text';
+      const atomId = '11111111-1111-4111-8111-111111111111';
+      final setup = await write([
+        const LocalOperationDraft(
+          kind: OperationKind.pageCreate,
+          objectId: destination,
+          payload: {
+            'value': {'title': 'Quill', 'isBookmarked': false},
+          },
+        ),
+        LocalOperationDraft(
+          kind: OperationKind.objectCreate,
+          pageId: pageId,
+          objectId: objectId,
+          payload: const {
+            'value': {
+              'objectType': 'text',
+              'dx': 0.0,
+              'dy': 0.0,
+              'width': 200.0,
+              'fontSize': 18.0,
+              'rotation': 0.0,
+              'colorValue': 0xFF000000,
+              'sortIndex': 0,
+            },
+          },
+        ),
+        LocalOperationDraft(
+          kind: OperationKind.textInsert,
+          pageId: pageId,
+          objectId: objectId,
+          payload: const {
+            'afterAtomId': null,
+            'atoms': [
+              {'id': atomId, 'text': 'A'},
+            ],
+          },
+        ),
+      ]);
+      OperationEnvelope envelope(
+        OperationKind kind,
+        String actor,
+        int clock,
+        Map<String, dynamic> payload,
+      ) => OperationEnvelope(
+        operationId: const Uuid().v4(),
+        actorId: actor,
+        actorSeq: 1,
+        logicalClock: clock,
+        documentId: documentId,
+        pageId: pageId,
+        objectId: objectId,
+        kind: kind,
+        payload: payload,
+        dependencies: [setup.last.operationId],
+      );
+      final move = envelope(
+        OperationKind.objectMove,
+        'quill-mover',
+        40,
+        const {'toPageId': destination, 'sortIndex': 1},
+      );
+      final format = envelope(
+        OperationKind.textFormat,
+        'quill-formatter',
+        41,
+        const {
+          'atomIds': [atomId],
+          'attributes': {'bold': true},
+        },
+      );
+      final deletion = envelope(
+        OperationKind.textDelete,
+        'quill-deleter',
+        42,
+        const {
+          'atomIds': [atomId],
+        },
+      );
+      final operations = moveFirst
+          ? [move, format, deletion]
+          : [deletion, format, move];
+      for (var index = 0; index < operations.length; index++) {
+        final event = operations[index];
+        await store.applyRemote(
+          event,
+          serverSequence: index + 1,
+          checkpointScope: 'quill-move-rebase',
+          apply: () => projector.apply(event),
+        );
+      }
+      final notebook = (await notebooks.getNotebook(documentId))!;
+      expect(notebook.pages.first.textBlocks, isEmpty);
+      expect(notebook.pages.last.textBlocks, hasLength(1));
+      expect(notebook.pages.last.textBlocks.single.id, objectId);
+      expect(notebook.pages.last.textBlocks.single.text, isEmpty);
+      final atoms = await store.textAtoms(
+        documentId: documentId,
+        pageId: destination,
+        objectId: objectId,
+      );
+      expect((atoms[atomId] as Map)['deleted'], isTrue);
+      expect((atoms[atomId] as Map)['attributes'], {'bold': true});
+      expect((await store.operation(format.operationId))!.pageId, pageId);
+      expect(await store.checkpoint('quill-move-rebase'), 3);
+      expect(await store.pending(includeDeferred: true),
+          hasLength(setup.length));
+    });
+  }
+
+  test('late edit on relocated deleted UID is a durable no-op', () async {
+    const destination = 'deleted-rebased-destination';
+    const objectId = 'deleted-rebased-object';
+    final setup = await write([
+      const LocalOperationDraft(
+        kind: OperationKind.pageCreate,
+        objectId: destination,
+        payload: {
+          'value': {'title': 'Destination', 'isBookmarked': false},
+        },
+      ),
+      LocalOperationDraft(
+        kind: OperationKind.strokeCreate,
+        pageId: pageId,
+        objectId: objectId,
+        payload: {'value': _stroke()},
+      ),
+    ]);
+    OperationEnvelope event(
+      OperationKind kind,
+      String actor,
+      int clock,
+      String source,
+      Map<String, dynamic> payload,
+    ) => OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: actor,
+      actorSeq: 1,
+      logicalClock: clock,
+      documentId: documentId,
+      pageId: source,
+      objectId: objectId,
+      kind: kind,
+      payload: payload,
+      dependencies: [setup.last.operationId],
+    );
+    final move = event(
+      OperationKind.objectMove,
+      'mover',
+      40,
+      pageId,
+      const {'toPageId': destination, 'sortIndex': 1},
+    );
+    final delete = event(
+      OperationKind.objectDelete,
+      'deleter',
+      41,
+      pageId,
+      const {},
+    );
+    final stale = event(
+      OperationKind.objectSet,
+      'late-writer',
+      42,
+      destination,
+      const {
+        'properties': {'colorValue': 0xFFAABBCC},
+      },
+    );
+    for (final operation in [move, delete, stale]) {
+      expect(
+        await store.applyRemote(
+          operation,
+          serverSequence: 1 + [move, delete, stale].indexOf(operation),
+          checkpointScope: 'tombstoned-move',
+          apply: () => projector.apply(operation),
+        ),
+        isTrue,
+      );
+    }
+    expect(await store.operation(stale.operationId), isNotNull);
+    expect(await store.checkpoint('tombstoned-move'), 3);
+    final notebook = (await notebooks.getNotebook(documentId))!;
+    expect(
+      notebook.pages.expand((page) => page.inkStrokes)
+          .where((stroke) => stroke.id == objectId),
+      isEmpty,
+    );
+  });
 }

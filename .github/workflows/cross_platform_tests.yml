@@ -35,10 +35,21 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
+      - name: Validate Dart formatting before native package downloads
+        run: dart format --output=none --set-exit-if-changed lib test integration_test test_driver
       - name: Install native PDF import test dependency
         run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y poppler-utils
+          for attempt in 1 2 3; do
+            if sudo apt-get update -o Acquire::Retries=2 &&
+              sudo apt-get install -o Acquire::Retries=2 \
+                --no-install-recommends -y poppler-utils; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              exit 1
+            fi
+            sleep 10
+          done
       - name: Verify generated Drift mappings after schema migration
         run: |
           dart run build_runner build --delete-conflicting-outputs

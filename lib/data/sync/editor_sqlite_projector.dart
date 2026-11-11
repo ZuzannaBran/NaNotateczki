@@ -1039,17 +1039,15 @@ class EditorSqliteProjector {
   /// Finds the durable receipt for an asset already attached to this object.
   Future<Map<String, dynamic>?> _attachedReceipt({
     required String documentId,
-    required String pageId,
     required String objectId,
     required String assetId,
   }) async {
     final rows = await database
         .customSelect(
           'SELECT envelope_json FROM operations WHERE document_id = ? '
-          'AND page_id = ? AND object_id = ? AND kind = ?',
+          'AND object_id = ? AND kind = ?',
           variables: [
             Variable<String>(documentId),
-            Variable<String>(pageId),
             Variable<String>(objectId),
             const Variable<String>('asset.attach'),
           ],
@@ -1141,7 +1139,6 @@ class EditorSqliteProjector {
       if (properties is Map && properties['assetId'] is String) {
         receipt = await _attachedReceipt(
           documentId: operation.documentId,
-          pageId: operation.pageId!,
           objectId: operation.objectId!,
           assetId: properties['assetId'] as String,
         );
@@ -1317,7 +1314,6 @@ class EditorSqliteProjector {
       }
       final receipt = await _attachedReceipt(
         documentId: op.documentId,
-        pageId: op.pageId!,
         objectId: op.objectId!,
         assetId: replacementId,
       );
@@ -1463,11 +1459,10 @@ class EditorSqliteProjector {
     }
     final original = await _row(
       'SELECT envelope_json FROM operations '
-      'WHERE document_id = ? AND page_id = ? AND object_id = ? '
+      'WHERE document_id = ? AND object_id = ? '
       "AND kind = 'object.create' ORDER BY rowid LIMIT 1",
       [
         Variable<String>(operation.documentId),
-        Variable<String>(pageId),
         Variable<String>(objectId),
       ],
     );

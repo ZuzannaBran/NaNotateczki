@@ -1,5 +1,14 @@
 # Dane NaNotateczki
 
+Uzupełnienie rebase mediów (2026-11-11): walidacja przeszłego
+`object.create` i `asset.attach` wyszukuje koperty po globalnie unikalnym
+UID w dokumencie. Klucz referencji bajtów nadal jest weryfikowany na
+**aktualnej** stronie. Usuwanie obiektu po przeniesieniu pozostawia
+trwały tombstone jego UID; późna edycja ze starej/nowej strony może zostać
+przyjęta jako jawny no-op bez wskrzeszenia. Regresje obejmują asset
+replacement, Quill i delete w obu kolejnościach dostarczenia.
+
+
 ## Pakiet 2: rebase operacyjny v2 (2026-11-11)
 
 - Przeniesiony obiekt zachowuje UID. Edycje jego wcześniejszej strony
