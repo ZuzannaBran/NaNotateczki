@@ -14,7 +14,9 @@ void main() {
   test(
     'two offline devices converge on move, color and width after restart',
     () async {
-      final directory = await Directory.systemTemp.createTemp('v2-two-clients-');
+      final directory = await Directory.systemTemp.createTemp(
+        'v2-two-clients-',
+      );
       addTearDown(() => directory.delete(recursive: true));
       final seedFile = File('${directory.path}/seed.sqlite');
       final aFile = File('${directory.path}/device-a.sqlite');
@@ -123,8 +125,9 @@ void main() {
       expect(await bStore.pending(includeDeferred: true), isEmpty);
 
       Future<void> verify(NotesDatabase db) async {
-        final notebook =
-            (await NotebookRepository(db).getNotebook(document.uid))!;
+        final notebook = (await NotebookRepository(
+          db,
+        ).getNotebook(document.uid))!;
         expect(notebook.pages, hasLength(2));
         expect(notebook.pages.first.inkStrokes, isEmpty);
         expect(notebook.pages.last.inkStrokes, hasLength(1));
