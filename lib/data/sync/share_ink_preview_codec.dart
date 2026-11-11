@@ -28,6 +28,9 @@ class ShareInkPreviewCodec {
     r'[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
   );
 
+  static int _sampleIndex(int index, int count, int total) =>
+      count < 2 ? 0 : (index * (total - 1) / (count - 1)).round();
+
   static bool supported(DrawingTool tool) =>
       tool == DrawingTool.pen ||
       tool == DrawingTool.highlighter ||
@@ -64,18 +67,9 @@ class ShareInkPreviewCodec {
               'points': [
                 for (var index = 0; index < count; index++)
                   [
-                    points[(index * (points.length - 1) / (count - 1))
-                            .round()
-                            .clamp(0, points.length - 1)]
-                        .dx,
-                    points[(index * (points.length - 1) / (count - 1))
-                            .round()
-                            .clamp(0, points.length - 1)]
-                        .dy,
-                    points[(index * (points.length - 1) / (count - 1))
-                            .round()
-                            .clamp(0, points.length - 1)]
-                        .pressure,
+                    points[_sampleIndex(index, count, points.length)].dx,
+                    points[_sampleIndex(index, count, points.length)].dy,
+                    points[_sampleIndex(index, count, points.length)].pressure,
                   ],
               ],
             },
