@@ -103,10 +103,7 @@ class EditorV2AccountRuntime {
   String? _sharePreviewId;
 
   /// Configure live, memory-only previews for the mounted v2 editor.
-  void configureSharePreview(
-    EditorController editor, {
-    String? shareId,
-  }) {
+  void configureSharePreview(EditorController editor, {String? shareId}) {
     if (!identical(_activeEditor, editor)) {
       throw StateError('Only the owning v2 editor can publish previews.');
     }

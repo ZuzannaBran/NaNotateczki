@@ -110,9 +110,7 @@ class StudyShareService {
     required String password,
   }) async {
     await ensureSavedOnAccount(documentUid);
-    final path = v2Runtime == null
-        ? '/v1/study-shares'
-        : '/v2/study-shares';
+    final path = v2Runtime == null ? '/v1/study-shares' : '/v2/study-shares';
     final response = await session.apiClient.postJson(path, {
       'documentUid': documentUid,
       'title': title,

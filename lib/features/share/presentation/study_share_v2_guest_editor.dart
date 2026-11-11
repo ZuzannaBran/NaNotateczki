@@ -258,7 +258,8 @@ class _StudyShareV2GuestEditorState extends State<StudyShareV2GuestEditor> {
     }
     setState(() {
       _error = error;
-      _needsRejoin = error != null &&
+      _needsRejoin =
+          error != null &&
           (error.contains('401') || error.contains('Unauthorized'));
     });
   }

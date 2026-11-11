@@ -77,8 +77,7 @@ class ShareInkPreviewCodec {
   }
 
   static ShareInkPreview? decode(Object? data) {
-    if (data is! Map<String, dynamic> ||
-        data['type'] != 'share_preview') {
+    if (data is! Map<String, dynamic> || data['type'] != 'share_preview') {
       return null;
     }
     final shareId = data['shareId'];
@@ -123,8 +122,7 @@ class ShareInkPreviewCodec {
       }
       final points = <InkPoint>[];
       for (final item in rawPoints) {
-        if (item is! List || item.length != 3 ||
-            item.any((v) => v is! num)) {
+        if (item is! List || item.length != 3 || item.any((v) => v is! num)) {
           return null;
         }
         final dx = (item[0] as num).toDouble();
