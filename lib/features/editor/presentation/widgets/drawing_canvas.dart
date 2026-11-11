@@ -1741,7 +1741,8 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
       return;
     }
     final tool = _activeTool(controller);
-    final active = _primaryPointer != null &&
+    final active =
+        _primaryPointer != null &&
         !_suspendInk &&
         _currentPoints.isNotEmpty &&
         ShareInkPreviewCodec.supported(tool);
@@ -1756,8 +1757,7 @@ class _DrawingCanvasState extends State<DrawingCanvas> {
     }
     final now = DateTime.now();
     if (_lastSharePreview != null &&
-        now.difference(_lastSharePreview!) <
-            const Duration(milliseconds: 80)) {
+        now.difference(_lastSharePreview!) < const Duration(milliseconds: 80)) {
       return;
     }
     final page = _resolvedPage(controller);
@@ -3293,7 +3293,8 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     }
     final tool = _activeTool(controller);
     final index = _activePageIndex;
-    final active = _primaryPointer != null &&
+    final active =
+        _primaryPointer != null &&
         index != null &&
         !_suspendInk &&
         _currentPoints.isNotEmpty &&
@@ -3309,8 +3310,7 @@ class _DocumentDrawingCanvasState extends State<DocumentDrawingCanvas> {
     }
     final now = DateTime.now();
     if (_lastSharePreview != null &&
-        now.difference(_lastSharePreview!) <
-            const Duration(milliseconds: 80)) {
+        now.difference(_lastSharePreview!) < const Duration(milliseconds: 80)) {
       return;
     }
     final pageId = controller.pageAt(index).id;
