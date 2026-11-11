@@ -3230,4 +3230,74 @@ void main() {
       isEmpty,
     );
   });
+
+  test('late object.delete after page.delete records a safe tombstone',
+      () async {
+    const destination = 'page-remaining-after-delete';
+    const objectId = 'deleted-with-source-page';
+    final setup = await write([
+      const LocalOperationDraft(
+        kind: OperationKind.pageCreate,
+        objectId: destination,
+        payload: {
+          'value': {'title': 'Remaining', 'isBookmarked': false},
+        },
+      ),
+      LocalOperationDraft(
+        kind: OperationKind.strokeCreate,
+        pageId: pageId,
+        objectId: objectId,
+        payload: {'value': _stroke()},
+      ),
+    ]);
+    final removed = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'delete-page-actor',
+      actorSeq: 1,
+      logicalClock: 50,
+      documentId: documentId,
+      objectId: pageId,
+      kind: OperationKind.pageDelete,
+      payload: const {},
+      dependencies: [setup.last.operationId],
+    );
+    final late = OperationEnvelope(
+      operationId: const Uuid().v4(),
+      actorId: 'delete-object-actor',
+      actorSeq: 1,
+      logicalClock: 51,
+      documentId: documentId,
+      pageId: pageId,
+      objectId: objectId,
+      kind: OperationKind.objectDelete,
+      payload: const {},
+      dependencies: [setup.last.operationId],
+    );
+    await store.applyRemote(
+      removed,
+      serverSequence: 1,
+      checkpointScope: 'deleted-page-object',
+      apply: () => projector.apply(removed),
+    );
+    expect(
+      await store.applyRemote(
+        late,
+        serverSequence: 2,
+        checkpointScope: 'deleted-page-object',
+        apply: () => projector.apply(late),
+      ),
+      isTrue,
+    );
+    expect(await store.checkpoint('deleted-page-object'), 2);
+    expect(
+      await store.wasObjectDeleted(
+        documentId: documentId,
+        objectId: objectId,
+      ),
+      isTrue,
+    );
+    final notebook = (await notebooks.getNotebook(documentId))!;
+    expect(notebook.pages, hasLength(1));
+    expect(notebook.pages.single.inkStrokes, isEmpty);
+  });
 }

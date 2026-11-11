@@ -876,6 +876,24 @@ class EditorSqliteProjector {
   }
 
   Future<void> _deleteObject(OperationEnvelope op) async {
+    // A page deleted earlier may already have destroyed this object.
+    // Still record the signed object.delete as a document-wide tombstone,
+    // provided no owner on another page remains unaccounted for.
+    if (await _store.isTombstoned(op.documentId, 'page', op.pageId!)) {
+      final liveOwners = await database.customSelect(
+        'SELECT page_uid FROM ink_stroke_rows WHERE uid = ? '
+        'UNION ALL SELECT page_uid FROM image_block_rows WHERE uid = ? '
+        'UNION ALL SELECT page_uid FROM text_block_rows WHERE uid = ?',
+        variables: [
+          Variable<String>(op.objectId!),
+          Variable<String>(op.objectId!),
+          Variable<String>(op.objectId!),
+        ],
+      ).get();
+      if (liveOwners.isEmpty) {
+        return;
+      }
+    }
     await _pageExists(op, op.pageId!);
     final ink = await _row(
       'SELECT uid FROM ink_stroke_rows WHERE uid = ? AND page_uid = ?',
