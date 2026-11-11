@@ -1,5 +1,16 @@
 # Dane NaNotateczki
 
+## Częściowy rebase ruchu w obrębie strony (2026-11-11)
+
+`object.move` z identycznym źródłowym i docelowym `pageId` jest zmianą
+kolejności, nie kontenera. Może współistnieć z lokalnym `object.set`,
+`object.transform` i `object.reorder` o zweryfikowanych polach oraz
+atomowymi operacjami Quill tego samego obiektu. `sortIndex` rozstrzyga
+trwały LWW na podstawie rangi operacji. Ruch między różnymi stronami,
+kolizje assetów, usunięcia obiektów i destrukcyjne operacje nadal
+wymagają osobnego bezstratnego rebase. Nie zmienia to outboxu ani
+schematu baz i nie aktywuje v2 na produkcji.
+
 Dokumentacja kompaktacji: filtrowany feed jest uznawany za kompletny tylko wtedy, gdy brama REST oznaczy stronę jako zweryfikowany widoczny prefiks. Luki globalnych numerów mogą reprezentować prywatne operacje innych dokumentów lub kont; błąd zastosowania dowolnej widocznej operacji zatrzymuje postęp checkpointu. Niestandardowe bramy bez tego potwierdzenia nie mogą kompresować przez nieudokumentowane luki.
 
 Trwałe checkpointy zdalnych aktorów w SQLite używają klucza `remote-actor:[<scope>,<actorId>]` (JSON). Chroni to przed kolizją kont i udziałów przy tym samym actorId. Backend ogranicza kursor gościa do widocznego dokumentu i weryfikuje istnienie dokładnego numeru operacji w tym zakresie. Numery pominięte przez transakcje PostgreSQL nie są poprawnymi kursorami przyczynowymi. Produkcyjne v1 pozostaje aktywne, cutover jest wyłączony.

@@ -53,7 +53,8 @@ class V2OutboxConflictPolicy {
         return _identicalAssetReceiptForIndependentOwners(remote, local);
       }
       if (remote.objectId == local.objectId) {
-        return _independentProperties(remote, local) ||
+        return _independentSamePageMove(remote, local) ||
+            _independentProperties(remote, local) ||
             _independentText(remote, local) ||
             _independentTextAndGeometry(remote, local);
       }
@@ -190,6 +191,44 @@ class V2OutboxConflictPolicy {
       return _rankResolvedMetadata(remote, local);
     }
     return false;
+  }
+
+  /// A reorder-only move within the same page cannot invalidate the
+  /// container of a pending scalar edit or Quill atom operation.
+  ///
+  /// Cross-page moves always require a causal rebase: the original
+  /// operation's pageId must not be silently treated as its new page.
+  static bool _independentSamePageMove(
+    OperationEnvelope remote,
+    OperationEnvelope local,
+  ) {
+    final move = remote.kind == OperationKind.objectMove
+        ? remote
+        : local.kind == OperationKind.objectMove
+        ? local
+        : null;
+    if (move == null || move.pageId == null) {
+      return false;
+    }
+    final edit = identical(move, remote) ? local : remote;
+    if (edit.pageId != move.pageId ||
+        move.payload['toPageId'] != move.pageId) {
+      return false;
+    }
+    switch (edit.kind) {
+      case OperationKind.objectSet:
+      case OperationKind.objectTransform:
+      case OperationKind.objectReorder:
+        return _supportedObjectFields(edit);
+      case OperationKind.textInsert:
+      case OperationKind.textDelete:
+      case OperationKind.textFormat:
+        // The Quill reducer only touches atoms of this existing block.
+        // Invalid atoms and anchors are still rejected by the reducer.
+        return true;
+      default:
+        return false;
+    }
   }
 
   static bool _independentProperties(

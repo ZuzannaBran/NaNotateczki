@@ -1752,4 +1752,90 @@ void main() {
     expect(_allowed(createDestination, move), isFalse);
   });
 
+  test('same-page move commutes with scalar and Quill edits', () {
+    final move = _operation(
+      OperationKind.objectMove,
+      remote: true,
+      objectId: 'stroke-a',
+      pageId: 'page-a',
+      payload: const {'toPageId': 'page-a', 'sortIndex': 3},
+    );
+    final color = _operation(
+      OperationKind.objectSet,
+      objectId: 'stroke-a',
+      pageId: 'page-a',
+      payload: const {
+        'properties': {'colorValue': 0xFF334455},
+      },
+    );
+    final reorder = _operation(
+      OperationKind.objectReorder,
+      objectId: 'stroke-a',
+      pageId: 'page-a',
+      payload: const {
+        'properties': {'sortIndex': 9},
+      },
+    );
+    expect(_allowed(move, color), isTrue);
+    expect(_allowed(color, move), isTrue);
+    expect(_allowed(move, reorder), isTrue);
+    expect(_allowed(reorder, move), isTrue);
+
+    final textMove = _operation(
+      OperationKind.objectMove,
+      remote: true,
+      objectId: 'text-a',
+      pageId: 'page-a',
+      payload: const {'toPageId': 'page-a', 'sortIndex': 1},
+    );
+    final textEdit = _operation(
+      OperationKind.textFormat,
+      objectId: 'text-a',
+      pageId: 'page-a',
+      payload: const {
+        'atomIds': ['00000000-0000-4000-8000-0000000000e1'],
+        'attributes': {'bold': true},
+      },
+    );
+    expect(_allowed(textMove, textEdit), isTrue);
+    expect(_allowed(textEdit, textMove), isTrue);
+  });
+
+  test('cross-page move still rejects same-object edits', () {
+    final move = _operation(
+      OperationKind.objectMove,
+      remote: true,
+      objectId: 'stroke-a',
+      pageId: 'page-a',
+      payload: const {'toPageId': 'page-b', 'sortIndex': 3},
+    );
+    final color = _operation(
+      OperationKind.objectSet,
+      objectId: 'stroke-a',
+      pageId: 'page-a',
+      payload: const {
+        'properties': {'colorValue': 0xFF334455},
+      },
+    );
+    final delete = _operation(
+      OperationKind.objectDelete,
+      objectId: 'stroke-a',
+      pageId: 'page-a',
+      payload: const {},
+    );
+    final assetChange = _operation(
+      OperationKind.objectSet,
+      objectId: 'stroke-a',
+      pageId: 'page-a',
+      payload: const {
+        'properties': {'assetId': 'attachment'},
+      },
+    );
+    expect(_allowed(move, color), isFalse);
+    expect(_allowed(color, move), isFalse);
+    expect(_allowed(move, delete), isFalse);
+    expect(_allowed(move, assetChange), isFalse);
+  });
+
+
 }

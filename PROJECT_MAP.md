@@ -1,6 +1,12 @@
 # PROJECT_MAP.md
 
 Regresja rebase (2026-11-11):
+`V2OutboxConflictPolicy` dopuszcza `object.move` w obrębie tej samej strony
+obok bezpiecznych zmian pól i atomów Quill. Przeniesienie między stronami
+pozostaje blokowane do trwałego rebase. Test:
+`test/v2_outbox_conflict_policy_test.dart`.
+
+Regresja rebase (2026-11-11):
 `V2OutboxConflictPolicy` dopuszcza `object.move` przy tworzeniu/usuwaniu
 niepowiązanej strony, lecz blokuje operacje dotyczące strony źródłowej
 lub docelowej. Test: `test/v2_outbox_conflict_policy_test.dart`.
