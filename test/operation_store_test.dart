@@ -716,7 +716,7 @@ void main() {
   });
 
   test(
-    'a tombstone on page one does not delete the same ID on page two',
+    'deleted object UID cannot be reused on a different page',
     () async {
       final first = await add('same-id');
       final deleted = await store.writeLocal(
@@ -737,6 +737,8 @@ void main() {
         ),
         isTrue,
       );
+      // The stored tombstone retains its original page for legacy lookups,
+      // but a moved UID cannot be recreated elsewhere in this document.
       expect(
         await store.isTombstoned(
           'document-one',
@@ -746,21 +748,81 @@ void main() {
         ),
         isFalse,
       );
-      final anotherPage = await store.writeLocal(
-        actorId: 'device-one',
-        documentId: 'document-one',
-        pageId: 'page-two',
-        objectId: 'same-id',
-        kind: OperationKind.objectCreate,
-        payload: const {
-          'value': {'name': 'on another page'},
-        },
-        apply: (_) async {},
+      expect(
+        await store.wasObjectDeleted(
+          documentId: 'document-one',
+          objectId: 'same-id',
+        ),
+        isTrue,
       );
-      expect(anotherPage.dependencies, contains(deleted.operationId));
-      expect(anotherPage.dependencies, isNot(contains(first.operationId)));
+      final queuedBefore = (await store.pending())
+          .map((operation) => operation.operationId)
+          .toList();
+      var projectionCalled = false;
+      await expectLater(
+        store.writeLocal(
+          actorId: 'device-one',
+          documentId: 'document-one',
+          pageId: 'page-two',
+          objectId: 'same-id',
+          kind: OperationKind.objectCreate,
+          payload: const {
+            'value': {'name': 'on another page'},
+          },
+          apply: (_) async {
+            projectionCalled = true;
+          },
+        ),
+        throwsStateError,
+      );
+      expect(projectionCalled, isFalse);
+      expect(
+        (await store.pending()).map((operation) => operation.operationId),
+        queuedBefore,
+      );
+      expect((await store.operation(first.operationId))?.actorSeq, 1);
+      expect((await store.operation(deleted.operationId))?.actorSeq, 2);
+      final fresh = await add('new-identity');
+      expect(fresh.actorSeq, 3);
+      expect(fresh.dependencies, contains(deleted.operationId));
     },
   );
+
+  test('object tombstone is isolated to its document', () async {
+    await add('shared-uid');
+    await store.writeLocal(
+      actorId: 'device-one',
+      documentId: 'document-one',
+      pageId: 'page-one',
+      objectId: 'shared-uid',
+      kind: OperationKind.objectDelete,
+      payload: const {},
+      apply: (_) async {},
+    );
+    final otherDocument = await store.writeLocal(
+      actorId: 'device-two',
+      documentId: 'document-two',
+      pageId: 'page-one',
+      objectId: 'shared-uid',
+      kind: OperationKind.objectCreate,
+      payload: const {
+        'value': {'label': 'independent'},
+      },
+      apply: (_) async {},
+    );
+    expect(otherDocument.actorSeq, 1);
+    expect(
+      await store.wasObjectDeleted(
+        documentId: 'document-two',
+        objectId: 'shared-uid',
+      ),
+      isFalse,
+    );
+    expect(
+      (await store.pending(documentId: 'document-two')).single.operationId,
+      otherDocument.operationId,
+    );
+  });
 
   test('permanent failure survives and blocks only its own actor', () async {
     final first = await add('blocked');

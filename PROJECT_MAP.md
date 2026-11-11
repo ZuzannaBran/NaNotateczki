@@ -655,6 +655,8 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   owner/document/remote scope, korupcja, nowa głowa, tombstone, migracja v7→v8
   i ograniczenie historii bez utraty treści/outboxu w transakcji gestu.
 - `test/operation_store_test.dart`: rollback, ponawianie, ACK, usunięcia,
+  tombstone UID blokujący odtworzenie obiektu na innej stronie tego samego
+  dokumentu bez naruszenia outboxu/actorSeq (inne dokumenty niezależne),
   migracja z v2, snapshoty i checkpointy; oczekiwana wersja schematu v8.
 - `test/notebook_incremental_update_test.dart`: wyzwalacze SQL wykrywają
   niepotrzebne usuwanie stron i tekstów przy zwykłej edycji.
