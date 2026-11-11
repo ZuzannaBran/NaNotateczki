@@ -1,5 +1,29 @@
 # Dane NaNotateczki
 
+## Pakiet 2: rebase operacyjny v2 (2026-11-11)
+
+- Przeniesiony obiekt zachowuje UID. Edycje jego wcześniejszej strony
+  używają aktualnej strony **wyłącznie w projekcji**, jeżeli ostatni
+  zatwierdzony `object.move` pochodzi od innego aktora i nie jest
+  jawnie zależnością edycji. Niewysłany outbox, `operationId`,
+  `actorSeq` i pierwotne `pageId` pozostają niezmienione.
+- `object.delete` jest destrukcyjne na poziomie UID; żaden późny
+  `object.move` ani edycja nie może odtworzyć tombstone. Zmiany
+  geometrii i `sortIndex` podlegają istniejącym rejestrom LWW.
+- Usunięty atom Quill pozostaje jako kotwica CRDT, a późniejsza
+  zmiana jego atrybutów nie przywraca widocznego tekstu.
+- Attach/detach oraz zmiany mediów przechodzą wciąż przez kontrolę
+  bajtów, receiptów i referencji; konflikt bez wiarygodnych danych
+  pozostaje jawnie zablokowany zamiast usuwać outbox.
+- Konflikt jednego dokumentu nie blokuje odbioru innych dokumentów
+  na następnych stronach feedu. Globalny checkpoint pozostaje
+  przed pierwszą nierozwiązaną luką. Zablokowaną operację lokalną
+  można ponowić bez zmiany jej tożsamości przez
+  `retryBlockedOperation`, po usunięciu przyczyny odmowy.
+
+Nie aktywować jeszcze produkcyjnego cutover v1/v2.
+
+
 ## Częściowy rebase ruchu w obrębie strony (2026-11-11)
 
 `object.move` z identycznym źródłowym i docelowym `pageId` jest zmianą

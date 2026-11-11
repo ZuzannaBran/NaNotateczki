@@ -53,7 +53,7 @@ class V2OutboxConflictPolicy {
         return _identicalAssetReceiptForIndependentOwners(remote, local);
       }
       if (remote.objectId == local.objectId) {
-        return _independentSamePageMove(remote, local) ||
+        return _independentConcurrentMove(remote, local) ||
             _independentProperties(remote, local) ||
             _independentText(remote, local) ||
             _independentTextAndGeometry(remote, local);
@@ -193,12 +193,11 @@ class V2OutboxConflictPolicy {
     return false;
   }
 
-  /// A reorder-only move within the same page cannot invalidate the
-  /// container of a pending scalar edit or Quill atom operation.
-  ///
-  /// Cross-page moves always require a causal rebase: the original
-  /// operation's pageId must not be silently treated as its new page.
-  static bool _independentSamePageMove(
+  /// Two operations on one UID may coexist across a page move only when
+  /// the verified reducers update independent, identity-stable state.
+  /// Cross-page targets are resolved from the durable move journal;
+  /// original envelope IDs, page IDs and actor sequences never change.
+  static bool _independentConcurrentMove(
     OperationEnvelope remote,
     OperationEnvelope local,
   ) {
@@ -207,12 +206,13 @@ class V2OutboxConflictPolicy {
         : local.kind == OperationKind.objectMove
         ? local
         : null;
-    if (move == null || move.pageId == null) {
+    if (move == null) {
       return false;
     }
     final edit = identical(move, remote) ? local : remote;
-    if (edit.pageId != move.pageId ||
-        move.payload['toPageId'] != move.pageId) {
+    if (move.pageId == null ||
+        edit.pageId != move.pageId ||
+        move.payload['toPageId'] is! String) {
       return false;
     }
     switch (edit.kind) {
@@ -220,12 +220,15 @@ class V2OutboxConflictPolicy {
       case OperationKind.objectTransform:
       case OperationKind.objectReorder:
         return _supportedObjectFields(edit);
+      case OperationKind.objectDelete:
+        return edit.payload.isEmpty;
       case OperationKind.textInsert:
       case OperationKind.textDelete:
       case OperationKind.textFormat:
-        // The Quill reducer only touches atoms of this existing block.
-        // Invalid atoms and anchors are still rejected by the reducer.
-        return true;
+        return _atomIds(edit) != null;
+      case OperationKind.assetAttach:
+      case OperationKind.assetDetach:
+        return _assetIds(edit) != null;
       default:
         return false;
     }
@@ -441,7 +444,14 @@ class V2OutboxConflictPolicy {
           second.isNotEmpty;
     }
     if (common.isNotEmpty) {
-      return false;
+      // Formatting a deleted atom updates its retained attribute register.
+      // The atom remains tombstoned, regardless of delivery order.
+      final isFormatDelete =
+          (remote.kind == OperationKind.textFormat &&
+              local.kind == OperationKind.textDelete) ||
+          (local.kind == OperationKind.textFormat &&
+              remote.kind == OperationKind.textDelete);
+      return isFormatDelete;
     }
     // A remote insert must not depend on an unacknowledged local atom.
     if (remote.kind == OperationKind.textInsert &&
@@ -450,18 +460,8 @@ class V2OutboxConflictPolicy {
             remoteIds.contains(local.payload['afterAtomId']))) {
       return false;
     }
-    // An insertion anchored to an atom concurrently deleted by another
-    // client needs explicit causal rebase, even if both sets are disjoint.
-    if (remote.kind == OperationKind.textInsert &&
-        local.kind == OperationKind.textDelete &&
-        localIds.contains(remote.payload['afterAtomId'])) {
-      return false;
-    }
-    if (local.kind == OperationKind.textInsert &&
-        remote.kind == OperationKind.textDelete &&
-        remoteIds.contains(local.payload['afterAtomId'])) {
-      return false;
-    }
+    // CRDT deletions retain tombstoned atoms as insertion anchors.
+    // An insertion after a concurrently deleted known atom is stable.
     // Concurrent unique inserts, disjoint deletes and independent
     // formatting use the same atom-ID CRDT in Dart and PostgreSQL.
     return true;

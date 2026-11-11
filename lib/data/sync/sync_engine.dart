@@ -129,6 +129,13 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
   /// Earliest scheduled retry across independent actors and pull failures.
   DateTime? get retryDeadline => _retryDueAt;
 
+  /// Explicitly requeues a blocked immutable local intent after the
+  /// user has corrected its cause. The same ID and actor sequence are sent.
+  Future<void> retryBlockedOperation(String operationId) async {
+    await store.requeueBlocked(operationId);
+    requestSync();
+  }
+
   /// Writes the projection and outbox in one transaction before scheduling IO.
   Future<OperationEnvelope> writeLocal({
     required String documentId,
@@ -394,16 +401,18 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
   /// Other independent operations in the same page can still be committed:
   /// replay after a crash or gap is idempotent.
   Future<void> _pull(int generation) async {
-    var cursor = await store.checkpoint(checkpointScope);
+    var durableCursor = await store.checkpoint(checkpointScope);
+    var readCursor = durableCursor;
+    Object? firstFailure;
+    var hasGap = false;
     for (var pageNumber = 0; pageNumber < maxPagesPerPass; pageNumber++) {
-      final page = await _authorized(() => gateway.readAfter(cursor));
+      final page = await _authorized(() => gateway.readAfter(readCursor));
       if (!_isActive(generation)) {
         return;
       }
-      _validateFeedPage(page, cursor);
-      var contiguous = cursor;
-      Object? blocked;
-      var gap = false;
+      _validateFeedPage(page, readCursor);
+      var contiguous = durableCursor;
+      var gap = hasGap;
       for (final item in page.operations) {
         try {
           final queuedEcho = await store.isPending(item.operation.operationId);
@@ -481,26 +490,37 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
             contiguous = item.cursor;
           }
         } catch (error) {
-          blocked ??= error;
+          firstFailure ??= error;
           gap = true;
+          hasGap = true;
         }
       }
       if (!_isActive(generation)) {
         return;
       }
-      if (contiguous > cursor) {
+      if (contiguous > durableCursor) {
         await store.advanceCheckpoint(checkpointScope, contiguous);
-        cursor = contiguous;
+        durableCursor = contiguous;
       }
-      if (blocked != null) {
-        throw StateError('Operation feed has an unresolved gap: $blocked');
-      }
+      readCursor = page.cursor;
       if (!page.hasMore) {
+        if (firstFailure != null) {
+          throw StateError(
+            'Operation feed has an unresolved gap: $firstFailure',
+          );
+        }
         return;
       }
     }
-    // Keep processing long feeds without monopolizing the UI event loop.
+    // A blocked document never prevents later pages for other documents
+    // from being inspected. Their operations are committed idempotently,
+    // but the durable global checkpoint stays before the first gap.
     _requested = true;
+    if (firstFailure != null) {
+      throw StateError(
+        'Operation feed has an unresolved gap: $firstFailure',
+      );
+    }
   }
 
   /// Old remote media events targeting tombstones are recorded as no-ops.

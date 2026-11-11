@@ -520,6 +520,7 @@ class OperationStore {
       return true;
     }
     if (entry.kind.target == OperationTarget.object &&
+        entry.kind != OperationKind.objectDelete &&
         await isTombstoned(document, 'page', entry.pageId!)) {
       return true;
     }
@@ -702,6 +703,24 @@ class OperationStore {
         "UPDATE operation_outbox SET status = 'blocked', last_error = ? "
         'WHERE operation_id = ?',
         [reason, operationId],
+      );
+    });
+  }
+
+  /// Restores a permanently blocked entry to its original send queue.
+  /// This is an explicit recovery action; it does not change the envelope,
+  /// actor sequence, dependency frontier or materialized projection.
+  Future<void> requeueBlocked(String operationId) async {
+    await database.transaction(() async {
+      final reason = await blockedReason(operationId);
+      if (reason == null) {
+        throw StateError('Only a blocked local operation can be requeued.');
+      }
+      await database.customStatement(
+        "UPDATE operation_outbox SET status = 'queued', "
+        'retry_after = 0, attempts = 0, last_error = NULL '
+        "WHERE operation_id = ? AND status = 'blocked'",
+        [operationId],
       );
     });
   }

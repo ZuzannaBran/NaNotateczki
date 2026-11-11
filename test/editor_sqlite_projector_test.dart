@@ -2730,4 +2730,158 @@ void main() {
   test('text.format refuses corrupt durable Quill BLOB', () async {
     await checkCorruptQuillDeletion(deletePage: false, formatOnly: true);
   });
+  for (final moveFirst in [false, true]) {
+    test('concurrent move and style preserve original journal, '
+        'moveFirst=$moveFirst', () async {
+      const destination = 'rebase-destination';
+      const objectId = 'rebase-stroke';
+      final setup = await write([
+        const LocalOperationDraft(
+          kind: OperationKind.pageCreate,
+          objectId: destination,
+          payload: {
+            'value': {'title': 'Destination', 'isBookmarked': false},
+          },
+        ),
+        LocalOperationDraft(
+          kind: OperationKind.strokeCreate,
+          pageId: pageId,
+          objectId: objectId,
+          payload: {'value': _stroke()},
+        ),
+      ]);
+      final move = OperationEnvelope(
+        operationId: const Uuid().v4(),
+        actorId: 'move-remote',
+        actorSeq: 1,
+        logicalClock: 50,
+        documentId: documentId,
+        pageId: pageId,
+        objectId: objectId,
+        kind: OperationKind.objectMove,
+        payload: const {'toPageId': destination, 'sortIndex': 4},
+        dependencies: [setup.last.operationId],
+      );
+      final style = OperationEnvelope(
+        operationId: const Uuid().v4(),
+        actorId: 'style-remote',
+        actorSeq: 1,
+        logicalClock: 51,
+        documentId: documentId,
+        pageId: pageId,
+        objectId: objectId,
+        kind: OperationKind.objectSet,
+        payload: const {
+          'properties': {'colorValue': 0xFF778899},
+        },
+        dependencies: [setup.last.operationId],
+      );
+      final delivered = moveFirst ? [move, style] : [style, move];
+      for (var index = 0; index < delivered.length; index++) {
+        final item = delivered[index];
+        expect(
+          await store.applyRemote(
+            item,
+            serverSequence: index + 1,
+            checkpointScope: 'rebase-style',
+            apply: () => projector.apply(item),
+          ),
+          isTrue,
+        );
+      }
+      final notebook = (await notebooks.getNotebook(documentId))!;
+      expect(notebook.pages.first.inkStrokes, isEmpty);
+      final stroke = notebook.pages.last.inkStrokes.single;
+      expect(stroke.id, objectId);
+      expect(stroke.color.toARGB32(), 0xFF778899);
+      expect(await store.checkpoint('rebase-style'), 2);
+      expect((await store.operation(style.operationId))!.pageId, pageId);
+      expect((await store.pending(includeDeferred: true)).map(
+        (item) => item.operationId,
+      ), setup.map((item) => item.operationId));
+      expect(
+        await store.applyRemote(
+          delivered.last,
+          serverSequence: 2,
+          apply: () => projector.apply(delivered.last),
+        ),
+        isFalse,
+      );
+    });
+  }
+
+  for (final moveFirst in [false, true]) {
+    test('concurrent move and object deletion never resurrect a UID, '
+        'moveFirst=$moveFirst', () async {
+      const destination = 'delete-move-destination';
+      const objectId = 'deleted-moved-stroke';
+      final setup = await write([
+        const LocalOperationDraft(
+          kind: OperationKind.pageCreate,
+          objectId: destination,
+          payload: {
+            'value': {'title': 'Destination', 'isBookmarked': false},
+          },
+        ),
+        LocalOperationDraft(
+          kind: OperationKind.strokeCreate,
+          pageId: pageId,
+          objectId: objectId,
+          payload: {'value': _stroke()},
+        ),
+      ]);
+      OperationEnvelope event(
+        OperationKind kind,
+        String actor,
+        int clock,
+        Map<String, dynamic> payload,
+      ) => OperationEnvelope(
+        operationId: const Uuid().v4(),
+        actorId: actor,
+        actorSeq: 1,
+        logicalClock: clock,
+        documentId: documentId,
+        pageId: pageId,
+        objectId: objectId,
+        kind: kind,
+        payload: payload,
+        dependencies: [setup.last.operationId],
+      );
+      final move = event(
+        OperationKind.objectMove,
+        'move-device',
+        40,
+        const {'toPageId': destination, 'sortIndex': 1},
+      );
+      final delete = event(
+        OperationKind.objectDelete,
+        'delete-device',
+        41,
+        const {},
+      );
+      final events = moveFirst ? [move, delete] : [delete, move];
+      for (var index = 0; index < events.length; index++) {
+        final item = events[index];
+        await store.applyRemote(
+          item,
+          serverSequence: index + 1,
+          apply: () => projector.apply(item),
+        );
+      }
+      final notebook = (await notebooks.getNotebook(documentId))!;
+      expect(
+        notebook.pages.expand((page) => page.inkStrokes)
+            .where((stroke) => stroke.id == objectId),
+        isEmpty,
+      );
+      expect(
+        await store.wasObjectDeleted(
+          documentId: documentId,
+          objectId: objectId,
+        ),
+        isTrue,
+      );
+    });
+  }
+
 }

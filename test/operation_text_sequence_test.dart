@@ -603,4 +603,50 @@ void main() {
     ]);
     expect((retained[firstId] as Map)['deleted'], isTrue);
   });
+  test('delete and concurrent format keep the same tombstoned atom', () {
+    final insert = textOperation(
+      operationId: firstId,
+      actorId: 'origin',
+      kind: OperationKind.textInsert,
+      payload: {
+        'afterAtomId': null,
+        'atoms': [
+          {'id': firstId, 'text': 'A'},
+        ],
+      },
+    );
+    final original = OperationTextSequence.apply({}, insert);
+    final formatting = textOperation(
+      operationId: secondId,
+      actorId: 'formatting',
+      kind: OperationKind.textFormat,
+      logicalClock: 30,
+      payload: {
+        'atomIds': [firstId],
+        'attributes': {'bold': true},
+      },
+    );
+    final deletion = textOperation(
+      operationId: thirdId,
+      actorId: 'deletion',
+      kind: OperationKind.textDelete,
+      logicalClock: 31,
+      payload: {
+        'atomIds': [firstId],
+      },
+    );
+    final left = OperationTextSequence.apply(
+      OperationTextSequence.apply(original, formatting),
+      deletion,
+    );
+    final right = OperationTextSequence.apply(
+      OperationTextSequence.apply(original, deletion),
+      formatting,
+    );
+    expect(left, right);
+    expect(OperationTextSequence.render(left), isEmpty);
+    expect((left[firstId] as Map)['deleted'], isTrue);
+    expect((left[firstId] as Map)['attributes'], {'bold': true});
+  });
+
 }

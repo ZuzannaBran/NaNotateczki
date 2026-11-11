@@ -131,7 +131,7 @@ void main() {
     expect(V2OutboxConflictPolicy.canApply(title, [ink, removed]), isFalse);
   });
 
-  test('object field updates use per-field ranks and guard moves', () {
+  test('object field updates and concurrent move preserve ranks', () {
     final color = _operation(
       OperationKind.objectSet,
       remote: true,
@@ -165,10 +165,10 @@ void main() {
     );
     expect(_allowed(color, width), isTrue);
     expect(_allowed(color, sameColor), isTrue);
-    expect(_allowed(color, moving), isFalse);
+    expect(_allowed(color, moving), isTrue);
   });
 
-  test('concurrent Quill inserts and deletes preserve independent atoms', () {
+  test('concurrent Quill inserts and tombstone anchors converge', () {
     const first = '00000000-0000-4000-8000-0000000000a1';
     const second = '00000000-0000-4000-8000-0000000000a2';
     final insert = _operation(
@@ -249,7 +249,7 @@ void main() {
         'atomIds': [first],
       },
     );
-    expect(_allowed(deleteAnchor, anchored), isFalse);
+    expect(_allowed(deleteAnchor, anchored), isTrue);
   });
 
   test('Quill formatting handles different atoms and attributes', () {
@@ -302,7 +302,7 @@ void main() {
     expect(_allowed(bold, italic), isTrue);
     expect(_allowed(bold, sameAttribute), isTrue);
     expect(_allowed(bold, deleted), isTrue);
-    expect(_allowed(bold, overlappingDelete), isFalse);
+    expect(_allowed(bold, overlappingDelete), isTrue);
   });
 
   test('two objects may not reuse a pending Quill asset identity', () {
@@ -648,7 +648,7 @@ void main() {
     );
   });
 
-  test('text metadata merge rejects unsafe fields and moved containers', () {
+  test('text metadata rejects snapshots but permits concurrent moves', () {
     const atom = '00000000-0000-4000-8000-0000000000d1';
     final insert = _operation(
       OperationKind.textInsert,
@@ -688,7 +688,7 @@ void main() {
     );
     expect(_allowed(unsafe, insert), isFalse);
     expect(_allowed(oldText, insert), isFalse);
-    expect(_allowed(moving, insert), isFalse);
+    expect(_allowed(moving, insert), isTrue);
   });
 
   test('text atoms never commute with ink-only transform or reorder', () {
@@ -1299,7 +1299,7 @@ void main() {
     expect(V2OutboxConflictPolicy.canApply(move, [style, newStroke]), isTrue);
   });
 
-  test('same-object move never outruns offline field edits', () {
+  test('same-object move rebases fields but not concurrent moves', () {
     final move = _operation(
       OperationKind.objectMove,
       remote: true,
@@ -1321,8 +1321,8 @@ void main() {
       objectId: 'same-ink',
       payload: const {'toPageId': 'third', 'sortIndex': 1},
     );
-    expect(_allowed(move, color), isFalse);
-    expect(_allowed(color, move), isFalse);
+    expect(_allowed(move, color), isTrue);
+    expect(_allowed(color, move), isTrue);
     expect(_allowed(move, pendingMove), isFalse);
     expect(_allowed(pendingMove, move), isFalse);
   });
@@ -1419,7 +1419,7 @@ void main() {
     expect(_allowed(pageTitle, deletePage), isFalse);
   });
 
-  test('same-object scalar collision converges but assets do not', () {
+  test('scalar collision converges while asset alias stays guarded', () {
     final width = _operation(
       OperationKind.objectSet,
       remote: true,
@@ -1464,10 +1464,10 @@ void main() {
     expect(_allowed(width, pendingCrop), isTrue);
     expect(_allowed(pendingCrop, width), isTrue);
     expect(_allowed(width, pendingAsset), isFalse);
-    expect(_allowed(width, pendingMove), isFalse);
+    expect(_allowed(width, pendingMove), isTrue);
   });
 
-  test('same-atom formatting resolves identical attribute by rank', () {
+  test('same-atom format and delete converge through tombstones', () {
     const atom = '00000000-0000-4000-8000-0000000000e1';
     final bold = _operation(
       OperationKind.textFormat,
@@ -1498,8 +1498,8 @@ void main() {
     );
     expect(_allowed(bold, removeBold), isTrue);
     expect(_allowed(removeBold, bold), isTrue);
-    expect(_allowed(bold, deleteAtom), isFalse);
-    expect(_allowed(deleteAtom, bold), isFalse);
+    expect(_allowed(bold, deleteAtom), isTrue);
+    expect(_allowed(deleteAtom, bold), isTrue);
   });
 
   test('scalar LWW never crosses pages or target operation kinds', () {
@@ -1752,56 +1752,7 @@ void main() {
     expect(_allowed(createDestination, move), isFalse);
   });
 
-  test('same-page move commutes with scalar and Quill edits', () {
-    final move = _operation(
-      OperationKind.objectMove,
-      remote: true,
-      objectId: 'stroke-a',
-      pageId: 'page-a',
-      payload: const {'toPageId': 'page-a', 'sortIndex': 3},
-    );
-    final color = _operation(
-      OperationKind.objectSet,
-      objectId: 'stroke-a',
-      pageId: 'page-a',
-      payload: const {
-        'properties': {'colorValue': 0xFF334455},
-      },
-    );
-    final reorder = _operation(
-      OperationKind.objectReorder,
-      objectId: 'stroke-a',
-      pageId: 'page-a',
-      payload: const {
-        'properties': {'sortIndex': 9},
-      },
-    );
-    expect(_allowed(move, color), isTrue);
-    expect(_allowed(color, move), isTrue);
-    expect(_allowed(move, reorder), isTrue);
-    expect(_allowed(reorder, move), isTrue);
-
-    final textMove = _operation(
-      OperationKind.objectMove,
-      remote: true,
-      objectId: 'text-a',
-      pageId: 'page-a',
-      payload: const {'toPageId': 'page-a', 'sortIndex': 1},
-    );
-    final textEdit = _operation(
-      OperationKind.textFormat,
-      objectId: 'text-a',
-      pageId: 'page-a',
-      payload: const {
-        'atomIds': ['00000000-0000-4000-8000-0000000000e1'],
-        'attributes': {'bold': true},
-      },
-    );
-    expect(_allowed(textMove, textEdit), isTrue);
-    expect(_allowed(textEdit, textMove), isTrue);
-  });
-
-  test('cross-page move still rejects same-object edits', () {
+  test('cross-page move rebases fields and protects unsafe media', () {
     final move = _operation(
       OperationKind.objectMove,
       remote: true,
@@ -1831,11 +1782,9 @@ void main() {
         'properties': {'assetId': 'attachment'},
       },
     );
-    expect(_allowed(move, color), isFalse);
-    expect(_allowed(color, move), isFalse);
-    expect(_allowed(move, delete), isFalse);
+    expect(_allowed(move, color), isTrue);
+    expect(_allowed(color, move), isTrue);
+    expect(_allowed(move, delete), isTrue);
     expect(_allowed(move, assetChange), isFalse);
   });
-
-
 }

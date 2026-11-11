@@ -63,6 +63,26 @@ class _FakeGateway implements OperationGateway {
   }
 }
 
+class _PagedFeedGateway extends _FakeGateway {
+  @override
+  Future<OperationFeedPage> readAfter(int cursor) async {
+    reads++;
+    final unread = accepted.where((item) => item.cursor > cursor).toList();
+    if (unread.isEmpty) {
+      return OperationFeedPage(
+        cursor: cursor,
+        hasMore: false,
+        operations: const [],
+      );
+    }
+    return OperationFeedPage(
+      cursor: unread.first.cursor,
+      hasMore: unread.length > 1,
+      operations: [unread.first],
+    );
+  }
+}
+
 class _HeldFeedGateway extends _FakeGateway {
   final entered = Completer<void>();
   final release = Completer<void>();
@@ -274,6 +294,69 @@ void main() {
       ),
     );
   }
+
+  test('blocked document does not starve later feed pages', () async {
+    await engine.stop();
+    engine.dispose();
+    gateway = _PagedFeedGateway();
+    gateway.seed(_remote('broken-actor', 'blocked-object'));
+    gateway.seed(
+      _remote(
+        'healthy-actor',
+        'healthy-object',
+        documentId: 'other-document',
+      ),
+    );
+    var canApply = false;
+    engine = SyncEngine(
+      store: store,
+      gateway: gateway,
+      actorId: 'actor-local',
+      checkpointScope: 'user-A-v2',
+      enableRealtime: false,
+      applyRemote: (operation, pending) async {
+        if (operation.objectId == 'blocked-object' && !canApply) {
+          throw StateError('Needs explicit conflict resolution.');
+        }
+        await database.customStatement(
+          'INSERT INTO projection_probe VALUES (?, ?)',
+          [operation.objectId!, 'remote'],
+        );
+      },
+    );
+    await engine.start();
+    expect(await store.checkpoint('user-A-v2'), 0);
+    expect(await store.operation(gateway.accepted[0].operation.operationId),
+        isNull);
+    expect(await store.operation(gateway.accepted[1].operation.operationId),
+        isNotNull);
+    expect(gateway.reads, greaterThanOrEqualTo(2));
+    expect(
+      (await database.customSelect('SELECT * FROM projection_probe').get()),
+      hasLength(1),
+    );
+    canApply = true;
+    await engine.syncNow();
+    expect(await store.checkpoint('user-A-v2'), 2);
+    expect(
+      (await database.customSelect('SELECT * FROM projection_probe').get()),
+      hasLength(2),
+    );
+  });
+
+  test('blocked local intent can be retried without rewriting identity',
+      () async {
+    final intent = await local('recoverable');
+    await store.markBlocked(intent.operationId, 'manual intervention');
+    expect(await store.pending(), isEmpty);
+    expect(await store.blockedReason(intent.operationId), isNotNull);
+    await engine.retryBlockedOperation(intent.operationId);
+    expect(await store.blockedReason(intent.operationId), isNull);
+    final queued = await store.pending();
+    expect(queued.single.toJson(), intent.toJson());
+    await engine.start();
+    expect(await store.pending(), isEmpty);
+  });
 
   test('malformed feed pages cannot commit valid-looking prefixes', () async {
     final first = _remote('remote-peer', 'bad-feed-first');

@@ -43,55 +43,132 @@ class EditorSqliteProjector {
     if (document == null) {
       throw StateError('The target notebook must be imported first.');
     }
-    switch (operation.kind) {
+    final projected = await _resolveConcurrentMove(operation);
+    switch (projected.kind) {
       case OperationKind.documentSet:
-        await _setDocument(operation);
+        await _setDocument(projected);
       case OperationKind.documentDelete:
-        await _deleteDocument(operation);
+        await _deleteDocument(projected);
         return;
       case OperationKind.pageCreate:
-        await _createPage(operation);
+        await _createPage(projected);
       case OperationKind.pageSet:
-        await _setPage(operation);
+        await _setPage(projected);
       case OperationKind.pageDelete:
-        await _deletePage(operation);
+        await _deletePage(projected);
       case OperationKind.strokeCreate:
-        await _createStroke(operation);
+        await _createStroke(projected);
       case OperationKind.objectCreate:
-        await _createObject(operation);
+        await _createObject(projected);
       case OperationKind.objectSet:
-        if (await _textRow(operation) != null) {
-          await _setText(operation);
-        } else if (await _imageRow(operation) != null) {
-          await _updateImage(operation);
+        if (await _textRow(projected) != null) {
+          await _setText(projected);
+        } else if (await _imageRow(projected) != null) {
+          await _updateImage(projected);
         } else {
-          await _updateStroke(operation);
+          await _updateStroke(projected);
         }
       case OperationKind.objectMove:
-        await _moveObject(operation);
+        await _moveObject(projected);
       case OperationKind.objectTransform:
       case OperationKind.objectReorder:
-        if (await _imageRow(operation) != null) {
-          await _updateImage(operation);
+        if (await _imageRow(projected) != null) {
+          await _updateImage(projected);
         } else {
-          await _updateStroke(operation);
+          await _updateStroke(projected);
         }
       case OperationKind.textInsert:
       case OperationKind.textDelete:
       case OperationKind.textFormat:
-        await _applyText(operation);
+        await _applyText(projected);
       case OperationKind.objectDelete:
-        await _deleteObject(operation);
+        await _deleteObject(projected);
       case OperationKind.assetAttach:
-        await _attachVerifiedAsset(operation);
+        await _attachVerifiedAsset(projected);
       case OperationKind.assetDetach:
-        await _detachUnusedAsset(operation);
+        await _detachUnusedAsset(projected);
       default:
         throw UnsupportedError(
-          'No verified SQLite editor reducer for ${operation.kind.wireName}.',
+          'No verified SQLite editor reducer for ${projected.kind.wireName}.',
         );
     }
     await _touchNotebook(operation.documentId);
+  }
+
+  /// Resolve an older pageId only when a different actor has already moved
+  /// this globally unique object. The persisted envelope is never rewritten.
+  /// Any missing, ambiguous or causally inconsistent object fails closed in
+  /// its existing reducer, without advancing the feed.
+  Future<OperationEnvelope> _resolveConcurrentMove(
+    OperationEnvelope operation,
+  ) async {
+    const candidates = <OperationKind>{
+      OperationKind.objectSet,
+      OperationKind.objectTransform,
+      OperationKind.objectReorder,
+      OperationKind.objectDelete,
+      OperationKind.textInsert,
+      OperationKind.textDelete,
+      OperationKind.textFormat,
+      OperationKind.assetAttach,
+      OperationKind.assetDetach,
+    };
+    if (!candidates.contains(operation.kind) ||
+        operation.objectId == null ||
+        operation.pageId == null) {
+      return operation;
+    }
+    final rows = await database.customSelect(
+      'SELECT page_uid FROM ink_stroke_rows WHERE uid = ? '
+      'UNION ALL SELECT page_uid FROM image_block_rows WHERE uid = ? '
+      'UNION ALL SELECT page_uid FROM text_block_rows WHERE uid = ?',
+      variables: [
+        Variable<String>(operation.objectId!),
+        Variable<String>(operation.objectId!),
+        Variable<String>(operation.objectId!),
+      ],
+    ).get();
+    if (rows.length != 1) {
+      return operation;
+    }
+    final actualPage = rows.single.read<String>('page_uid');
+    if (actualPage == operation.pageId) {
+      return operation;
+    }
+    final history = await database.customSelect(
+      'SELECT envelope_json FROM operations WHERE document_id = ? '
+      "AND object_id = ? AND kind = 'object.move'",
+      variables: [
+        Variable<String>(operation.documentId),
+        Variable<String>(operation.objectId!),
+      ],
+    ).get();
+    if (history.length > 50000) {
+      throw StateError('Move history requires a durable checkpoint.');
+    }
+    OperationEnvelope? winner;
+    for (final row in history) {
+      final json = jsonDecode(row.read<String>('envelope_json'));
+      if (json is! Map) {
+        throw const FormatException('Corrupt move history.');
+      }
+      final move = OperationEnvelope.fromJson(
+        Map<String, dynamic>.from(json),
+      );
+      if (winner == null || _compareRank(move, winner) > 0) {
+        winner = move;
+      }
+    }
+    if (winner == null ||
+        winner.payload['toPageId'] != actualPage ||
+        winner.actorId == operation.actorId ||
+        operation.dependencies.contains(winner.operationId)) {
+      return operation;
+    }
+    return OperationEnvelope.fromJson({
+      ...operation.toJson(),
+      'pageId': actualPage,
+    });
   }
 
   /// Creates a fresh operational document and its pages through one v2 batch.
@@ -1051,6 +1128,7 @@ class EditorSqliteProjector {
     OperationEnvelope operation,
     OperationAssetGateway gateway,
   ) async {
+    operation = await _resolveConcurrentMove(operation);
     final buffer = verifiedAssetBuffer;
     if (buffer == null) {
       throw UnsupportedError('Verified asset staging is unavailable.');

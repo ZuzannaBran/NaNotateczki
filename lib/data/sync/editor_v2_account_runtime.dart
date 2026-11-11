@@ -139,6 +139,11 @@ class EditorV2AccountRuntime {
     }
   }
 
+  /// Reattempts an explicitly resolved conflict without losing the
+  /// original local intent, operation ID or actor sequence.
+  Future<void> retryBlockedOperation(String operationId) =>
+      engine.retryBlockedOperation(operationId);
+
   Future<void> start() => engine.start();
 
   /// The account owner must remain current across every startup await.

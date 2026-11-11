@@ -1,5 +1,16 @@
 # PROJECT_MAP.md
 
+Pakiet 2 rebase (2026-11-11): współbieżne `object.move` i edycje
+tego samego UID są rozwiązywane na aktualnym kontenerze SQLite,
+bez przepisywania oryginalnej koperty operacji. `SyncEngine` przegląda
+dalsze strony feedu pomimo luki i umożliwia jawne ponowienie
+zablokowanego outboxu. Backend Python w obu repozytoriach stosuje
+takie samo wyszukiwanie obiektu po UID. Regresje:
+`test/editor_sqlite_projector_test.dart`,
+`test/v2_outbox_conflict_policy_test.dart`, `test/sync_engine_test.dart`
+oraz `server/api/tests/test_operation_projection.py`.
+
+
 Regresja rebase (2026-11-11):
 `V2OutboxConflictPolicy` dopuszcza `object.move` w obrębie tej samej strony
 obok bezpiecznych zmian pól i atomów Quill. Przeniesienie między stronami

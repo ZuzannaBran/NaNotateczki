@@ -173,16 +173,52 @@ class EditorV2RemotePatchDispatcher {
       return;
     }
 
-    final source = _page(notebook.pages, sourceId);
-    if (source == null) {
-      // A previously delivered page deletion may have erased the entire
-      // target. No old operation may resurrect it.
-      if (editor.pageById(sourceId) != null) {
-        throw StateError('The editor has a stale deleted page.');
+    final objectId = operation.objectId!;
+    final owners = [
+      for (final page in notebook.pages)
+        if (_ownsObject(page, objectId)) page,
+    ];
+    if (owners.length > 1) {
+      throw StateError('Committed object has ambiguous SQLite identity.');
+    }
+    final visibleOwners = [
+      for (final page in editor.pages)
+        if (_ownsObject(page, objectId)) page.id,
+    ];
+    if (visibleOwners.length > 1) {
+      throw StateError('Committed object has ambiguous visible identity.');
+    }
+    if (owners.isNotEmpty) {
+      final destination = owners.single;
+      if (visibleOwners.isNotEmpty &&
+          visibleOwners.single != destination.id) {
+        final source = _page(notebook.pages, visibleOwners.single);
+        if (source == null ||
+            !editor.applyConfirmedV2PageMovePatch(
+              source: source,
+              destination: destination,
+            )) {
+          throw StateError('Committed relocated object patch was deferred.');
+        }
+      } else {
+        _applyObject(destination, objectId);
       }
       return;
     }
-    _applyObject(source, operation.objectId!);
+    // An object deleted on its old page may already be displayed elsewhere.
+    for (final id in visibleOwners) {
+      final page = _page(notebook.pages, id);
+      if (page == null) {
+        throw StateError('Committed deletion awaits a page patch.');
+      }
+      _applyObject(page, objectId);
+    }
+    if (visibleOwners.isEmpty) {
+      final source = _page(notebook.pages, sourceId);
+      if (source == null && editor.pageById(sourceId) != null) {
+        throw StateError('The editor has a stale deleted page.');
+      }
+    }
   }
 
   void _applyObject(NotePage page, String objectId) {
