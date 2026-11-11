@@ -2109,6 +2109,7 @@ class _PersistentWorkspaceEditorState
   void initState() {
     super.initState();
     widget.operationRuntime?.attachEditor(_editor);
+    _configureSharePreview();
     _editor.backgroundSettingsListenable.addListener(_scheduleAppearance);
   }
 
@@ -2120,6 +2121,22 @@ class _PersistentWorkspaceEditorState
         : null;
     _registerRemoteGuard();
     _scheduleAppearance();
+  }
+
+  void _configureSharePreview() {
+    final runtime = widget.operationRuntime;
+    if (runtime == null) {
+      return;
+    }
+    final share = widget.share;
+    runtime.configureSharePreview(
+      _editor,
+      shareId: kIsWeb &&
+              share?.protocol == 'v2' &&
+              share?.documentUid == widget.item.uid
+          ? share!.id
+          : null,
+    );
   }
 
   void _registerRemoteGuard() {
@@ -2194,6 +2211,7 @@ class _PersistentWorkspaceEditorState
     _editor.saveDebounce = _shareDebounce;
     if (oldWidget.share?.id != widget.share?.id) {
       _lastAppearanceKey = null;
+      _configureSharePreview();
       _registerRemoteGuard();
       _scheduleAppearance();
     }

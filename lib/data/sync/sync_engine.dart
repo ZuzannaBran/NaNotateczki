@@ -864,6 +864,7 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     }
     _socket = null;
     _socketSubscription = null;
+    _socketAuthenticated = false;
     requestRealtimeChannelClose(socket);
     if (!_isActive(generation)) {
       return;

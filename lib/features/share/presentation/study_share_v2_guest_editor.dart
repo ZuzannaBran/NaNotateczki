@@ -10,6 +10,7 @@ import '../../../data/sync/operation_asset_gateway.dart';
 import '../../../data/sync/operation_gateway.dart';
 import '../../../data/sync/operation_protocol.dart';
 import '../../../data/sync/operation_store.dart';
+import '../../../data/sync/share_ink_preview_codec.dart';
 import '../../../data/sync/persistent_share_actor.dart';
 import '../../../data/sync/sync_engine.dart';
 import '../../../data/sync/v2_outbox_conflict_policy.dart';
@@ -53,6 +54,10 @@ class StudyShareV2GuestEditor extends StatefulWidget {
 
 class _StudyShareV2GuestEditorState extends State<StudyShareV2GuestEditor> {
   static const guestNamespace = 'browser-guest';
+  static Future<void> _previousClose = Future<void>.value();
+
+  late final Future<void> _startup;
+  Future<void>? _releasing;
 
   NotesDatabase? _database;
   NotebookRepository? _repository;
@@ -67,7 +72,8 @@ class _StudyShareV2GuestEditorState extends State<StudyShareV2GuestEditor> {
   @override
   void initState() {
     super.initState();
-    unawaited(_initialize());
+    _startup = _initialize();
+    unawaited(_startup);
   }
 
   Future<void> _initialize() async {
@@ -76,6 +82,10 @@ class _StudyShareV2GuestEditorState extends State<StudyShareV2GuestEditor> {
     }
     _starting = true;
     try {
+      await _previousClose;
+      if (_closed || !mounted) {
+        return;
+      }
       final database = await guest_db.openSharedGuestOperationDatabase(
         widget.shareId,
         guestActorId: guestNamespace,
@@ -140,6 +150,7 @@ class _StudyShareV2GuestEditorState extends State<StudyShareV2GuestEditor> {
         onShareEnded: widget.onEnded,
       );
       _engine = engine;
+      engine.onSharePreview = _onSharePreview;
       engine.addListener(_onEngineChanged);
       final writer = EditorV2OperationWriter(
         syncEngine: engine,
@@ -173,6 +184,17 @@ class _StudyShareV2GuestEditorState extends State<StudyShareV2GuestEditor> {
         saveDebounce: const Duration(milliseconds: 20),
       );
       _editor = editor;
+      editor.sendShareInkPreview = (pageId, stroke) {
+        engine.publishSharePreview(
+          ShareInkPreviewCodec.encode(
+            shareId: widget.shareId,
+            documentUid: widget.documentUid,
+            pageId: pageId,
+            senderId: engine.actorId,
+            stroke: stroke,
+          ),
+        );
+      };
       await editor.historyReady;
       if (_closed || !mounted) {
         return;
@@ -211,6 +233,21 @@ class _StudyShareV2GuestEditorState extends State<StudyShareV2GuestEditor> {
     }
   }
 
+  void _onSharePreview(Map<String, dynamic> message) {
+    final preview = ShareInkPreviewCodec.decode(message);
+    if (preview == null ||
+        preview.shareId != widget.shareId ||
+        preview.documentUid != widget.documentUid ||
+        preview.senderId == _engine?.actorId) {
+      return;
+    }
+    _editor?.applyRemoteShareInkPreview(
+      senderId: preview.senderId,
+      pageId: preview.pageId,
+      stroke: preview.stroke,
+    );
+  }
+
   void _onEngineChanged() {
     if (!mounted || _closed) {
       return;
@@ -246,7 +283,21 @@ class _StudyShareV2GuestEditorState extends State<StudyShareV2GuestEditor> {
     }
   }
 
-  Future<void> _release() async {
+  Future<void> _release() {
+    final current = _releasing;
+    if (current != null) {
+      return current;
+    }
+    final release = _releaseResources();
+    _releasing = release;
+    return release.whenComplete(() {
+      if (identical(_releasing, release)) {
+        _releasing = null;
+      }
+    });
+  }
+
+  Future<void> _releaseResources() async {
     final editor = _editor;
     final engine = _engine;
     final database = _database;
@@ -257,6 +308,7 @@ class _StudyShareV2GuestEditorState extends State<StudyShareV2GuestEditor> {
     _database = null;
     _api = null;
     if (editor != null) {
+      editor.sendShareInkPreview = null;
       try {
         await editor.flushPendingSaves();
       } catch (_) {
@@ -276,10 +328,20 @@ class _StudyShareV2GuestEditorState extends State<StudyShareV2GuestEditor> {
     api?.close();
   }
 
+  Future<void> _shutdown() async {
+    try {
+      await _startup;
+    } finally {
+      await _release();
+    }
+  }
+
   @override
   void dispose() {
     _closed = true;
-    unawaited(_release());
+    final closing = _shutdown();
+    _previousClose = closing;
+    unawaited(closing);
     super.dispose();
   }
 

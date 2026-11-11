@@ -920,6 +920,13 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 
 ### Share v2 — przyrostowe operacje (etap 6, opt-in)
 
+- Host v2 w `EditorV2AccountRuntime.configureSharePreview` i gość v2
+  publikują nietrwałe preview przez `SyncEngine.publishSharePreview`.
+  `EditorController.applyRemoteShareInkPreview` renderuje je poza
+  dokumentem, z TTL i bez operacji; `DrawingCanvas` throttluje emisję.
+  Regresja: `test/share_editor_object_patch_test.dart`.
+
+
 - `lib/data/sync/persistent_share_actor.dart`: stały aktor przeglądarkowego
   gościa per zaproszenie, nie jest przechowywany w koncie użytkownika.
   Brak aktora z istniejącym journalem kończy się blokadą, nie utratą kolejki.

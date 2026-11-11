@@ -8,6 +8,7 @@ import 'operation_asset_gateway.dart';
 import 'operation_gateway.dart';
 import 'operation_protocol.dart';
 import 'operation_store.dart';
+import 'share_ink_preview_codec.dart';
 import 'sync_engine.dart';
 import 'verified_editor_asset_buffer.dart';
 import 'v2_outbox_conflict_policy.dart';
@@ -99,6 +100,62 @@ class EditorV2AccountRuntime {
   final Future<void> Function()? onLibraryChanged;
 
   EditorController? _activeEditor;
+  String? _sharePreviewId;
+
+  /// Configure live, memory-only previews for the mounted v2 editor.
+  void configureSharePreview(
+    EditorController editor, {
+    String? shareId,
+  }) {
+    if (!identical(_activeEditor, editor)) {
+      throw StateError('Only the owning v2 editor can publish previews.');
+    }
+    engine.onSharePreview = null;
+    editor.sendShareInkPreview = null;
+    _sharePreviewId = shareId;
+    if (shareId == null) {
+      return;
+    }
+    final documentUid = editor.notebook.uid;
+    engine.onSharePreview = (message) {
+      final preview = ShareInkPreviewCodec.decode(message);
+      if (preview == null ||
+          _sharePreviewId != shareId ||
+          preview.shareId != shareId ||
+          preview.documentUid != documentUid ||
+          preview.senderId == engine.actorId) {
+        return;
+      }
+      editor.applyRemoteShareInkPreview(
+        senderId: preview.senderId,
+        pageId: preview.pageId,
+        stroke: preview.stroke,
+      );
+    };
+    editor.sendShareInkPreview = (pageId, stroke) {
+      if (_sharePreviewId != shareId) {
+        return;
+      }
+      engine.publishSharePreview(
+        ShareInkPreviewCodec.encode(
+          shareId: shareId,
+          documentUid: documentUid,
+          pageId: pageId,
+          senderId: engine.actorId,
+          stroke: stroke,
+        ),
+      );
+    };
+  }
+
+  void clearSharePreview(EditorController editor) {
+    if (!identical(_activeEditor, editor)) {
+      return;
+    }
+    _sharePreviewId = null;
+    engine.onSharePreview = null;
+    editor.sendShareInkPreview = null;
+  }
 
   /// Only the currently mounted operational editor receives object patches.
   void attachEditor(EditorController editor) {
@@ -112,6 +169,7 @@ class EditorV2AccountRuntime {
 
   void detachEditor(EditorController editor) {
     if (identical(_activeEditor, editor)) {
+      clearSharePreview(editor);
       _activeEditor = null;
     }
   }
@@ -177,6 +235,10 @@ class EditorV2AccountRuntime {
   Future<void> stop() => engine.stop();
 
   void dispose() {
+    final editor = _activeEditor;
+    if (editor != null) {
+      clearSharePreview(editor);
+    }
     _activeEditor = null;
     engine.dispose();
   }

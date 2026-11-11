@@ -4,6 +4,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:program/core/storage/text_storage.dart';
 import 'package:program/data/drift/notes_database.dart';
+import 'package:program/data/sync/operation_store.dart';
 import 'package:program/features/editor/state/editor_controller.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:program/features/notebook/domain/drawing_tool.dart';
@@ -74,6 +75,43 @@ void main() {
       expect(editor.viewScale, 1.5);
     },
   );
+
+  test('transient peer ink leaves pages, viewport and journal unchanged',
+      () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final notebook = await repository.createNotebook();
+    final editor = EditorController(
+      repository: repository,
+      notebook: notebook,
+    );
+    addTearDown(editor.dispose);
+    final page = notebook.pages.single;
+    final preview = InkStroke(
+      id: 'unpersisted',
+      color: const Color(0xff224466),
+      width: 2,
+      tool: DrawingTool.pen,
+      points: [const InkPoint(dx: 4, dy: 8, pressure: 1)],
+    );
+    editor.setViewTransform(pan: const Offset(12, 18), scale: 1.25);
+    editor.applyRemoteShareInkPreview(
+      senderId: 'remote-peer',
+      pageId: page.id,
+      stroke: preview,
+    );
+    expect(editor.inkStrokesForDisplay(page).single.id, 'unpersisted');
+    expect(editor.currentPage.inkStrokes, isEmpty);
+    expect(await OperationStore(database).pending(), isEmpty);
+    editor.applyRemoteShareInkPreview(
+      senderId: 'remote-peer',
+      pageId: page.id,
+    );
+    expect(editor.inkStrokesForDisplay(page), isEmpty);
+    expect(editor.viewPan, const Offset(12, 18));
+    expect(editor.viewScale, 1.25);
+  });
 
   test(
     'remote style patches preserve ink order until explicit reorder',
