@@ -171,3 +171,38 @@ kod pozostaje opt-in; produkcyjny Share wciąż używa starego protokołu.
 - **Bez migracji UID nie wolno przełączać dokumentów v1**. Do ostatecznej
   akceptacji wymagane jest jeszcze E2E dwóch rzeczywistych klientów oraz
   ulotny, nieutrwalany podgląd w trakcie aktywnego rysowania.
+
+
+## Akceptacja dwóch klientów Share v2
+
+Automatyczne testy walidują protokół, autoryzację, operacje, outbox,
+Quill, assety, patche obiektów i serwerowy PostgreSQL/WebSocket.
+**Nie zastępuje to testu dwóch działających przeglądarek.** Ten
+scenariusz stanowi obowiązkową bramkę przed pełną akceptacją etapu 6.
+
+1. Na testowym koncie v2 utworzyć link z poziomu hosta. Otworzyć go
+   hasłem w dwóch oddzielnych profilach Web. Sprawdzić izolację biblioteki,
+   dokumentów i viewportu każdego uczestnika.
+2. Host i gość jednocześnie rysują i wymazują. Druga przeglądarka powinna
+   widzieć tymczasową kreskę przed zakończeniem gestu; tylko zakończony
+   gest może otrzymać `OperationEnvelope`, SQLite commit i ACK.
+3. Równolegle przeprowadzić: Unicode, style i formatowanie Quill,
+   osadzone PDF/obrazy, przenoszenie pomiędzy stronami, zmiany warstw,
+   Undo/Redo i usuwanie. Zweryfikować zbieżność UID i tombstones
+   bez migania lub resetowania viewportu.
+4. Odłączyć sieć podczas edycji gościa. Zrestartować stronę. Po
+   ponownym połączeniu potwierdzić niezmienne `operationId`,
+   `actorSeq`, zmaterializowany dokument i brak duplikatów.
+5. Odnowić bilet ponownym wpisaniem hasła. Ten sam gość musi odzyskać
+   outbox bez przyjmowania identyfikatorów z innego linku lub konta.
+6. Zakończyć udział z hosta podczas aktywnej sesji. Po revoke nie może
+   być nowego zapisu ani odczytu, ale lokalne oczekujące zmiany muszą
+   pozostać do kontrolowanego odzyskania.
+7. Potwierdzić, że zaproszenie v1 nadal używa osobnego legacy edytora
+   i nie może uzyskać dostępu do operacji czy assetów v2.
+
+Test dwóch rzeczywistych interfejsów nie został tutaj oznaczony jako
+zaliczony. Nie aktywować globalnego cutover ani nie usuwać v1 tylko
+dlatego, że regresje API są zielone. Historyczne obrazy są pobierane
+wyłącznie po weryfikacji tego samego dokumentu i wcześniejszego
+`asset.attach` w jego dzienniku.

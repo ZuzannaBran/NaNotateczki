@@ -920,6 +920,24 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 
 ### Share v2 — przyrostowe operacje (etap 6, opt-in)
 
+- `lib/data/sync/share_ink_preview_codec.dart`: ograniczony do 96 punktów
+  nieutrwalany komunikat `share_preview`, odrzucający niepoprawne
+  współrzędne i narzędzia; odpowiada mu
+  `test/share_ink_preview_codec_test.dart`.
+- `server/api/app/routers/operation_realtime.py`: transmisja wyłącznie
+  zatwierdzonych uprawnieniami i ograniczonych rozmiarem podglądów przez
+  WebSocket, poza PostgreSQL i ACK; test
+  `server/api/tests/test_share_preview_protocol.py`. Lustro w serwerze.
+- `server/api/app/routers/assets.py`: dla zaproszonego gościa historyczne
+  `asset.attach` tej samej pary właściciel–UID uprawnia do ponownego
+  odczytu SHA przy odtwarzaniu pełnego dziennika; inne dokumenty zabronione.
+  `server/api/tests/test_share_asset_history.py` i serwer główny.
+- `server/api/tests/test_stage12_real_stack.py`: test dwukierunkowego
+  WebSocket korzysta z jawnie oznaczonej sesji v2.
+- `test/study_share_http_test.dart`: link v2 dopiero po ACK operacji hosta,
+  bez legacy snapshotu.
+
+
 - Host v2 w `EditorV2AccountRuntime.configureSharePreview` i gość v2
   publikują nietrwałe preview przez `SyncEngine.publishSharePreview`.
   `EditorController.applyRemoteShareInkPreview` renderuje je poza
