@@ -40,10 +40,24 @@ jobs:
         run: |
           dart format lib test integration_test test_driver
           git diff --exit-code -- lib test integration_test test_driver
-      - name: Verify two offline v2 SQLite clients before external downloads
-        run: flutter test test/v2_two_client_rebase_test.dart
+      - name: Analyze Dart source before installing native packages
+        run: dart analyze
+      - name: Test operational v2 rebase before installing native packages
+        run: |
+          flutter test \
+            test/v2_two_client_rebase_test.dart \
+            test/v2_outbox_conflict_policy_test.dart \
+            test/editor_sqlite_projector_test.dart \
+            test/sync_engine_test.dart \
+            test/operation_text_sequence_test.dart \
+            test/editor_v2_account_startup_test.dart \
+            test/editor_v2_remote_patch_dispatcher_test.dart
       - name: Install native PDF import test dependency
         run: |
+          if command -v pdftoppm >/dev/null 2>&1; then
+            pdftoppm -v
+            exit 0
+          fi
           for attempt in 1 2 3; do
             if sudo apt-get update -o Acquire::Retries=2 &&
               sudo apt-get install -o Acquire::Retries=2 \
@@ -64,8 +78,6 @@ jobs:
         run: |
           dart format lib test integration_test test_driver
           git diff --exit-code -- lib test integration_test test_driver
-      - name: Analyze source and tests
-        run: dart analyze
       - name: Verify DDS startup retry handles only infrastructure failures
         run: bash .github/scripts/test_flutter_integration_retry.sh
       - name: Verify sqlite3 hash retry never masks test failures
