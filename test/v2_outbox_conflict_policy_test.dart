@@ -1299,7 +1299,7 @@ void main() {
     expect(V2OutboxConflictPolicy.canApply(move, [style, newStroke]), isTrue);
   });
 
-  test('same-object move rebases fields but not concurrent moves', () {
+  test('same-object move rebases fields and ranked concurrent moves', () {
     final move = _operation(
       OperationKind.objectMove,
       remote: true,
@@ -1323,8 +1323,8 @@ void main() {
     );
     expect(_allowed(move, color), isTrue);
     expect(_allowed(color, move), isTrue);
-    expect(_allowed(move, pendingMove), isFalse);
-    expect(_allowed(pendingMove, move), isFalse);
+    expect(_allowed(move, pendingMove), isTrue);
+    expect(_allowed(pendingMove, move), isTrue);
   });
 
   test('independent concurrent moves use rank rather than pending gate', () {
@@ -1349,6 +1349,12 @@ void main() {
       'dependencies': [local.operationId],
     });
     expect(_allowed(dependent, local), isFalse);
+    final sameActor = OperationEnvelope.fromJson({
+      ...local.toJson(),
+      'actorId': remote.actorId,
+    });
+    expect(_allowed(remote, sameActor), isFalse);
+    expect(_allowed(sameActor, remote), isFalse);
     final movedAgain = OperationEnvelope.fromJson({
       ...local.toJson(),
       'pageId': 'other-source',
