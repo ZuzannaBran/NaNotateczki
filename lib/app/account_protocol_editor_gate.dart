@@ -10,6 +10,7 @@ class AccountProtocolEditorGate extends StatefulWidget {
     required this.userId,
     required this.legacyReadyUser,
     required this.v2ReadyUser,
+    this.blockingReason,
     required this.onRetry,
     required this.onLogOut,
     required this.child,
@@ -20,6 +21,7 @@ class AccountProtocolEditorGate extends StatefulWidget {
   final String? userId;
   final String? legacyReadyUser;
   final String? v2ReadyUser;
+  final String? blockingReason;
   final Future<void> Function() onRetry;
   final Future<void> Function() onLogOut;
   final Widget child;
@@ -93,9 +95,10 @@ class _AccountProtocolEditorGateState extends State<AccountProtocolEditorGate> {
               children: [
                 const CircularProgressIndicator(),
                 const SizedBox(height: 16),
-                const Text(
-                  'Checking the account sync protocol. Editing is paused '
-                  'until the account version is verified.',
+                Text(
+                  widget.blockingReason ??
+                      'Checking the account sync protocol. Editing is paused '
+                          'until the account version is verified.',
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),

@@ -8,6 +8,7 @@ void main() {
     String? userId,
     String? legacyReadyUser,
     String? v2ReadyUser,
+    String? blockingReason,
     Future<void> Function()? onRetry,
     Future<void> Function()? onLogOut,
   }) => MaterialApp(
@@ -16,6 +17,7 @@ void main() {
       userId: userId,
       legacyReadyUser: legacyReadyUser,
       v2ReadyUser: v2ReadyUser,
+      blockingReason: blockingReason,
       onRetry: onRetry ?? () async {},
       onLogOut: onLogOut ?? () async {},
       child: const Scaffold(body: Text('Editor content')),
@@ -74,6 +76,21 @@ void main() {
     await tester.pumpWidget(app(signedIn: false));
     expect(find.text('Editor content'), findsOneWidget);
   });
+  testWidgets('pending Local import explains why editor remains blocked', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        signedIn: true,
+        userId: 'account-a',
+        blockingReason: 'Local import paused: missing verified asset.',
+      ),
+    );
+    expect(find.textContaining('Local import paused'), findsOneWidget);
+    expect(find.text('Editor content'), findsNothing);
+    expect(find.text('Retry'), findsOneWidget);
+  });
+
   testWidgets('blocked account offers retry and logout', (tester) async {
     var retries = 0;
     var logouts = 0;

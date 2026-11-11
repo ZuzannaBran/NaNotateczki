@@ -59,6 +59,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   StorageNamespace? _namespace;
   bool _switchingNamespace = false;
   Object? _namespaceSwitchFailure;
+  String? _localImportFailure;
   NotebookRepository? _repository;
   LocalBackupService? _backupService;
   CloudSyncService? _cloudSync;
@@ -216,6 +217,12 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
               : (_v2AccountRuntime == null ? null : _bootstrappedAccount),
           onRetry: _startAccountSync,
           onLogOut: session.logout,
+          blockingReason: session.hasPendingLocalImport(session.userId ?? '')
+              ? (_localImportFailure ??
+                    'Importing Local data into this account. Editing is '
+                        'paused until the transfer and remote acknowledgements '
+                        'are complete. Use Retry if the connection is restored.')
+              : null,
           child: const LibraryScreen(),
         );
       },
@@ -645,7 +652,11 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     if (repository == null || planner == null || library == null) {
       throw StateError('Local account import dependencies are unavailable.');
     }
-    await LocalAccountImportService(
+    if (_localImportFailure != null && mounted) {
+      setState(() => _localImportFailure = null);
+    }
+    try {
+      await LocalAccountImportService(
       accountId: userId,
       repository: repository,
       planner: planner,
@@ -694,9 +705,15 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         throw StateError('Imported study entries have not synchronized.');
       }
     }
-    await session.completeLocalImport(userId);
-    if (mounted) {
-      setState(() {});
+      await session.completeLocalImport(userId);
+      if (mounted) {
+        setState(() => _localImportFailure = null);
+      }
+    } catch (error) {
+      if (mounted && current()) {
+        setState(() => _localImportFailure = error.toString());
+      }
+      rethrow;
     }
   }
 

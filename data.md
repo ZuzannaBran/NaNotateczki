@@ -1,3 +1,20 @@
+## Import Local → konto (pakiet 4, 2026-11-11)
+
+- Import tylko po jawnym wyborze użytkownika; Local pozostaje nienaruszony.
+- Docelowe UID są deterministyczne dla pary (konto, źródłowy UID);
+  ponowienie używa tych samych tożsamości i nie nadpisuje późniejszych
+  edycji na koncie. Trwały checkpoint w bazie konta ma stany pending/complete.
+- Odmienna historia konta i jej ustawienia mają pierwszeństwo. Foldery
+  i zadania dodaje się bez zastępowania już obecnych identyfikatorów.
+- Zmiana konta unieważnia rozpoczęty transfer; dopóki import czeka na
+  potwierdzenie synchronizacji, edytor konta pozostaje zablokowany.
+  Nie wolno skasować niewysłanych zmian.
+- Import mediów wymaga dostępnych bajtów. Embed Quill bez zweryfikowanego
+  assetu zatrzymuje transfer, nie tworzy pustego pliku.
+- Pakiet 5 musi uruchomić synchronizację planera, zadań i metadanych
+  folderów na v2. Do tego czasu import tych kategorii do v2 jest
+  jawnie zablokowany, bez ryzyka cichej utraty.
+
 # Dane NaNotateczki
 
 Uzupełnienie rebase mediów (2026-11-11): walidacja przeszłego
