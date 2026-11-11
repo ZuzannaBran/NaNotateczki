@@ -309,6 +309,12 @@ class EditorController extends ChangeNotifier {
   int? activeShapePageIndex;
   DrawingTool? _toolBeforeShapeEdit;
   ({String pageId, InkStroke stroke})? _shapeStrokePreview;
+  final Map<String, ({String pageId, InkStroke stroke, Timer expiry})>
+      _remoteShareInk = {};
+
+  /// Optional live hint: only completed gestures enter the v2 journal.
+  void Function(String pageId, InkStroke? stroke)? sendShareInkPreview;
+
   LassoSelection? lassoSelection;
   final ValueNotifier<Offset> lassoDragDelta = ValueNotifier(Offset.zero);
   final ValueNotifier<ImageBlock?> imageTransformPreview =
@@ -817,6 +823,11 @@ class EditorController extends ChangeNotifier {
       }
     }
     _isDisposed = true;
+    sendShareInkPreview = null;
+    for (final entry in _remoteShareInk.values) {
+      entry.expiry.cancel();
+    }
+    _remoteShareInk.clear();
     imageTransformPreview.dispose();
     lassoDragDelta.dispose();
     inkRevision.dispose();
@@ -1194,15 +1205,55 @@ class EditorController extends ChangeNotifier {
     return null;
   }
 
-  /// Keeps the in-progress shape geometry out of snapshots and the outbox.
+  /// Ephemeral remote ink lives only in UI memory, never SQLite or outbox.
+  void applyRemoteShareInkPreview({
+    required String senderId,
+    required String pageId,
+    InkStroke? stroke,
+  }) {
+    if (_isDisposed) {
+      return;
+    }
+    final previous = _remoteShareInk.remove(senderId);
+    previous?.expiry.cancel();
+    if (stroke != null && pages.any((page) => page.id == pageId)) {
+      final expiry = Timer(const Duration(seconds: 2), () {
+        final current = _remoteShareInk.remove(senderId);
+        if (current != null) {
+          _notifyShapePreviewChanged(current.pageId);
+        }
+      });
+      _remoteShareInk[senderId] = (
+        pageId: pageId,
+        stroke: stroke,
+        expiry: expiry,
+      );
+    }
+    if (previous != null) {
+      _notifyShapePreviewChanged(previous.pageId);
+    }
+    if (_remoteShareInk.containsKey(senderId)) {
+      _notifyShapePreviewChanged(pageId);
+    }
+  }
+
+  /// UI-only previews cannot alter the persisted pages or operation journal.
   List<InkStroke> inkStrokesForDisplay(NotePage page) {
     final preview = _shapeStrokePreview;
-    if (preview == null || preview.pageId != page.id) {
+    final local = preview != null && preview.pageId == page.id
+        ? preview.stroke
+        : null;
+    final remote = [
+      for (final entry in _remoteShareInk.values)
+        if (entry.pageId == page.id) entry.stroke,
+    ];
+    if (local == null && remote.isEmpty) {
       return page.inkStrokes;
     }
     return [
       for (final stroke in page.inkStrokes)
-        if (stroke.id == preview.stroke.id) preview.stroke else stroke,
+        if (stroke.id == local?.id) local! else stroke,
+      ...remote,
     ];
   }
 
