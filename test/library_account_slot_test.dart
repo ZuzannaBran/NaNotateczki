@@ -246,21 +246,6 @@ void main() {
             find.byKey(const ValueKey('account-login-submit')),
           )
           .onPressed!();
-      for (var i = 0;
-          i < 100 &&
-              find.byKey(const ValueKey('account-keep-local-separate'))
-                  .evaluate()
-                  .isEmpty;
-          i++) {
-        await tester.pump(const Duration(milliseconds: 10));
-      }
-      expect(
-        find.byKey(const ValueKey('account-import-local')),
-        findsOneWidget,
-      );
-      await tester.tap(
-        find.byKey(const ValueKey('account-keep-local-separate')),
-      );
       for (var i = 0; i < 100 && !session.isSignedIn; i++) {
         await tester.pump(const Duration(milliseconds: 10));
       }
@@ -375,6 +360,20 @@ void main() {
             find.byKey(const ValueKey('account-login-submit')),
           )
           .onPressed!();
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 10));
+      }
+      expect(
+        find.byKey(const ValueKey('account-import-local')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('account-keep-local-separate')),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('account-keep-local-separate')),
+      );
       for (var i = 0; i < 100 && !session.isSignedIn; i++) {
         await tester.pump(const Duration(milliseconds: 10));
       }
