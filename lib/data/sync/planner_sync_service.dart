@@ -37,6 +37,16 @@ class PlannerSyncService {
     lastError = null;
   }
 
+  /// Join an in-flight planner request before changing account credentials.
+  Future<void> stopAndDrain() async {
+    stop();
+    try {
+      await _running;
+    } catch (_) {
+      // A rejected, already cancelled request must not unblock old writes.
+    }
+  }
+
   Future<void> syncNow() {
     final previous = _running;
     if (previous != null) {

@@ -379,6 +379,16 @@ class AccountSettingsSyncService {
     lastError = null;
   }
 
+  /// Wait for the old account's request to finish after invalidating it.
+  Future<void> stopAndDrain() async {
+    stop();
+    try {
+      await _running;
+    } catch (_) {
+      // The generation fence makes a failed old request harmless.
+    }
+  }
+
   static bool _equivalent(Object? left, Object? right) =>
       jsonEncode(_canonical(left)) == jsonEncode(_canonical(right));
 
