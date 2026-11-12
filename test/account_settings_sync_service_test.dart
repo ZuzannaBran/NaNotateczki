@@ -129,7 +129,7 @@ void main() {
     expect((remote['value'] as Map)['uiScale'], 1.5);
   });
 
-  test('v2 preimport backup cannot follow an account namespace switch', () async {
+  test('v2 backup respects account namespace changes', () async {
     ActiveStorageNamespace.activate(StorageNamespace.account('account-a'));
     final files = <String, String>{
       'app_prefs.json': '{"darkMode":false}',
@@ -185,8 +185,10 @@ void main() {
     releaseRead.complete(null);
     await pending;
     expect(files['app_prefs.json'], '{"darkMode":false}');
-    expect(files.keys.where((key) => key.startsWith('account_preimport_')),
-        isEmpty);
+    expect(
+      files.keys.where((key) => key.startsWith('account_preimport_')),
+      isEmpty,
+    );
     expect(files.keys.where((key) => key.contains('cursor')), isEmpty);
   });
 
