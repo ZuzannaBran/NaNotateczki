@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 
+import '../core/storage/shutdown_coordinator.dart';
+
 /// Prevents editing when this client cannot save the account protocol.
 class UnsupportedAccountProtocolScreen extends StatefulWidget {
-  const UnsupportedAccountProtocolScreen({required this.onLogOut, super.key});
+  const UnsupportedAccountProtocolScreen({
+    required this.onLogOut,
+    this.onLogOutOffline,
+    super.key,
+  });
 
   final Future<void> Function() onLogOut;
+  final Future<void> Function()? onLogOutOffline;
 
   @override
   State<UnsupportedAccountProtocolScreen> createState() =>
@@ -14,18 +21,28 @@ class UnsupportedAccountProtocolScreen extends StatefulWidget {
 class _UnsupportedAccountProtocolScreenState
     extends State<UnsupportedAccountProtocolScreen> {
   bool _signingOut = false;
+  bool _canSignOutOffline = false;
   String? _error;
 
-  Future<void> _logOut() async {
+  Future<void> _logOut({bool offline = false}) async {
     setState(() {
       _signingOut = true;
       _error = null;
+      _canSignOutOffline = false;
     });
     try {
-      await widget.onLogOut();
+      if (offline) {
+        await widget.onLogOutOffline?.call();
+      } else {
+        await widget.onLogOut();
+      }
     } catch (error) {
       if (mounted) {
-        setState(() => _error = 'Log out failed: $error');
+        setState(() {
+          _error = 'Log out failed: $error';
+          _canSignOutOffline = error is ShutdownInterrupted &&
+              error.localSafe;
+        });
       }
     } finally {
       if (mounted) {
@@ -60,6 +77,13 @@ class _UnsupportedAccountProtocolScreenState
                   onPressed: _signingOut ? null : _logOut,
                   child: const Text('Log out'),
                 ),
+                if (_canSignOutOffline && widget.onLogOutOffline != null)
+                  TextButton(
+                    onPressed: _signingOut
+                        ? null
+                        : () => _logOut(offline: true),
+                    child: const Text('Log out offline'),
+                  ),
               ],
             ),
           ),
