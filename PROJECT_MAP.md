@@ -1,3 +1,19 @@
+## Pakiet 8 — bezpieczna aktywacja v2 (2026-11-12)
+
+- `ApiClient.ensureV2AccountReady` sprawdza autoryzowany endpoint
+  `GET /v2/activation/readiness` zanim `AppScope._startV2Account`
+  zarezerwuje lokalny writer. Serwer wymaga markera v2, allowlist canary
+  i braku starych dokumentów, eventów v1, backupów lub share v1.
+- `NotebookRepository.enableAccountOperations` wymaga rzeczywistej
+  `document.create` dla każdego istniejącego notebooka SQLite.
+  Testy regresyjne: `test/api_client_test.dart`,
+  `test/notebook_repository_v2_account_test.dart`,
+  `server/api/tests/test_account_protocol_fence.py`.
+- Serwerowy `stage13-activate-empty-canary.sh` nie akceptuje
+  nieznanego statusu API, nowych account-owned tabel ani assetów.
+  Brak automatycznego cutover kont z historią v1; wciąż wymagają
+  bezstratnej konwersji lokalnej i PostgreSQL.
+
 ## Pakiet 7 — shutdown, logout i restart (2026-11-12)
 
 - `lib/app/app_scope.dart`: wspólna sekwencja `ShutdownCoordinator`

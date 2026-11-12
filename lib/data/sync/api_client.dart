@@ -117,6 +117,21 @@ class ApiClient {
     }
   }
 
+  /// Verifies the canary marker and server readiness before starting v2.
+  /// Missing endpoints never allow a fallback to a legacy writer.
+  Future<void> ensureV2AccountReady() async {
+    final response = await get('/v2/activation/readiness');
+    final payload = response.decodeJson();
+    if (payload is! Map<String, dynamic> ||
+        payload['protocol'] != 'v2' ||
+        payload['writeEnabled'] != true ||
+        payload['version'] != 1) {
+      throw const FormatException(
+        'V2 account activation is not verified by this server.',
+      );
+    }
+  }
+
   Uri realtimeUri() {
     final uri = resolve('/v1/realtime');
     return uri.replace(scheme: uri.scheme == 'https' ? 'wss' : 'ws');

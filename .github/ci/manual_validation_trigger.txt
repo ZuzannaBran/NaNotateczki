@@ -1,1 +1,1 @@
-full-ci-2026-11-12-package7-shutdown-format-verified-v2
+full-ci-2026-11-12-package8-activation-preflight

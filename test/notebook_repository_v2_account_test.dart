@@ -210,6 +210,53 @@ void main() {
     expect(await store.pending(), hasLength(3));
   });
 
+
+  test('a v2 update alone cannot disguise a legacy notebook', () async {
+    final database = NotesDatabase(NativeDatabase.memory());
+    addTearDown(database.close);
+    final repository = NotebookRepository(database);
+    final legacy = await repository.createNotebook();
+    await database.customStatement(
+      'INSERT INTO operations '
+      '(operation_id, actor_id, actor_seq, document_id, page_id, object_id, '
+      'kind, envelope_json, logical_clock, schema_version, source, '
+      'created_at) VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?)',
+      [
+        '00000000-0000-4000-8000-000000000001',
+        'legacy-misidentified-actor',
+        1,
+        legacy.uid,
+        'document.set',
+        '{}',
+        1,
+        1,
+        'remote',
+        1,
+      ],
+    );
+    final store = OperationStore(database);
+    final projector = EditorSqliteProjector(database);
+    final engine = SyncEngine(
+      store: store,
+      gateway: _OfflineGateway(),
+      actorId: 'activation-guard-test',
+      checkpointScope: 'activation-guard-test',
+      enableRealtime: false,
+      applyRemote: (operation, pending) => projector.apply(operation),
+    );
+    addTearDown(engine.stop);
+    final writer = EditorV2OperationWriter(
+      syncEngine: engine,
+      projector: projector,
+    );
+    await expectLater(
+      repository.enableAccountOperations(writer),
+      throwsStateError,
+    );
+    expect((await repository.getNotebook(legacy.uid))!.uid, legacy.uid);
+    expect(await repository.saveNotebook(legacy), isTrue);
+  });
+
   test('v2 account activation rejects unmigrated documents', () async {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);

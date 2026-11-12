@@ -106,6 +106,25 @@ SQLite v6 rozszerza trwałe lokalne tombstones o `task`. Narzędzie
 źródłowe bajty oraz działa nadal wyłącznie w trybie `staged-not-activated`.
 Test regresyjny sprawdza staging bazy v6 bez zmiany źródła.
 
+## Pakiet 8 — kontrola aktywacji konta v2
+
+Klient najpierw potwierdza protokół konta, a przed uruchomieniem
+writera wywołuje `GET /v2/activation/readiness`. Serwer kontroluje
+trwały marker v2, tryb canary i allowlist kont, po czym odmawia
+przy pozostałościach dokumentów, events, idempotency, backupów,
+ustawień biblioteki i linków Share w protokole v1. Brak endpointu
+albo przerwanie HTTP pozostawia edytor zablokowany.
+
+Na urządzeniu nawet obecność `document.set` nie oznacza wykonanej
+migracji: każdy istniejący notebook musi mieć `document.create`
+w dzienniku v2. Aktywacja pustego konta testowego odrzuca błąd
+sprawdzenia procesu API, nieznane tabele i zweryfikowane assety.
+
+**Konta historyczne:** staging etapu 11 nie przenosi jeszcze danych
+przez protokół v2. Bez utrwalenia Quill, mediów, folderów, zadań,
+tombstones, checkpointów i niewysłanego outboxu nie wolno aktywować
+istniejącego konta ani zastępować migracji resetem serwera.
+
 ## Uzupełnienie przy etapie 13 — trwała bariera protokołów
 
 Backend po migracji `0013_account_protocol_fence.sql` zachowuje dla

@@ -105,7 +105,8 @@ class NotebookRepository {
       final ready = database
           .customSelect(
             'SELECT n.uid FROM notebook_rows n WHERE NOT EXISTS '
-            '(SELECT 1 FROM operations o WHERE o.document_id = n.uid) LIMIT 1',
+            '(SELECT 1 FROM operations o WHERE o.document_id = n.uid '
+            "AND o.kind = 'document.create') LIMIT 1",
           )
           .getSingleOrNull()
           .then<void>((legacy) {

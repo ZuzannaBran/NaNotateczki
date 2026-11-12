@@ -71,10 +71,6 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   RemoteBackupScheduler? _remoteBackupScheduler;
   LiveWebSyncService? _liveSync;
   EditorV2AccountRuntime? _v2AccountRuntime;
-  static const bool _enableV2AccountPreview = bool.fromEnvironment(
-    'NN_ENABLE_V2_ACCOUNT',
-    defaultValue: false,
-  );
   AccountSettingsSyncService? _accountSettingsSync;
   PlannerSyncService? _plannerSync;
   Future<void>? _plannerReady;
@@ -797,9 +793,6 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
 
   /// Starts the operational engine for an explicitly confirmed v2 account.
   Future<void> _startV2Account(String userId, int generation) async {
-    if (!_enableV2AccountPreview) {
-      throw AccountProtocolNotSupported();
-    }
     bool isCurrent() => _isCurrentAccountBootstrap(userId, generation);
     if (!isCurrent()) {
       return;
@@ -809,6 +802,11 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     final library = _libraryController;
     if (repository == null || apiClient == null || library == null) {
       throw StateError('V2 account cannot start without its SQLite scope.');
+    }
+    // Server-side canary approval replaces a local build-time bypass.
+    await apiClient.ensureV2AccountReady();
+    if (!isCurrent()) {
+      return;
     }
     var runtime = _v2AccountRuntime;
     if (runtime == null) {

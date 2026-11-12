@@ -172,4 +172,67 @@ void main() {
       }
     }
   });
+  test('v2 readiness requires an authenticated successful preflight', () async {
+    final visited = <String>[];
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        visited.add(request.url.path);
+        expect(request.headers['authorization'], 'Bearer access');
+        return http.Response(
+          jsonEncode({
+            'protocol': 'v2',
+            'writeEnabled': true,
+            'version': 1,
+          }),
+          200,
+        );
+      }),
+    );
+    addTearDown(client.close);
+    client.setAccessToken('access');
+    await client.ensureV2AccountReady();
+    expect(visited, ['/v2/activation/readiness']);
+  });
+
+  test('v2 preflight fails closed for invalid and missing responses', () async {
+    for (final body in <String>[
+      '{"protocol":"v1","writeEnabled":true,"version":1}',
+      '{"protocol":"v2","writeEnabled":false,"version":1}',
+      '{"protocol":"v2","writeEnabled":true}',
+      '{"protocol":"v2","writeEnabled":"true","version":1}',
+      '[]',
+    ]) {
+      final client = ApiClient(
+        baseUri: Uri.parse('https://api.example.com'),
+        httpClient: MockClient((_) async => http.Response(body, 200)),
+      );
+      addTearDown(client.close);
+      client.setAccessToken('access');
+      await expectLater(
+        client.ensureV2AccountReady(),
+        throwsA(isA<FormatException>()),
+      );
+    }
+    for (final status in <int>[403, 404, 409, 503]) {
+      final client = ApiClient(
+        baseUri: Uri.parse('https://api.example.com'),
+        httpClient: MockClient(
+          (_) async => http.Response('{"detail":"Not ready"}', status),
+        ),
+      );
+      addTearDown(client.close);
+      client.setAccessToken('access');
+      await expectLater(
+        client.ensureV2AccountReady(),
+        throwsA(
+          isA<ApiException>().having(
+            (error) => error.statusCode,
+            'statusCode',
+            status,
+          ),
+        ),
+      );
+    }
+  });
 }
