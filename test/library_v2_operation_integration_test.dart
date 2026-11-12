@@ -143,10 +143,7 @@ void main() {
     for (final actor in ['offline-device-a', 'offline-device-b']) {
       final database = NotesDatabase(NativeDatabase.memory());
       addTearDown(database.close);
-      final store = OperationStore(
-        database,
-        checkpointScope: 'account:$user',
-      );
+      final store = OperationStore(database, checkpointScope: 'account:$user');
       final engine = SyncEngine(
         store: store,
         gateway: _NoNetworkGateway(),

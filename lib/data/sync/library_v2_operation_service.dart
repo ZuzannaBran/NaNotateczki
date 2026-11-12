@@ -355,13 +355,9 @@ class LibraryV2OperationService {
       if (count > 1 && parent == null) {
         throw StateError('Implicit folder parent is missing.');
       }
-      await _commit(
-        OperationKind.folderCreate,
-        const Uuid().v4(),
-        {
-          'value': {'name': segments[count - 1], 'parentId': parent},
-        },
-      );
+      await _commit(OperationKind.folderCreate, const Uuid().v4(), {
+        'value': {'name': segments[count - 1], 'parentId': parent},
+      });
     }
   }
 
