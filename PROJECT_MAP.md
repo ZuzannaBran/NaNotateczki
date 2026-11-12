@@ -246,18 +246,19 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
   niezależny od migracji bazy notatek.
 - Dostarcza klient API, ładowaną asynchronicznie sesję/profil konta, zdalny
   backup i live sync; repozytorium przekazuje zmiany do schedulerów po zapisie.
-- 47: `AppScope`; 56: `_AppScopeState`; 300: `didRequestAppExit`;
+- 47: `AppScope`; 56: `_AppScopeState`; 438: `didRequestAppExit`.
+  158: `_flushLocallyForShutdown`, 251: `_prepareAccountLogout`.
   `_startAccountSync` automatycznie odtwarza stan po logowaniu i restarcie
   na wszystkich platformach, zanim uruchomi backup.
-- 121: `_quiesceAccountWriters` unieważnia bootstrap i czeka na niego
-  przed opróżnieniem writerów oraz zmianą namespace/API identity.
-- 506: `_syncAccountSettings`; 606: `_v2ActorId`;
-  609: `_isCurrentAccountBootstrap`; 619: `_startV2Account`;
-  665: `_startAccountSync`. Każdy startup ma generację; późny odczyt
+- 125: `_quiesceAccountWriters` unieważnia bootstrap, czeka na koniec gestu,
+  drenuje planera, ustawienia i writery przed zmianą namespace/API identity.
+- 590: `_syncAccountSettings`; 696: `_v2ActorId`;
+  699: `_isCurrentAccountBootstrap`; 798: `_startV2Account`;
+  959: `_startAccountSync`. Każdy startup ma generację; późny odczyt
   protokołu/aktora nie może uruchomić opuszczonego konta ani zwolnić UI.
-- 1119: `AppUiScale`; 1167: `_ExitGuardOverlay`;
-  1250: `_FinishingExitOverlay`; 1358: `_BackupScheduler`;
-  1554: `flushForExit`.
+- 1443: `AppUiScale`; 1491: `_ExitGuardOverlay`;
+  1582: `_FinishingExitOverlay`; 1699: `_BackupScheduler`;
+  1895: `flushForExit`.
 
 ### `lib/app/account_bootstrap_barrier.dart`
 
@@ -1208,9 +1209,11 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   Oddzielny restart zachowuje sekret i sprawdza refresh poprzedniego konta.
   `shouldShowStartupDialog` tylko przy nieukończonym onboardingu.
   10: `AccountDataMode`; 12: `AccountSessionController`;
-  90: `_loadProfile`; 220: `_refreshSession`;
-  269: `_restorePersistedSession`; 335: `_persistRefreshCredential`;
-  365: `changePassword`; 397: `logout`; 466: `useLocalProfile`.
+  114: `_loadProfile`; 270: `_refreshSession`;
+  319: `_restorePersistedSession`;
+  385: `_persistRefreshCredential`;
+  415: `changePassword`; 447: `logout`;
+  450: `logoutOffline`; 528: `useLocalProfile`.
   Hasła 8–128 przy tworzeniu i 1–256 przy logowaniu.
 - `lib/data/sync/account_settings_sync_service.dart` (aktualizowany):
   11: `AccountSettingsSyncService`; 34: `syncNow`; 164: `stop`.
