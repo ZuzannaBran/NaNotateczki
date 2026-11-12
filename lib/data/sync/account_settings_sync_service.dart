@@ -138,6 +138,7 @@ class AccountSettingsSyncService {
           applied =
               await _syncLibraryState(
                 userId: userId,
+                generation: generation,
                 key: key,
                 fileKey: fileKey,
                 entries: entries,
@@ -188,7 +189,7 @@ class AccountSettingsSyncService {
                 if (!_current(userId, generation)) {
                   return;
                 }
-                await _savePreimportCopy(userId, category, local);
+                await _savePreimportCopy(userId, category, local, generation);
               }
               if (!_current(userId, generation)) {
                 return;
@@ -262,6 +263,7 @@ class AccountSettingsSyncService {
 
   Future<bool> _syncLibraryState({
     required String userId,
+    required int generation,
     required String key,
     required String fileKey,
     required Map<String, dynamic> entries,
@@ -274,7 +276,7 @@ class AccountSettingsSyncService {
     }
     var currentRemote = serverEntry;
     for (var attempt = 0; attempt < 4; attempt++) {
-      if (_stopped || !session.isSignedIn || session.userId != userId) {
+      if (!_current(userId, generation)) {
         return false;
       }
       final revision = currentRemote?['revision'] as int? ?? 0;
@@ -337,13 +339,17 @@ class AccountSettingsSyncService {
               remote: resolved,
             );
       var applied = false;
-      if (session.isSignedIn &&
-          session.userId == userId &&
+      if (_current(userId, generation) &&
           !_equivalent(latestLocal, mergedLocal)) {
         _applying = true;
         try {
           if (known == null && local != null) {
-            await _savePreimportCopy(userId, 'libraryState', local);
+            await _savePreimportCopy(
+              userId,
+              'libraryState',
+              local,
+              generation,
+            );
           }
           await writeStoredText(fileKey, jsonEncode(mergedLocal));
           applied = true;
@@ -356,6 +362,9 @@ class AccountSettingsSyncService {
           'revision': currentRemote['revision'],
           'value': resolved,
         };
+      }
+      if (!_current(userId, generation)) {
+        return false;
       }
       await writeStoredText(
         key,
@@ -413,13 +422,20 @@ class AccountSettingsSyncService {
     };
   }
 
-  static Future<void> _savePreimportCopy(
+  Future<void> _savePreimportCopy(
     String userId,
     String category,
     Object value,
+    int generation,
   ) async {
+    if (!_current(userId, generation)) {
+      return;
+    }
     final key = 'account_preimport_${_hash(userId)}.json';
     final old = await readStoredText(key);
+    if (!_current(userId, generation)) {
+      return;
+    }
     final previous = old == null
         ? <String, dynamic>{}
         : _object(jsonDecode(old));
@@ -427,6 +443,9 @@ class AccountSettingsSyncService {
       return;
     }
     previous[category] = value;
+    if (!_current(userId, generation)) {
+      return;
+    }
     await writeStoredText(key, jsonEncode(previous));
   }
 }
