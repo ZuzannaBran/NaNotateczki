@@ -357,10 +357,7 @@ class LibraryV2OperationService {
       }
       await _commit(
         OperationKind.folderCreate,
-        const Uuid().v5(
-          Uuid.NAMESPACE_URL,
-          'library-folder:$accountId:$parentPath',
-        ),
+        const Uuid().v4(),
         {
           'value': {'name': segments[count - 1], 'parentId': parent},
         },

@@ -132,6 +132,43 @@ void main() {
     );
   });
 
+  test('offline devices never reuse implicit folder IDs', () async {
+    const user = 'v2-implicit-folder-identity';
+    ActiveStorageNamespace.activate(StorageNamespace.account(user));
+    final files = <String, String>{};
+    textStorageReadOverride = (key) async => files[key];
+    textStorageWriteOverride = (key, value) async => files[key] = value;
+
+    final folderIds = <String>[];
+    for (final actor in ['offline-device-a', 'offline-device-b']) {
+      final database = NotesDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      final store = OperationStore(
+        database,
+        checkpointScope: 'account:$user',
+      );
+      final engine = SyncEngine(
+        store: store,
+        gateway: _NoNetworkGateway(),
+        actorId: actor,
+        checkpointScope: 'account:$user',
+        enableRealtime: false,
+        applyRemote: (_, __) async {},
+      );
+      addTearDown(engine.stop);
+      final journal = LibraryV2OperationService(
+        engine: engine,
+        accountId: user,
+      );
+      await journal.ensureFolderPath('School/Physics');
+      final paths = (await journal.snapshot()).folderIdsByPath;
+      expect(paths.keys, containsAll(['School', 'School/Physics']));
+      folderIds.addAll([paths['School']!, paths['School/Physics']!]);
+    }
+
+    expect(folderIds.toSet(), hasLength(4));
+  });
+
   test('writes are rejected when the account namespace changes', () async {
     const user = 'v2-other-account';
     ActiveStorageNamespace.activate(StorageNamespace.local());

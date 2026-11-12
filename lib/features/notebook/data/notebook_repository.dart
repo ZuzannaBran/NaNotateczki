@@ -1046,9 +1046,6 @@ class NotebookRepository {
       if (before == null) {
         return null;
       }
-      if (before.kind == NotebookKind.planner) {
-        throw UnsupportedError('Planner metadata v2 is not enabled yet.');
-      }
       final after = before.copyWith(
         title: title ?? before.title,
         folder: folder ?? before.folder,

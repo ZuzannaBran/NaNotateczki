@@ -108,9 +108,28 @@ void main() {
     final planner = await repository.createPlanner();
     expect(planner.kind.index, 2);
     expect((await repository.getNotebook(planner.uid))?.kind.index, 2);
+    final movedPlanner = await repository.updateNotebookMetadata(
+      planner.uid,
+      folder: 'School/Physics',
+      title: 'Updated planner',
+    );
+    expect(movedPlanner?.title, 'Updated planner');
+    expect(movedPlanner?.folder, 'School/Physics');
+    expect(
+      (await repository.getNotebook(planner.uid))?.folder,
+      'School/Physics',
+    );
+    expect(
+      (await store.pending(documentId: planner.uid)).last.kind,
+      OperationKind.documentSet,
+    );
     expect(
       (await store.pending(documentId: planner.uid)).map((op) => op.kind),
-      [OperationKind.documentCreate, OperationKind.pageCreate],
+      [
+        OperationKind.documentCreate,
+        OperationKind.pageCreate,
+        OperationKind.documentSet,
+      ],
     );
     await expectLater(
       writer.writeCreateNotebook(notebook: board),

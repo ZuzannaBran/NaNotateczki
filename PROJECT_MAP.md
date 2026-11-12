@@ -60,6 +60,9 @@ Testy: `test/local_import_plan_test.dart`,
 `test/storage_namespace_manager_test.dart`.
 Nieobsługiwane dokumenty Planner v2 i embedy bez zweryfikowanych bajtów
 blokują transfer, nie są po cichu gubione.
+Testy iPhone/iPad korzystają z 30-minutowego limitu integracji, ponieważ
+zimna kompilacja Xcode może znacząco wydłużyć uruchomienie; kontrakt CI
+weryfikuje `.github/scripts/test_ios_integration_matrix.sh`.
 
 Regresja mediów rebase (2026-11-11): weryfikowane `asset.attach`,
 `object.set(assetId)` i `asset.detach` po przeniesieniu obrazu

@@ -1,6 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Cold Xcode builds can consume several minutes before Flutter executes cases.
+ios_timeout="$(awk '
+  /^  ios-simulator:/ { in_ios = 1 }
+  in_ios && /name: Run all iOS integration cases in a single app process/ {
+    getline
+    gsub(/[^0-9]/, "", $0)
+    print $0
+    exit
+  }
+' .github/workflows/cross_platform_tests.yml)"
+if [[ ! "$ios_timeout" =~ ^[0-9]+$ ]] || (( ios_timeout < 30 )); then
+  echo 'iOS integration timeout must allow at least 30 minutes.' >&2
+  exit 1
+fi
+
 sandbox="$(mktemp -d)"
 trap 'rm -rf "$sandbox"' EXIT
 cat > "$sandbox/flutter" <<'MOCK'

@@ -638,7 +638,7 @@ jobs:
           xcrun simctl bootstatus "$SIMULATOR_UDID" -b
           echo "SIMULATOR_UDID=$SIMULATOR_UDID" >> "$GITHUB_ENV"
       - name: Run all iOS integration cases in a single app process
-        timeout-minutes: 20
+        timeout-minutes: 30
         run: >-
           bash .github/scripts/flutter_transient_network_retry.sh
           bash .github/scripts/ios_integration_matrix.sh "$SIMULATOR_UDID"
