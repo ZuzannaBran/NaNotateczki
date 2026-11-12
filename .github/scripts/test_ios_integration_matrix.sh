@@ -48,4 +48,5 @@ if bash .github/scripts/ios_integration_matrix.sh device-123; then
   exit 1
 fi
 test "$(wc -l < "$TRACE_FILE")" -eq 2
+python3 .github/scripts/test_ios_integration_watchdog.py
 echo 'Single-process iOS integration matrix contract passed.'
