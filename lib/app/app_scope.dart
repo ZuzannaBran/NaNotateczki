@@ -847,10 +847,16 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     }
     backupScheduler.uploadOperationalSnapshot = (deviceId) =>
         recovery.uploadVerifiedSnapshot(deviceId: deviceId);
+    // Capture the non-null owner, not the mutable nullable startup local.
+    final backupRuntime = runtime;
     backupScheduler.reconcileBeforeBackup = () async {
-      await runtime!.engine.syncNow();
-      if (runtime.engine.lastError != null ||
-          (await runtime.store.pending(
+      if (!isCurrent()) {
+        throw StateError('Account changed before v2 backup.');
+      }
+      await backupRuntime.engine.syncNow();
+      if (!isCurrent() ||
+          backupRuntime.engine.lastError != null ||
+          (await backupRuntime.store.pending(
             limit: 1,
             includeDeferred: true,
           )).isNotEmpty) {
