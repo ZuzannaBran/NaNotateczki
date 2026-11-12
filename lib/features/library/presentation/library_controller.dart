@@ -627,14 +627,30 @@ class LibraryController extends ChangeNotifier {
     final affected = items
         .where((item) => isInFolderTree(item.folder, path))
         .toList();
-    for (final item in affected) {
-      await repository.deleteNotebook(item.uid);
+    final v2 = _v2LibraryOperations;
+    if (v2 == null) {
+      for (final item in affected) {
+        await repository.deleteNotebook(item.uid);
+        _plannerTasks.remove(item.uid);
+      }
+    } else {
+      Future<void> deleteDocuments() async {
+        for (final item in affected) {
+          await repository.deleteNotebook(item.uid);
+          await v2.deletePlannerTasks(item.uid, refresh: false);
+        }
+      }
+
+      try {
+        await v2.deleteTree(path, deleteDocuments: deleteDocuments);
+      } catch (_) {
+        await repository.fetchNotebooks();
+        rethrow;
+      }
+      for (final item in affected) {
+        _plannerTasks.remove(item.uid);
+      }
     }
-    for (final item in affected) {
-      await _v2LibraryOperations?.deletePlannerTasks(item.uid);
-      _plannerTasks.remove(item.uid);
-    }
-    await _v2LibraryOperations?.deleteTree(path);
     final deletedIds = affected.map((item) => item.uid).toSet();
     items = items.where((item) => !deletedIds.contains(item.uid)).toList();
     _folders.removeWhere((folder) => isInFolderTree(folder, path));
