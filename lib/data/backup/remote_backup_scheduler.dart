@@ -41,7 +41,8 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Installed only for an authenticated v2 account; legacy backup remains
   /// unchanged, and no v1 endpoint is reachable through this callback.
-  Future<RemoteBackupReceipt> Function(String deviceId)? uploadOperationalSnapshot;
+  Future<RemoteBackupReceipt> Function(String deviceId)?
+  uploadOperationalSnapshot;
   final DateTime Function() _now;
   Timer? _timer;
   late DateTime _lastActivityAt = _now();
