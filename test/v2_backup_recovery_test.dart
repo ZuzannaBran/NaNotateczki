@@ -27,6 +27,7 @@ OperationEnvelope event(
   Map<String, dynamic>? payload,
   String documentId = 'notebook-1',
   String? objectId,
+  String? pageId,
 }) {
   return OperationEnvelope(
     operationId:
@@ -36,6 +37,7 @@ OperationEnvelope event(
     documentId: documentId,
     kind: kind,
     objectId: objectId,
+    pageId: pageId,
     logicalClock: seq,
     dependencies: [
       if (seq > 1)
@@ -77,6 +79,9 @@ class _Server {
   Future<http.Response> respond(http.Request request) async {
     final path = request.url.path;
     paths.add('${request.method} $path');
+    if (path.startsWith('/v2/assets/')) {
+      return http.Response.bytes([9, 9, 9], 200);
+    }
     if (path == '/v2/sync/checkpoint') {
       return http.Response(jsonEncode({'cursor': history.length}), 200);
     }
@@ -340,6 +345,53 @@ void main() {
     };
     envelope['checksum'] = sha256
         .convert(utf8.encode(jsonEncode(payload))).toString();
+    server.verified = Uint8List.fromList(utf8.encode(jsonEncode(envelope)));
+    final target = _Client(server);
+    addTearDown(target.close);
+    await expectLater(
+      target.backup.recoverVerifiedArchive(databaseWasReset: true),
+      throwsFormatException,
+    );
+    expect(
+      (await target.db.customSelect('SELECT * FROM operations').get()),
+      isEmpty,
+    );
+  });
+
+  test('corrupt content-addressed server asset blocks replay', () async {
+    final server = _Server();
+    final source = _Client(server);
+    addTearDown(source.close);
+    await source.seed();
+    await source.backup.uploadVerifiedSnapshot(deviceId: deviceId);
+    final envelope = jsonDecode(utf8.decode(server.verified!)) as Map;
+    final payload = envelope['payload'] as Map;
+    final history = payload['operationHistory'] as List;
+    final sha = sha256.convert([1, 2, 3]).toString();
+    final attach = event(
+      3,
+      OperationKind.assetAttach,
+      objectId: 'object-one',
+      pageId: 'page-one',
+      payload: {
+        'assetId': 'a1',
+        'sha256': sha,
+        'sizeBytes': 3,
+        'mediaType': 'application/pdf',
+      },
+    );
+    history.add({'cursor': 3, 'operation': attach.toJson()});
+    (envelope['operationCheckpoint'] as Map)['account:$accountId'] = 3;
+    payload['assetBlobs'] = {
+      sha: {
+        'sizeBytes': 3,
+        'mediaType': 'application/pdf',
+        'storage': 'verified-v2',
+      },
+    };
+    envelope['checksum'] = sha256.convert(
+      utf8.encode(jsonEncode(payload)),
+    ).toString();
     server.verified = Uint8List.fromList(utf8.encode(jsonEncode(envelope)));
     final target = _Client(server);
     addTearDown(target.close);
