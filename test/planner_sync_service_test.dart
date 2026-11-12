@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -9,6 +10,49 @@ import 'package:program/data/sync/planner_sync_service.dart';
 import 'package:program/features/planner/state/study_planner_controller.dart';
 
 void main() {
+  test('stopAndDrain joins an in-flight planner request', () async {
+    final started = Completer<void>();
+    final release = Completer<http.Response>();
+    final planner = StudyPlannerController(
+      read: (_) async => null,
+      write: (_, __) async {},
+      autoTick: false,
+    );
+    await planner.load();
+    final api = ApiClient(
+      baseUri: Uri.parse('http://localhost:18080'),
+      httpClient: MockClient((request) {
+        if (!started.isCompleted) {
+          started.complete();
+        }
+        return release.future;
+      }),
+    )..setAccessToken('test-token');
+    final session = AccountSessionController(api)
+      ..mode = AccountDataMode.account
+      ..userId = 'account-a';
+    final sync = PlannerSyncService(
+      apiClient: api,
+      session: session,
+      planner: planner,
+    );
+
+    final running = sync.syncNow();
+    await started.future;
+    var drained = false;
+    final stop = sync.stopAndDrain().then((_) => drained = true);
+    await Future<void>.delayed(Duration.zero);
+    expect(drained, isFalse);
+
+    release.complete(http.Response('{"entries":[],"next":null}', 200));
+    await Future.wait([running, stop]);
+    expect(drained, isTrue);
+
+    planner.dispose();
+    session.dispose();
+    api.close();
+  });
+
   test(
     'two systems reconcile creates, edits, deletes and late conflicts',
     () async {

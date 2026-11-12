@@ -13,6 +13,51 @@ import 'package:program/data/sync/account_settings_sync_service.dart';
 import 'package:program/data/sync/api_client.dart';
 
 void main() {
+  test('stopAndDrain waits for an old settings HTTP request', () async {
+    const user = 'settings-shutdown-account';
+    ActiveStorageNamespace.activate(StorageNamespace.account(user));
+    final files = <String, String>{};
+    textStorageReadOverride = (key) async => files[key];
+    textStorageWriteOverride = (key, value) async => files[key] = value;
+    addTearDown(() {
+      textStorageReadOverride = null;
+      textStorageWriteOverride = null;
+    });
+    final started = Completer<void>();
+    final release = Completer<http.Response>();
+    final api = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) {
+        if (!started.isCompleted) {
+          started.complete();
+        }
+        return release.future;
+      }),
+    )..setAccessToken('test-token');
+    addTearDown(api.close);
+    final session = AccountSessionController(api)
+      ..mode = AccountDataMode.account
+      ..userId = user;
+    addTearDown(session.dispose);
+    final service = AccountSettingsSyncService(
+      apiClient: api,
+      session: session,
+      useV2: true,
+    );
+
+    final running = service.syncNow();
+    await started.future;
+    var drained = false;
+    final stop = service.stopAndDrain().then((_) => drained = true);
+    await Future<void>.delayed(Duration.zero);
+    expect(drained, isFalse);
+
+    release.complete(http.Response('{"settings":{}}', 200));
+    await Future.wait([running, stop]);
+    expect(drained, isTrue);
+    expect(files, isEmpty);
+  });
+
   test('v2 settings use guarded CAS without library JSON writes', () async {
     ActiveStorageNamespace.activate(StorageNamespace.account('account-v2'));
     final files = <String, String>{
