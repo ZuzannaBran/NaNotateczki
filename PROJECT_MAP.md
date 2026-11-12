@@ -3508,6 +3508,14 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   Przywracanie zewnętrznego assetu wymaga zachowania magazynu
   serwera `assets-v2`. Pełne archiwum ma limit 64 MiB / 100000 operacji;
   potrzebne będą osobne przyrostowe archiwa dla dłuższych historii.
+- Regresje po przebiegu CI #43228761331: callback backupu przechwytuje
+  stabilny, niepusty `EditorV2AccountRuntime` przez `await` i weryfikuje
+  właściciela; `/v1/backups` zachowuje sygnaturę finalize i odrzuca konta
+  v2 przed walidacją formatu danych; `verified-v2` nie wymaga
+  `bytesBase64`, natomiast inline JSON nadal wymaga poprawnego base64.
+  Testy: `test/v2_backup_recovery_test.dart`,
+  `server/api/tests/test_backup_v2.py`,
+  `server/api/tests/test_backup_finalization_memory.py`.
 
 ## Poprzednie ograniczenia etapu 9 (protokół legacy)
 
