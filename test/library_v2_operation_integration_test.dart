@@ -35,6 +35,16 @@ class _FailSecondMetadataRepository extends NotebookRepository {
 
   bool failRelocation = false;
   int relocationWrites = 0;
+  bool failDeletion = false;
+  int deletionWrites = 0;
+
+  @override
+  Future<void> deleteNotebook(String uid) {
+    if (failDeletion && ++deletionWrites == 2) {
+      throw StateError('Simulated second document deletion failure.');
+    }
+    return super.deleteNotebook(uid);
+  }
 
   @override
   Future<Notebook?> updateNotebookMetadata(
@@ -265,6 +275,29 @@ void main() {
       expect(
         (await repository.fetchNotebooks()).map((item) => item.folder),
         everyElement('Archive/Renamed'),
+      );
+
+      final beforeDelete = (await store.pending())
+          .map((operation) => operation.operationId)
+          .toList();
+      repository.failDeletion = true;
+      await expectLater(library.deleteFolder('Archive'), throwsStateError);
+      expect(await repository.fetchNotebooks(), hasLength(2));
+      expect(
+        (await journal.snapshot()).folderIdsByPath.keys,
+        contains('Archive/Renamed'),
+      );
+      expect(
+        (await store.pending()).map((operation) => operation.operationId),
+        beforeDelete,
+      );
+
+      repository.failDeletion = false;
+      await library.deleteFolder('Archive');
+      expect(await repository.fetchNotebooks(), isEmpty);
+      expect(
+        (await journal.snapshot()).folderIdsByPath.keys,
+        isNot(contains('Archive/Renamed')),
       );
     },
   );
