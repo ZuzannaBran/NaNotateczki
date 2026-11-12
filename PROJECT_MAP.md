@@ -3477,7 +3477,39 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   sync folderów/zadań zależą od tej migracji. Testy nieuruchomione
   w środowisku bez SDK.
 
-## Etap 9 — backup i odtwarzanie (częściowo wdrożony)
+## Etap 9 — pakiet 6: operacyjny backup i odzyskiwanie v2
+
+- `lib/data/backup/v2_backup_recovery_service.dart`: `V2BackupRecoveryService`
+  uruchamia weryfikację ACK/outboxu/checkpointu, przechwytuje niezmienny
+  prefiks `OperationEnvelope` przez REST, przygotowuje envelope v3
+  z `operationHistory`, `schemaVersion`, ustawieniami, plannerem,
+  biblioteką oraz referencjami do zweryfikowanych assetów SHA-256.
+  `recoverVerifiedArchive` sprawdza sumy, wykonuje idempotentny replay
+  przez `OperationStore` + `EditorSqliteProjector`, odświeża read model,
+  a marker `pending` umożliwia wznowienie po restarcie.
+- `lib/app/app_scope.dart`: brak wcześniej zainicjalizowanej bazy lub
+  przerwane recovery blokuje start edytora v2 do ukończenia replay,
+  dogrania nowszych operacji i porównania checkpointu z serwerem;
+  brak zmiany globalnych flag aktywacji v1/v2.
+- `lib/data/backup/remote_backup_scheduler.dart`:
+  `uploadOperationalSnapshot` wybiera v3 wyłącznie dla konta v2, pozostawia
+  istniejące ustawienia idle (15/30/60/120/300/900/1800 s).
+  Callback reconcilacji zachowuje poprawny protokół po rebuild AppScope.
+- `server/api/app/routers/backups.py`, `server/api/app/main.py`,
+  `server/api/app/schemas.py`: odrębne trasy `/v2/backups`,
+  walidacja wersji 3, kompletnego prefiksu oraz SHA-256 assetów
+  właściciela, atomowe finalize `verified`; endpointy v1 bez zmian.
+  To lustro `NaNotateczki-serwer/main`.
+- Testy: `test/v2_backup_recovery_test.dart`,
+  `server/api/tests/test_backup_v2.py`,
+  `server/api/tests/test_backup_v2_pipeline.py`.
+  Utrata SQLite, przerwany zapis, utracony nośnik/507, uszkodzenie
+  assetu, starszy checkpoint, restart w trakcie replay oraz nowszy tombstone.
+  Przywracanie zewnętrznego assetu wymaga zachowania magazynu
+  serwera `assets-v2`. Pełne archiwum ma limit 64 MiB / 100000 operacji;
+  potrzebne będą osobne przyrostowe archiwa dla dłuższych historii.
+
+## Poprzednie ograniczenia etapu 9 (protokół legacy)
 
 - `docs/ETAP_9_BACKUP_RECOVERY.md`: zasady snapshotów z checkpointem,
   zidentyfikowane granice starego protokołu, scenariusze weryfikacji.
