@@ -1026,7 +1026,11 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   odczytu SHA przy odtwarzaniu pełnego dziennika; inne dokumenty zabronione.
   `server/api/tests/test_share_asset_history.py` i serwer główny.
 - `server/api/tests/test_stage12_real_stack.py`: test dwukierunkowego
-  WebSocket korzysta z jawnie oznaczonej sesji v2.
+  WebSocket korzysta z jawnie oznaczonej sesji v2; host i gość
+  potwierdzają `unsubscribed` przed zamknięciem transportu.
+  `server/scripts/run-stage12-real.sh` uruchamia ten scenariusz
+  dodatkowo dwukrotnie na świeżych portalach TestClient, aby wykrywać
+  wyścigi cleanupu (`CancelledError` w CI #43272882658).
 - `test/study_share_http_test.dart`: link v2 dopiero po ACK operacji hosta,
   bez legacy snapshotu.
 
