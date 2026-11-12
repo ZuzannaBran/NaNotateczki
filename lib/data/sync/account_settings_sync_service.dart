@@ -193,6 +193,28 @@ class AccountSettingsSyncService {
               if (!_current(userId, generation)) {
                 return;
               }
+              // An edit may arrive while preserving the first-sync backup.
+              // Never replace newer local preferences with an older download.
+              final latestText = await readStoredText(fileKey);
+              if (!_current(userId, generation)) {
+                return;
+              }
+              final latestLocal = latestText == null || latestText.isEmpty
+                  ? null
+                  : jsonDecode(latestText);
+              if (!_equivalent(latestLocal, local)) {
+                // Bind this remote revision without consuming the new edit.
+                // On the next pass it is uploaded with the server CAS token.
+                entries[category] = {
+                  'revision': remoteRevision,
+                  'value': remoteValue,
+                };
+                await writeStoredText(
+                  key,
+                  jsonEncode({'version': 1, 'settings': entries}),
+                );
+                continue;
+              }
               await writeStoredText(fileKey, jsonEncode(remoteValue));
               applied = true;
             } finally {
