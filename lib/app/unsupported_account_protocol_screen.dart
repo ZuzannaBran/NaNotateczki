@@ -40,8 +40,8 @@ class _UnsupportedAccountProtocolScreenState
       if (mounted) {
         setState(() {
           _error = 'Log out failed: $error';
-          _canSignOutOffline = error is ShutdownInterrupted &&
-              error.localSafe;
+          _canSignOutOffline =
+              error is ShutdownInterrupted && error.localSafe;
         });
       }
     } finally {
@@ -74,7 +74,7 @@ class _UnsupportedAccountProtocolScreenState
                   const SizedBox(height: 12),
                 ],
                 ElevatedButton(
-                  onPressed: _signingOut ? null : _logOut,
+                  onPressed: _signingOut ? null : () => _logOut(),
                   child: const Text('Log out'),
                 ),
                 if (_canSignOutOffline && widget.onLogOutOffline != null)
