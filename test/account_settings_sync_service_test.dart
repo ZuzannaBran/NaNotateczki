@@ -62,6 +62,73 @@ void main() {
     expect(files['library_folders.json'], '{"folders":["Local"]}');
   });
 
+  test('v2 download retains an edit made during preimport backup', () async {
+    const user = 'account-v2-settings-race';
+    ActiveStorageNamespace.activate(StorageNamespace.account(user));
+    final files = <String, String>{
+      'app_prefs.json': '{"darkMode":false}',
+    };
+    var injected = false;
+    textStorageReadOverride = (key) async => files[key];
+    textStorageWriteOverride = (key, value) async {
+      files[key] = value;
+      if (key.startsWith('account_preimport_') && !injected) {
+        injected = true;
+        files['app_prefs.json'] = '{"darkMode":true,"uiScale":1.5}';
+      }
+    };
+    var remote = <String, dynamic>{
+      'revision': 7,
+      'value': {'darkMode': false, 'uiScale': 1.0},
+    };
+    final expectedRevisions = <int>[];
+    final api = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        if (request.method == 'GET' &&
+            request.url.path == '/v2/account-settings') {
+          return http.Response(
+            jsonEncode({'settings': {'appPreferences': remote}}),
+            200,
+          );
+        }
+        if (request.method == 'PUT' &&
+            request.url.path == '/v2/account-settings/appPreferences') {
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          final revision = remote['revision'] as int;
+          expect(body['expectedRevision'], revision);
+          expectedRevisions.add(revision);
+          remote = {
+            'revision': revision + 1,
+            'value': body['value'],
+          };
+          return http.Response(jsonEncode(remote), 200);
+        }
+        fail('Unexpected settings request: ${request.method} ${request.url}');
+      }),
+    )..setAccessToken('test-token');
+    addTearDown(api.close);
+    final session = AccountSessionController(api)
+      ..mode = AccountDataMode.account
+      ..userId = user;
+    addTearDown(session.dispose);
+    final sync = AccountSettingsSyncService(
+      apiClient: api,
+      session: session,
+      useV2: true,
+    );
+
+    await sync.syncNow();
+    expect(injected, isTrue);
+    expect(jsonDecode(files['app_prefs.json']!)['uiScale'], 1.5);
+    expect(expectedRevisions, isEmpty);
+    await sync.syncNow();
+    expect(expectedRevisions, [7]);
+    expect(remote['revision'], 8);
+    expect((remote['value'] as Map)['darkMode'], true);
+    expect((remote['value'] as Map)['uiScale'], 1.5);
+  });
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   tearDown(() {
