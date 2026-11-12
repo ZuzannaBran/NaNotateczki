@@ -96,10 +96,10 @@ class V2BackupRecoveryService {
     if (record['state'] != 'pending') {
       return;
     }
-    await writeStoredText(_marker(id), jsonEncode({
-      ...record,
-      'state': 'complete',
-    }));
+    await writeStoredText(
+      _marker(id),
+      jsonEncode({...record, 'state': 'complete'}),
+    );
   }
 
   Future<RemoteBackupReceipt> uploadVerifiedSnapshot({
@@ -124,9 +124,9 @@ class V2BackupRecoveryService {
     final checkpoint = await _serverCursor();
     late final int localCursor;
     await repository.database.transaction(() async {
-      final pending = await repository.database.customSelect(
-        'SELECT COUNT(*) AS total FROM operation_outbox',
-      ).getSingle();
+      final pending = await repository.database
+          .customSelect('SELECT COUNT(*) AS total FROM operation_outbox')
+          .getSingle();
       if (pending.read<int>('total') != 0) {
         throw StateError('Backup postponed until the v2 outbox is ACKed.');
       }
@@ -134,9 +134,9 @@ class V2BackupRecoveryService {
       if (localCursor != checkpoint) {
         throw StateError('Server history is not yet fully applied.');
       }
-      final rows = await repository.database.customSelect(
-        'PRAGMA quick_check',
-      ).get();
+      final rows = await repository.database
+          .customSelect('PRAGMA quick_check')
+          .get();
       if (rows.length != 1 || rows.single.data.values.single != 'ok') {
         throw StateError('Local database integrity check failed.');
       }
@@ -200,8 +200,10 @@ class V2BackupRecoveryService {
     if (await runtime.store.checkpoint(_scope) != localCursor ||
         await _serverCursor() != checkpoint ||
         !await _unchangedAccountFiles(accountId, files) ||
-        (await runtime.store.pending(limit: 1, includeDeferred: true))
-            .isNotEmpty) {
+        (await runtime.store.pending(
+          limit: 1,
+          includeDeferred: true,
+        )).isNotEmpty) {
       throw StateError('V2 account changed during backup capture.');
     }
 
@@ -218,8 +220,9 @@ class V2BackupRecoveryService {
       'recentColors': files['shared_recent_colors.json'] == null
           ? <dynamic>[]
           : _decodeColors(files['shared_recent_colors.json']!),
-      'backupPreferences':
-          _decodeObject(files[_backupPreferenceKey(accountId)]),
+      'backupPreferences': _decodeObject(
+        files[_backupPreferenceKey(accountId)],
+      ),
     };
     final encoded = await compute(_encodeOperationalArchive, {
       'payload': payload,
@@ -234,18 +237,22 @@ class V2BackupRecoveryService {
     }
     _assertAccount(accountId);
     if (await runtime.store.checkpoint(_scope) != checkpoint ||
-        (await runtime.store.pending(limit: 1, includeDeferred: true))
-            .isNotEmpty) {
+        (await runtime.store.pending(
+          limit: 1,
+          includeDeferred: true,
+        )).isNotEmpty) {
       throw StateError('V2 operations changed before backup upload.');
     }
     final hash = sha256.convert(bytes).toString();
     _assertAccount(accountId);
-    final created = _asObject((await apiClient.postJson('/v2/backups', {
-      'deviceId': deviceId,
-      'sha256': hash,
-      'sizeBytes': bytes.length,
-      'formatVersion': formatVersion,
-    })).decodeJson());
+    final created = _asObject(
+      (await apiClient.postJson('/v2/backups', {
+        'deviceId': deviceId,
+        'sha256': hash,
+        'sizeBytes': bytes.length,
+        'formatVersion': formatVersion,
+      })).decodeJson(),
+    );
     final backupId = created['backupId'];
     if (backupId is! String || !_uuidPattern.hasMatch(backupId)) {
       throw const FormatException('Invalid v2 backup identifier.');
@@ -262,10 +269,12 @@ class V2BackupRecoveryService {
       requestTimeout: const Duration(minutes: 2),
     );
     _assertAccount(accountId);
-    final result = _asObject((await apiClient.postJson(
-      '/v2/backups/$backupId/finalize',
-      const <String, dynamic>{},
-    )).decodeJson());
+    final result = _asObject(
+      (await apiClient.postJson(
+        '/v2/backups/$backupId/finalize',
+        const <String, dynamic>{},
+      )).decodeJson(),
+    );
     if (result['status'] != 'verified' || result['sha256'] != hash) {
       throw const FormatException('Operational archive not verified.');
     }
@@ -287,7 +296,9 @@ class V2BackupRecoveryService {
     _assertAccount(accountId);
     await _refreshCredentials();
     _assertAccount(accountId);
-    final listing = _asObject((await apiClient.get('/v2/backups')).decodeJson());
+    final listing = _asObject(
+      (await apiClient.get('/v2/backups')).decodeJson(),
+    );
     final backups = listing['backups'];
     if (backups is! List<dynamic>) {
       throw const FormatException('Invalid v2 backup listing.');
@@ -300,9 +311,7 @@ class V2BackupRecoveryService {
     }
     final markerKey = _marker(accountId);
     final earlier = await readStoredText(markerKey);
-    final pending = earlier == null
-        ? null
-        : _asObject(jsonDecode(earlier));
+    final pending = earlier == null ? null : _asObject(jsonDecode(earlier));
     if (pending != null &&
         pending['state'] == 'pending' &&
         (pending['backupId'] is! String)) {
@@ -310,8 +319,12 @@ class V2BackupRecoveryService {
     }
 
     final chosen = pending != null && pending['state'] == 'pending'
-        ? backups.where((entry) =>
-            entry is Map && entry['backupId'] == pending['backupId']).toList()
+        ? backups
+              .where(
+                (entry) =>
+                    entry is Map && entry['backupId'] == pending['backupId'],
+              )
+              .toList()
         : backups;
     if (chosen.isEmpty) {
       throw StateError('Pending v2 recovery archive is unavailable.');
@@ -329,25 +342,30 @@ class V2BackupRecoveryService {
     if (!databaseWasReset && localCursor > archiveCursor) {
       throw StateError('Older backup cannot roll back the v2 checkpoint.');
     }
-    if ((await runtime.store.pending(limit: 1, includeDeferred: true))
-        .isNotEmpty) {
+    if ((await runtime.store.pending(
+      limit: 1,
+      includeDeferred: true,
+    )).isNotEmpty) {
       throw StateError('Local pending edits block archive recovery.');
     }
     if (pending == null || pending['state'] != 'pending') {
-      final oldJournal = await repository.database.customSelect(
-        'SELECT COUNT(*) AS total FROM operations',
-      ).getSingle();
+      final oldJournal = await repository.database
+          .customSelect('SELECT COUNT(*) AS total FROM operations')
+          .getSingle();
       if (oldJournal.read<int>('total') != 0) {
         throw StateError('Archive recovery requires a fresh v2 journal.');
       }
     }
     _assertAccount(accountId);
-    await writeStoredText(markerKey, jsonEncode({
-      'version': 1,
-      'state': 'pending',
-      'backupId': backupId,
-      'checkpoint': archiveCursor,
-    }));
+    await writeStoredText(
+      markerKey,
+      jsonEncode({
+        'version': 1,
+        'state': 'pending',
+        'backupId': backupId,
+        'checkpoint': archiveCursor,
+      }),
+    );
 
     final assets = verified.assets;
     var previous = 0;
@@ -376,8 +394,7 @@ class V2BackupRecoveryService {
         checkpointScope: _scope,
         serverSequence: cursor,
         coveredCursor: cursor - 1,
-        apply: () => operation.documentId ==
-                OperationEnvelope.libraryDocumentId
+        apply: () => operation.documentId == OperationEnvelope.libraryDocumentId
             ? runtime.libraryOperations.apply(operation)
             : runtime.projector.apply(operation),
       );
@@ -390,7 +407,9 @@ class V2BackupRecoveryService {
     if (await runtime.store.checkpoint(_scope) != archiveCursor) {
       throw StateError('Operational recovery checkpoint mismatch.');
     }
-    final check = await repository.database.customSelect('PRAGMA quick_check').get();
+    final check = await repository.database
+        .customSelect('PRAGMA quick_check')
+        .get();
     if (check.length != 1 || check.single.data.values.single != 'ok') {
       throw StateError('Recovered SQLite integrity check failed.');
     }
@@ -464,7 +483,8 @@ class V2BackupRecoveryService {
         final payload = _asObject(envelope['payload']);
         final rawHistory = payload['operationHistory'];
         final rawAssets = payload['assetBlobs'];
-        if (rawHistory is! List || rawAssets is! Map ||
+        if (rawHistory is! List ||
+            rawAssets is! Map ||
             payload['studyPlannerState'] is! Map ||
             payload['libraryState'] is! Map) {
           throw const FormatException('Incomplete operational archive.');
@@ -475,7 +495,8 @@ class V2BackupRecoveryService {
         for (final rawEntry in rawHistory) {
           final op = _asObject(rawEntry);
           final cursor = op['cursor'];
-          if (cursor is! int || cursor <= previous ||
+          if (cursor is! int ||
+              cursor <= previous ||
               cursor > (checkpoint[_scope] as int)) {
             throw const FormatException('Invalid archived event order.');
           }
@@ -486,8 +507,7 @@ class V2BackupRecoveryService {
           operation.validateForV2Projection();
           history.add(SequencedOperation(cursor, operation));
           if (operation.kind == OperationKind.assetAttach) {
-            required[operation.payload['sha256'] as String] =
-                operation.payload;
+            required[operation.payload['sha256'] as String] = operation.payload;
           }
         }
         if (previous != checkpoint[_scope] ||
@@ -498,7 +518,8 @@ class V2BackupRecoveryService {
         final assets = <String, Uint8List>{};
         for (final entry in rawAssets.entries) {
           final hash = entry.key;
-          if (hash is! String || !_digestPattern.hasMatch(hash) ||
+          if (hash is! String ||
+              !_digestPattern.hasMatch(hash) ||
               !required.containsKey(hash)) {
             throw const FormatException('Unexpected backup asset.');
           }
@@ -509,8 +530,7 @@ class V2BackupRecoveryService {
             throw const FormatException('Backup asset receipt mismatch.');
           }
           Uint8List bytes;
-          if (item['storage'] == 'verified-v2' &&
-              item.length == 3) {
+          if (item['storage'] == 'verified-v2' && item.length == 3) {
             // A missing or altered remote asset is a recovery failure,
             // never a blank image or an implicitly successful restore.
             _assertAccount(accountId);
@@ -540,9 +560,10 @@ class V2BackupRecoveryService {
             'app_prefs.json' => payload['appPreferences'],
             'editor_prefs.json' => payload['editorPreferences'],
             'shared_recent_colors.json' => payload['recentColors'],
-            _ => key == _backupPreferenceKey(accountId)
-                ? payload['backupPreferences']
-                : null,
+            _ =>
+              key == _backupPreferenceKey(accountId)
+                  ? payload['backupPreferences']
+                  : null,
           };
           if (value != null) {
             files[key] = jsonEncode(value);
