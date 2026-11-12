@@ -33,7 +33,8 @@
   `test/local_account_import_service_test.dart`,
   `test/notebook_repository_v2_account_test.dart`,
   `test/account_settings_sync_service_test.dart`,
-  `server/api/tests/test_account_settings.py`.
+  `server/api/tests/test_account_settings.py`,
+  `server/api/tests/test_native_realtime.py` (rozłączenie WS bez 4401).
 - Granica bezpieczeństwa: `v2` nadal wymaga potwierdzonego cutover konta;
   nie zmienia domyślnej flagi preview, backupu, Share ani v1 klientów.
   Dla folderów i dokumentów operacje różnych `documentId` mają oddzielne
