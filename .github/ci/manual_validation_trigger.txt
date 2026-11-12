@@ -1,1 +1,1 @@
-full-ci-2026-11-12-package7-shutdown-logout-restart-v2-complete
+full-ci-2026-11-12-package7-shutdown-format-verified-v2
