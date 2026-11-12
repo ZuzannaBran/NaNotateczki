@@ -6,6 +6,8 @@ import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../core/storage/app_save_coordinator.dart';
+import '../../core/storage/active_storage_namespace.dart';
+import '../../core/storage/storage_namespace_manager.dart';
 import '../../core/storage/text_storage.dart';
 import '../../features/notebook/data/notebook_repository.dart';
 import '../sync/account_session_controller.dart';
@@ -53,6 +55,13 @@ class V2BackupRecoveryService {
 
   String get _scope => 'account:${_accountId}';
 
+  void _assertAccount(String id) {
+    if (_accountId != id ||
+        ActiveStorageNamespace.current != StorageNamespace.account(id)) {
+      throw StateError('Account namespace changed during v2 backup.');
+    }
+  }
+
   String _marker(String userId) =>
       'v2_backup_recovery_${sha256.convert(utf8.encode(userId)).toString().substring(0, 16)}.json';
 
@@ -88,6 +97,7 @@ class V2BackupRecoveryService {
     required String deviceId,
   }) async {
     final accountId = _accountId;
+    _assertAccount(accountId);
     if (!_uuidPattern.hasMatch(deviceId)) {
       throw const FormatException('Backup device ID must be a UUID.');
     }
@@ -98,6 +108,7 @@ class V2BackupRecoveryService {
     await AppSaveCoordinator.instance.flushPending();
     await repository.waitForPendingSaves();
 
+    _assertAccount(accountId);
     final files = await _readAccountFiles(accountId);
     final checkpoint = await _serverCursor();
     late final int localCursor;
@@ -127,6 +138,7 @@ class V2BackupRecoveryService {
     final receipts = <String, Map<String, dynamic>>{};
     var after = 0;
     while (after < checkpoint) {
+      _assertAccount(accountId);
       final page = await feed.readAfter(after);
       if (!page.verifiedVisiblePrefix ||
           page.operations.isEmpty ||
@@ -165,6 +177,7 @@ class V2BackupRecoveryService {
     // A digest is archived once, not once per occurrence or document.
     final assetBlobs = <String, Map<String, dynamic>>{};
     for (final entry in receipts.entries) {
+      _assertAccount(accountId);
       final digest = entry.key;
       final receipt = entry.value;
       final rows = await repository.database.customSelect(
@@ -196,8 +209,8 @@ class V2BackupRecoveryService {
         'bytesBase64': base64Encode(bytes),
       };
     }
-    if (_accountId != accountId ||
-        await runtime.store.checkpoint(_scope) != localCursor ||
+    _assertAccount(accountId);
+    if (await runtime.store.checkpoint(_scope) != localCursor ||
         await _serverCursor() != checkpoint ||
         !await _unchangedAccountFiles(accountId, files) ||
         (await runtime.store.pending(limit: 1, includeDeferred: true))
@@ -232,13 +245,14 @@ class V2BackupRecoveryService {
     if (bytes.length > RemoteBackupService.maximumSnapshotBytes) {
       throw StateError('V2 archive exceeds the 64 MiB backup safety limit.');
     }
-    if (_accountId != accountId ||
-        await runtime.store.checkpoint(_scope) != checkpoint ||
+    _assertAccount(accountId);
+    if (await runtime.store.checkpoint(_scope) != checkpoint ||
         (await runtime.store.pending(limit: 1, includeDeferred: true))
             .isNotEmpty) {
       throw StateError('V2 operations changed before backup upload.');
     }
     final hash = sha256.convert(bytes).toString();
+    _assertAccount(accountId);
     final created = _asObject((await apiClient.postJson('/v2/backups', {
       'deviceId': deviceId,
       'sha256': hash,
@@ -249,6 +263,7 @@ class V2BackupRecoveryService {
     if (backupId is! String || !_uuidPattern.hasMatch(backupId)) {
       throw const FormatException('Invalid v2 backup identifier.');
     }
+    _assertAccount(accountId);
     await apiClient.request(
       'PUT',
       '/v2/backups/$backupId/content',
@@ -259,6 +274,7 @@ class V2BackupRecoveryService {
       },
       requestTimeout: const Duration(minutes: 2),
     );
+    _assertAccount(accountId);
     final result = _asObject((await apiClient.postJson(
       '/v2/backups/$backupId/finalize',
       const <String, dynamic>{},
@@ -281,6 +297,7 @@ class V2BackupRecoveryService {
   /// A failed or interrupted replay retains the pending marker and cursor.
   Future<bool> recoverVerifiedArchive({required bool databaseWasReset}) async {
     final accountId = _accountId;
+    _assertAccount(accountId);
     final listing = _asObject((await apiClient.get('/v2/backups')).decodeJson());
     final backups = listing['backups'];
     if (backups is! List<dynamic>) {
@@ -303,7 +320,15 @@ class V2BackupRecoveryService {
       throw const FormatException('Invalid pending recovery identity.');
     }
 
-    final verified = await _downloadValidArchive(backups, accountId);
+    final chosen = pending != null && pending['state'] == 'pending'
+        ? backups.where((entry) =>
+            entry is Map && entry['backupId'] == pending['backupId']).toList()
+        : backups;
+    if (chosen.isEmpty) {
+      throw StateError('Pending v2 recovery archive is unavailable.');
+    }
+    _assertAccount(accountId);
+    final verified = await _downloadValidArchive(chosen, accountId);
     final backupId = verified.id;
     final archiveCursor = verified.cursor;
     if (pending != null &&
@@ -327,6 +352,7 @@ class V2BackupRecoveryService {
         throw StateError('Archive recovery requires a fresh v2 journal.');
       }
     }
+    _assertAccount(accountId);
     await writeStoredText(markerKey, jsonEncode({
       'version': 1,
       'state': 'pending',
@@ -338,9 +364,7 @@ class V2BackupRecoveryService {
     var previous = 0;
     var replayed = 0;
     for (final item in verified.history) {
-      if (_accountId != accountId) {
-        throw StateError('Account changed during operational recovery.');
-      }
+      _assertAccount(accountId);
       final cursor = item.cursor;
       final operation = item.operation;
       if (cursor <= previous || cursor > archiveCursor) {
@@ -381,6 +405,7 @@ class V2BackupRecoveryService {
     if (check.length != 1 || check.single.data.values.single != 'ok') {
       throw StateError('Recovered SQLite integrity check failed.');
     }
+    _assertAccount(accountId);
     // A read model may be rebuilt; never use a legacy snapshot as a writer.
     await runtime.libraryOperations.refreshReadModel();
     for (final entry in verified.files.entries) {
@@ -401,6 +426,7 @@ class V2BackupRecoveryService {
   ) async {
     Object? failure;
     for (final raw in backups) {
+      _assertAccount(accountId);
       try {
         final entry = _asObject(raw);
         final id = entry['backupId'];
@@ -424,6 +450,7 @@ class V2BackupRecoveryService {
         if (bytes.length != size || sha256.convert(bytes).toString() != hash) {
           throw const FormatException('Corrupt verified archive.');
         }
+        _assertAccount(accountId);
         final envelope = _asObject(jsonDecode(utf8.decode(bytes)));
         if (envelope['format'] != 'nanotateczki-server-backup' ||
             envelope['version'] != formatVersion ||
