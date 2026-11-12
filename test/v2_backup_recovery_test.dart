@@ -73,6 +73,7 @@ class _Server {
   Uint8List? verified;
   Uint8List? pending;
   bool rejectUpload = false;
+  Future<void> Function()? beforeCheckpoint;
   final paths = <String>[];
 
   Future<http.Response> respond(http.Request request) async {
@@ -82,6 +83,7 @@ class _Server {
       return http.Response.bytes([9, 9, 9], 200);
     }
     if (path == '/v2/sync/checkpoint') {
+      await beforeCheckpoint?.call();
       return http.Response(jsonEncode({'cursor': history.length}), 200);
     }
     if (path == '/v2/operations') {
@@ -462,6 +464,21 @@ void main() {
       throwsStateError,
     );
     expect(await target.runtime.store.checkpoint('account:$accountId'), 3);
+  });
+
+  test('account switch during checkpoint read blocks old backup', () async {
+    final server = _Server();
+    final client = _Client(server);
+    addTearDown(client.close);
+    await client.seed();
+    server.beforeCheckpoint = () async {
+      ActiveStorageNamespace.activate(StorageNamespace.local());
+    };
+    await expectLater(
+      client.backup.uploadVerifiedSnapshot(deviceId: deviceId),
+      throwsStateError,
+    );
+    expect(server.paths.where((p) => p == 'POST /v2/backups'), isEmpty);
   });
 
   test(
