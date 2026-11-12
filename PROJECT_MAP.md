@@ -20,6 +20,9 @@
   Pobieranie ustawień sprawdza ponownie lokalny plik po asynchronicznej
   kopii preimportowej; nowa edycja nie jest nadpisywana, tylko otrzymuje
   bazową rewizję CAS do wysłania przy następnej synchronizacji.
+  Kopia preimportowa oraz zapis metadanych są dodatkowo chronione
+  generacją bootstrapu i aktualnym namespace (Local/A/B).
+  Regresje są w `test/account_settings_sync_service_test.dart`.
 - `lib/data/sync/local_account_import_service.dart`: import Local
   przenosi foldery, okładki, zadania, Study Sessions i dokument Planner
   przez właściwe writery; import idempotentny, nie wskrzesza tombstones.
