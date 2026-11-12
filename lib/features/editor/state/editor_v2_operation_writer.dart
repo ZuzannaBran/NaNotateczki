@@ -345,7 +345,7 @@ class EditorV2OperationWriter {
   }) async {
     if (notebook.uid.isEmpty ||
         notebook.pages.isEmpty ||
-        notebook.kind.index > 1 ||
+        notebook.kind.index > 2 ||
         notebook.title.isEmpty ||
         notebook.folder.isEmpty) {
       throw ArgumentError('Invalid operational notebook identity or kind.');

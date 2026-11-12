@@ -1614,3 +1614,28 @@ i pełne E2E nadal wymagają osobnej weryfikacji.
 W trybie opt-in v2 Quill obraz jest renderowany przez `Image.memory`
 na podstawie zweryfikowanego BLOB; PDF pokazuje oznaczenie osadzonego
 pliku (nie strony PDF). Brak assetu pokazuje ikonę błędu.
+
+
+## Stage 8 — Planner, library and account settings v2
+
+On an explicitly enabled v2 account, notebook and Planner documents use
+`document.create`/`page.create` (Planner `kindIndex=2`) in the operational
+journal. Study Sessions/events, repetition, history and timer state retain
+`study_planner.json` as a local projection and use per-entry
+`/v2/planner/entries` CAS with the account-scoped revision ledger; never
+start the legacy `/v1/planner/entries` writer for a v2 account.
+
+Folder identities, parent relations, covers and planner tasks are recorded
+as `folder.*` and `task.*` operations with `documentId=@library`.
+`library_folders.json` is a derived read model generated from the SQLite
+journal after startup and each committed remote operation. Folder deletions
+and task deletions preserve tombstones; active account namespace is checked
+before each write. Do not use whole-file `libraryState` CAS alongside these
+operations. On v2, the remaining account preferences use the separately
+protocol-fenced `/v2/account-settings` CAS endpoint and keep revisioned
+checkpoints isolated from Local.
+
+Import Local to v2 through the journal and planner CAS only. An interrupted
+import can be resumed by stable source→account IDs; a deleted destination
+UID must not be recreated. The final account-import gate requires both the
+v2 operation outbox to be ACKed and planner revision synchronization.

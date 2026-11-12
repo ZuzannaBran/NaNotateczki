@@ -12,6 +12,7 @@ import '../../../core/storage/app_save_coordinator.dart';
 import '../../../core/storage/text_storage.dart';
 import '../../../data/backup/local_backup_service.dart';
 import '../../../data/sync/cloud_sync_service.dart';
+import '../../../data/sync/library_v2_operation_service.dart';
 import '../../editor/state/ink_color_presets.dart';
 import '../../notebook/data/notebook_repository.dart';
 import '../../notebook/domain/notebook.dart';
@@ -88,6 +89,13 @@ class LibraryController extends ChangeNotifier {
   DateTime? lastSyncedAt;
   CloudSyncResult? lastSyncResult;
   Object? loadError;
+  LibraryV2OperationService? _v2LibraryOperations;
+
+  /// Switches the library metadata writer only for a confirmed v2 account.
+  void attachV2LibraryOperations(LibraryV2OperationService? service) {
+    _v2LibraryOperations = service;
+  }
+
   final Set<String> _folders = <String>{};
   final Map<String, FolderCoverStyle> _folderCovers =
       <String, FolderCoverStyle>{};
@@ -176,7 +184,8 @@ class LibraryController extends ChangeNotifier {
       loadError = null;
       await _refreshCorruptRecoveryState();
 
-      if (items.isEmpty &&
+      if (_v2LibraryOperations == null &&
+          items.isEmpty &&
           (wasReset || freshFile) &&
           await backup.hasLatest()) {
         final restore = await backup.restoreFromLatestDetailed();
@@ -196,7 +205,9 @@ class LibraryController extends ChangeNotifier {
             source: 'LibraryController.loadItems(reset_restore_failed)',
           );
         }
-      } else if (items.isEmpty && wasReset) {
+      } else if (_v2LibraryOperations == null &&
+          items.isEmpty &&
+          wasReset) {
         AppErrorLog.instance.record(
           'Database recovery is pending, but no local backup snapshot was '
           'available for automatic restore.',
@@ -370,6 +381,10 @@ class LibraryController extends ChangeNotifier {
     if (!folderNames.contains(folder)) {
       return;
     }
+    await _v2LibraryOperations?.updateCover(
+      folder,
+      Map<String, dynamic>.from(cover.toJson()),
+    );
     _folderCovers[folder] = cover;
     if (cover.iconColor case final Color selectedColor) {
       _recentCoverColors.removeWhere(
@@ -396,6 +411,10 @@ class LibraryController extends ChangeNotifier {
     final path = parentPath == null ? trimmed : '$parentPath/$trimmed';
     if (folderNames.contains(path)) {
       return null;
+    }
+    final v2 = _v2LibraryOperations;
+    if (v2 != null) {
+      await v2.createFolder(path);
     }
     _folders.add(path);
     selectedFolder = path;
@@ -428,6 +447,8 @@ class LibraryController extends ChangeNotifier {
     )) {
       return null;
     }
+
+    await _v2LibraryOperations?.renameFolder(oldPath, nextPath);
 
     String relocate(String path) => nextPath + path.substring(oldPath.length);
 
@@ -501,6 +522,7 @@ class LibraryController extends ChangeNotifier {
       return null;
     }
     final destination = '$targetPath/${folderLabel(sourcePath)}';
+    await _v2LibraryOperations?.moveFolder(sourcePath, targetPath);
     String relocate(String path) =>
         destination + path.substring(sourcePath.length);
 
@@ -566,8 +588,10 @@ class LibraryController extends ChangeNotifier {
       await repository.deleteNotebook(item.uid);
     }
     for (final item in affected) {
+      await _v2LibraryOperations?.deletePlannerTasks(item.uid);
       _plannerTasks.remove(item.uid);
     }
+    await _v2LibraryOperations?.deleteTree(path);
     final deletedIds = affected.map((item) => item.uid).toSet();
     items = items.where((item) => !deletedIds.contains(item.uid)).toList();
     _folders.removeWhere((folder) => isInFolderTree(folder, path));
@@ -606,9 +630,17 @@ class LibraryController extends ChangeNotifier {
       throw ArgumentError.value(uid, 'uid', 'Planner not found');
     }
     final task = PlannerTask(id: const Uuid().v4(), title: '');
-    _plannerTasks.putIfAbsent(uid, () => <PlannerTask>[]).add(task);
+    final tasks = _plannerTasks.putIfAbsent(uid, () => <PlannerTask>[]);
+    await _v2LibraryOperations?.createTask(
+      uid,
+      Map<String, dynamic>.from(task.toJson()),
+      tasks.length,
+    );
+    tasks.add(task);
     notifyListeners();
-    _schedulePlannerTaskSave();
+    if (_v2LibraryOperations == null) {
+      _schedulePlannerTaskSave();
+    }
     return task;
   }
 
@@ -629,15 +661,22 @@ class LibraryController extends ChangeNotifier {
     if (index < 0) {
       return;
     }
-    list[index] = list[index].copyWith(
+    final updated = list[index].copyWith(
       title: title,
       completed: completed,
       deadline: deadline,
       clearDeadline: clearDeadline,
       deadlineHasTime: deadlineHasTime,
     );
+    await _v2LibraryOperations?.updateTask(
+      taskId,
+      Map<String, dynamic>.from(updated.toJson()),
+    );
+    list[index] = updated;
     notifyListeners();
-    _schedulePlannerTaskSave();
+    if (_v2LibraryOperations == null) {
+      _schedulePlannerTaskSave();
+    }
   }
 
   Future<void> removePlannerTask(String uid, String taskId) async {
@@ -645,9 +684,15 @@ class LibraryController extends ChangeNotifier {
     if (list == null) {
       return;
     }
+    if (!list.any((task) => task.id == taskId)) {
+      return;
+    }
+    await _v2LibraryOperations?.deleteTask(taskId);
     list.removeWhere((task) => task.id == taskId);
     notifyListeners();
-    _schedulePlannerTaskSave();
+    if (_v2LibraryOperations == null) {
+      _schedulePlannerTaskSave();
+    }
   }
 
   void _schedulePlannerTaskSave() {
@@ -709,6 +754,7 @@ class LibraryController extends ChangeNotifier {
 
   Future<void> deleteItem(String uid) async {
     await repository.deleteNotebook(uid);
+    await _v2LibraryOperations?.deletePlannerTasks(uid);
     if (_plannerTasks.remove(uid) != null) {
       await _saveFolders();
     }
@@ -990,6 +1036,12 @@ class LibraryController extends ChangeNotifier {
   }
 
   Future<void> _saveFolders() async {
+    final v2 = _v2LibraryOperations;
+    if (v2 != null) {
+      await v2.refreshReadModel();
+      repository.onChanged?.call(const <NotebookRepositoryChange>[]);
+      return;
+    }
     try {
       final names = _folders.toList()..sort(_compareFolderNames);
       final payload = <String, Object?>{

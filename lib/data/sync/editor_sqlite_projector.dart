@@ -189,7 +189,7 @@ class EditorSqliteProjector {
         value['folder'] is! String ||
         (value['folder'] as String).isEmpty ||
         value['kindIndex'] is! int ||
-        !const {0, 1}.contains(value['kindIndex']) ||
+        !const {0, 1, 2}.contains(value['kindIndex']) ||
         value['createdAt'] is! String) {
       throw const FormatException('Invalid v2 notebook creation.');
     }

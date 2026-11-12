@@ -1,0 +1,535 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:drift/drift.dart';
+import 'package:uuid/uuid.dart';
+
+import '../../core/storage/active_storage_namespace.dart';
+import '../../core/storage/storage_namespace_manager.dart';
+import '../../core/storage/text_storage.dart';
+import '../drift/notes_database.dart';
+import 'operation_protocol.dart';
+import 'operation_store.dart';
+import 'sync_engine.dart';
+
+/// Read model derived exclusively from the durable v2 library journal.
+class LibraryV2Snapshot {
+  const LibraryV2Snapshot(this.folderIdsByPath, this.value);
+
+  final Map<String, String> folderIdsByPath;
+  final Map<String, dynamic> value;
+}
+
+class _LibraryNode {
+  final Map<String, dynamic> fields = {};
+  final Map<String, List<Object>> versions = {};
+
+  void merge(Map fieldsToMerge, OperationEnvelope operation) {
+    final rank = <Object>[
+      operation.logicalClock,
+      operation.actorId,
+      operation.actorSeq,
+      operation.operationId,
+    ];
+    for (final entry in fieldsToMerge.entries) {
+      if (entry.key is! String) {
+        throw const FormatException('Invalid library field.');
+      }
+      final name = entry.key as String;
+      final previous = versions[name];
+      if (previous == null ||
+          LibraryV2OperationReducer.compareRank(rank, previous) > 0) {
+        versions[name] = rank;
+        fields[name] = entry.value;
+      }
+    }
+  }
+}
+
+/// Deterministic field-wise LWW with permanent tombstones and graph guards.
+///
+/// A read-model cache may be lost or interrupted: the operations table is
+/// sufficient to reconstruct it without reviving any deleted UID.
+class LibraryV2OperationReducer {
+  const LibraryV2OperationReducer._();
+
+  static int compareRank(List<Object> a, List<Object> b) {
+    for (var index = 0; index < 4; index++) {
+      final order = index.isEven
+          ? (a[index] as int).compareTo(b[index] as int)
+          : (a[index] as String).compareTo(b[index] as String);
+      if (order != 0) {
+        return order;
+      }
+    }
+    return 0;
+  }
+
+  static LibraryV2Snapshot replay(Iterable<OperationEnvelope> history) {
+    final folders = <String, _LibraryNode>{};
+    final tasks = <String, _LibraryNode>{};
+    final deletedFolders = <String>{};
+    final deletedTasks = <String>{};
+
+    for (final operation in history) {
+      if (operation.documentId != OperationEnvelope.libraryDocumentId) {
+        throw const FormatException('Non-library operation in journal.');
+      }
+      final kind = operation.kind;
+      if (kind.target != OperationTarget.folder &&
+          kind.target != OperationTarget.task) {
+        throw const FormatException('Unsupported library operation.');
+      }
+      final id = operation.objectId!;
+      final isFolder = kind.target == OperationTarget.folder;
+      final nodes = isFolder ? folders : tasks;
+      final deleted = isFolder ? deletedFolders : deletedTasks;
+      final isCreate = kind == OperationKind.folderCreate ||
+          kind == OperationKind.taskCreate;
+      final isDelete = kind == OperationKind.folderDelete ||
+          kind == OperationKind.taskDelete;
+      if (isDelete) {
+        if (isFolder &&
+            folders.entries.any((entry) =>
+                entry.key != id && entry.value.fields['parentId'] == id)) {
+          throw StateError('Folder still contains a child.');
+        }
+        nodes.remove(id);
+        deleted.add(id);
+        continue;
+      }
+      if (deleted.contains(id)) {
+        if (isCreate) {
+          throw StateError('Deleted library UID cannot be reused.');
+        }
+        continue;
+      }
+      if (isCreate && nodes.containsKey(id)) {
+        throw StateError('Library UID already exists.');
+      }
+      if (!isCreate && !nodes.containsKey(id)) {
+        throw StateError('Library target has not been created.');
+      }
+      final key = isCreate ? 'value' : 'properties';
+      final raw = operation.payload[key];
+      if (raw is! Map || operation.payload.length != 1) {
+        throw const FormatException('Invalid library properties.');
+      }
+      final node = nodes.putIfAbsent(id, _LibraryNode.new);
+      node.merge(raw, operation);
+      if (isFolder) {
+        _validateFolders(folders);
+      } else if (node.fields['plannerUid'] is! String ||
+          (node.fields['plannerUid'] as String).isEmpty) {
+        throw const FormatException('Task has no planner identity.');
+      }
+    }
+
+    final paths = _paths(folders);
+    final covers = <String, dynamic>{};
+    final colors = <int>[];
+    for (final entry in paths.entries) {
+      final cover = folders[entry.value]!.fields['cover'];
+      if (cover is Map) {
+        covers[entry.key] = Map<String, dynamic>.from(cover);
+        final color = cover['iconColor'];
+        if (color is int && !colors.contains(color)) {
+          colors.add(color);
+        }
+      }
+    }
+    final tasksByPlanner = <String, List<Map<String, dynamic>>>{};
+    for (final entry in tasks.entries) {
+      final fields = entry.value.fields;
+      final owner = fields['plannerUid'];
+      if (owner is! String || owner.isEmpty) {
+        throw const FormatException('Task owner is missing.');
+      }
+      tasksByPlanner.putIfAbsent(owner, () => []).add({
+        'id': entry.key,
+        'title': fields['title'] ?? '',
+        'completed': fields['completed'] ?? false,
+        'deadline': fields['deadline'],
+        'deadlineHasTime': fields['deadlineHasTime'] ?? false,
+        'sortIndex': fields['sortIndex'] ?? 0,
+      });
+    }
+    for (final list in tasksByPlanner.values) {
+      list.sort((a, b) {
+        final ai = a['sortIndex'];
+        final bi = b['sortIndex'];
+        if (ai is! int || bi is! int) {
+          throw const FormatException('Invalid task order.');
+        }
+        final order = ai.compareTo(bi);
+        return order != 0
+            ? order
+            : (a['id'] as String).compareTo(b['id'] as String);
+      });
+      for (final task in list) {
+        task.remove('sortIndex');
+      }
+    }
+    final folderNames = paths.keys.toList()..sort();
+    return LibraryV2Snapshot(
+      Map.unmodifiable(paths),
+      {
+        'folders': folderNames,
+        'covers': covers,
+        'plannerTasks': tasksByPlanner,
+        'recentCoverColors': colors.take(12).toList(),
+      },
+    );
+  }
+
+  static void _validateFolders(Map<String, _LibraryNode> folders) {
+    _paths(folders);
+  }
+
+  static Map<String, String> _paths(Map<String, _LibraryNode> folders) {
+    final resolved = <String, String>{};
+    final visiting = <String>{};
+    // The server accepts concurrent sibling creations with distinct UIDs.
+    // Derive a stable display alias rather than blocking the whole feed.
+    final names = <String, String>{};
+    final childrenByParent = <String, List<String>>{};
+    for (final entry in folders.entries) {
+      final parent = entry.value.fields['parentId'];
+      final group = parent is String ? parent : '';
+      childrenByParent.putIfAbsent(group, () => []).add(entry.key);
+    }
+    for (final ids in childrenByParent.values) {
+      ids.sort();
+      final used = <String>{};
+      for (final id in ids) {
+        final raw = folders[id]!.fields['name'];
+        if (raw is! String || raw.isEmpty) {
+          throw const FormatException('Missing folder name.');
+        }
+        var label = raw;
+        var attempt = 0;
+        while (used.contains(label)) {
+          attempt++;
+          final suffix = id.substring(0, id.length < 8 ? id.length : 8);
+          label = '$raw ($suffix${attempt > 1 ? '-$attempt' : ''})';
+        }
+        used.add(label);
+        names[id] = label;
+      }
+    }
+    String resolve(String id) {
+      final node = folders[id];
+      if (node == null) {
+        throw StateError('Folder parent is missing.');
+      }
+      if (!visiting.add(id)) {
+        throw StateError('Folder hierarchy contains a cycle.');
+      }
+      try {
+        final name = node.fields['name'];
+        final parent = node.fields['parentId'];
+        if (name is! String ||
+            name.trim() != name ||
+            name.isEmpty ||
+            name.contains('/') ||
+            (parent != null && (parent is! String || parent.isEmpty))) {
+          throw const FormatException('Invalid folder name or parent.');
+        }
+        final label = names[id]!;
+        final path = parent == null
+            ? label
+            : resolve(parent as String) + '/' + label;
+        return path;
+      } finally {
+        visiting.remove(id);
+      }
+    }
+
+    for (final id in folders.keys) {
+      final path = resolve(id);
+      if (resolved.containsKey(path)) {
+        throw StateError('Duplicate folder path.');
+      }
+      resolved[path] = id;
+    }
+    return resolved;
+  }
+}
+
+/// Journals each folder/task mutation in @library, never a JSON snapshot.
+///
+/// The library_folders.json file is a disposable compatibility read-model.
+/// It is regenerated from SQLite on startup and after remote commits.
+class LibraryV2OperationService {
+  LibraryV2OperationService({
+    required this.engine,
+    required this.accountId,
+  });
+
+  final SyncEngine engine;
+  final String accountId;
+  Future<void> _refreshTail = Future<void>.value();
+
+  NotesDatabase get _database => engine.store.database;
+
+  void _requireNamespace() {
+    if (ActiveStorageNamespace.current !=
+        StorageNamespace.account(accountId)) {
+      throw StateError('Library v2 belongs to another account.');
+    }
+  }
+
+  Future<List<OperationEnvelope>> _history() async {
+    final rows = await _database.customSelect(
+      'SELECT envelope_json FROM operations WHERE document_id = ? '
+      'ORDER BY rowid',
+      variables: [
+        const Variable<String>(OperationEnvelope.libraryDocumentId),
+      ],
+    ).get();
+    return [
+      for (final row in rows)
+        OperationEnvelope.fromJson(
+          Map<String, dynamic>.from(
+            jsonDecode(row.read<String>('envelope_json')) as Map,
+          ),
+        ),
+    ];
+  }
+
+  Future<LibraryV2Snapshot> snapshot() async {
+    _requireNamespace();
+    return LibraryV2OperationReducer.replay(await _history());
+  }
+
+  /// Invoked inside the journal transaction before an envelope is appended.
+  Future<void> apply(OperationEnvelope operation) async {
+    _requireNamespace();
+    LibraryV2OperationReducer.replay([
+      ...await _history(),
+      operation,
+    ]);
+  }
+
+  Future<void> refreshReadModel() {
+    final refresh = _refreshTail.then((_) async {
+      final state = await snapshot();
+      _requireNamespace();
+      await writeStoredText('library_folders.json', jsonEncode(state.value));
+    });
+    _refreshTail = refresh.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace __) {},
+    );
+    return refresh;
+  }
+
+  Future<void> _commit(
+    OperationKind kind,
+    String id,
+    Map<String, dynamic> payload,
+  ) async {
+    _requireNamespace();
+    await engine.writeLocal(
+      documentId: OperationEnvelope.libraryDocumentId,
+      kind: kind,
+      objectId: id,
+      payload: payload,
+      apply: apply,
+    );
+    await refreshReadModel();
+  }
+
+  /// Registers a parent inferred from an existing document folder path.
+  /// Pending operations have durable IDs so retries never duplicate a node.
+  Future<void> ensureFolderPath(String path) async {
+    if (path.isEmpty) {
+      return;
+    }
+    final segments = path.split('/');
+    for (var count = 1; count <= segments.length; count++) {
+      final parentPath = segments.take(count).join('/');
+      final state = await snapshot();
+      if (state.folderIdsByPath.containsKey(parentPath)) {
+        continue;
+      }
+      final parent = count == 1
+          ? null
+          : state.folderIdsByPath[segments.take(count - 1).join('/')];
+      if (count > 1 && parent == null) {
+        throw StateError('Implicit folder parent is missing.');
+      }
+      await _commit(
+        OperationKind.folderCreate,
+        const Uuid().v5(
+          Uuid.NAMESPACE_URL,
+          'library-folder:$accountId:$parentPath',
+        ),
+        {
+          'value': {
+            'name': segments[count - 1],
+            'parentId': parent,
+          },
+        },
+      );
+    }
+  }
+
+  Future<void> createFolder(String path) async {
+    final separator = path.lastIndexOf('/');
+    if (separator >= 0) {
+      await ensureFolderPath(path.substring(0, separator));
+    }
+    final state = await snapshot();
+    if (state.folderIdsByPath.containsKey(path)) {
+      throw StateError('Folder already exists.');
+    }
+    final separator = path.lastIndexOf('/');
+    final name = separator < 0 ? path : path.substring(separator + 1);
+    final parentPath = separator < 0 ? null : path.substring(0, separator);
+    final parent = parentPath == null
+        ? null
+        : state.folderIdsByPath[parentPath];
+    if (parentPath != null && parent == null) {
+      throw StateError('Folder parent is missing.');
+    }
+    await _commit(
+      OperationKind.folderCreate,
+      const Uuid().v4(),
+      {
+        'value': {'name': name, 'parentId': parent},
+      },
+    );
+  }
+
+  Future<void> renameFolder(String path, String nextPath) async {
+    await ensureFolderPath(path);
+    final state = await snapshot();
+    final id = state.folderIdsByPath[path];
+    if (id == null || state.folderIdsByPath.containsKey(nextPath)) {
+      throw StateError('Folder rename collides or is missing.');
+    }
+    await _commit(OperationKind.folderSet, id, {
+      'properties': {'name': nextPath.split('/').last},
+    });
+  }
+
+  Future<void> moveFolder(String path, String targetParent) async {
+    await ensureFolderPath(path);
+    await ensureFolderPath(targetParent);
+    final state = await snapshot();
+    final id = state.folderIdsByPath[path];
+    final parent = state.folderIdsByPath[targetParent];
+    if (id == null ||
+        parent == null ||
+        targetParent == path ||
+        targetParent.startsWith(path + '/')) {
+      throw StateError('Folder move would create a cycle.');
+    }
+    await _commit(OperationKind.folderMove, id, {
+      'properties': {'parentId': parent},
+    });
+  }
+
+  Future<void> updateCover(
+    String path,
+    Map<String, dynamic> cover,
+  ) async {
+    await ensureFolderPath(path);
+    final state = await snapshot();
+    final id = state.folderIdsByPath[path];
+    if (id == null) {
+      throw StateError('Folder is missing.');
+    }
+    await _commit(OperationKind.folderSet, id, {
+      'properties': {'cover': cover},
+    });
+  }
+
+  Future<void> deleteTree(String root) async {
+    await ensureFolderPath(root);
+    final state = await snapshot();
+    final children = state.folderIdsByPath.keys
+        .where((path) => path == root || path.startsWith(root + '/'))
+        .toList()
+      ..sort((a, b) => b.length.compareTo(a.length));
+    if (children.isEmpty) {
+      throw StateError('Folder is missing.');
+    }
+    await engine.writeLocalBatch(
+      documentId: OperationEnvelope.libraryDocumentId,
+      operations: [
+        for (final path in children)
+          LocalOperationDraft(
+            kind: OperationKind.folderDelete,
+            objectId: state.folderIdsByPath[path],
+            payload: const {},
+          ),
+      ],
+      apply: apply,
+    );
+    await refreshReadModel();
+  }
+
+  /// Deleted imported tasks must never be recreated with the same UID.
+  Future<bool> wasTaskDeleted(String id) async {
+    _requireNamespace();
+    return engine.store.isTombstoned(
+      OperationEnvelope.libraryDocumentId,
+      'task',
+      id,
+    );
+  }
+
+  Future<void> createTask(
+    String plannerUid,
+    Map<String, dynamic> task,
+    int sortIndex,
+  ) async {
+    final id = task['id'];
+    if (id is! String || id.isEmpty) {
+      throw ArgumentError.value(id, 'id', 'Task ID is required.');
+    }
+    await _commit(OperationKind.taskCreate, id, {
+      'value': {
+        ...task,
+        'plannerUid': plannerUid,
+        'sortIndex': sortIndex,
+      },
+    });
+  }
+
+  Future<void> updateTask(
+    String id,
+    Map<String, dynamic> task,
+  ) async {
+    final fields = Map<String, dynamic>.from(task)..remove('id');
+    await _commit(OperationKind.taskSet, id, {'properties': fields});
+  }
+
+  Future<void> deleteTask(String id) async {
+    await _commit(OperationKind.taskDelete, id, const {});
+  }
+
+  Future<void> deletePlannerTasks(String plannerUid) async {
+    final state = await snapshot();
+    final tasks = state.value['plannerTasks'] as Map<String, dynamic>;
+    final list = tasks[plannerUid];
+    if (list is! List || list.isEmpty) {
+      return;
+    }
+    await engine.writeLocalBatch(
+      documentId: OperationEnvelope.libraryDocumentId,
+      operations: [
+        for (final task in list)
+          LocalOperationDraft(
+            kind: OperationKind.taskDelete,
+            objectId: (task as Map)['id'] as String,
+            payload: const {},
+          ),
+      ],
+      apply: apply,
+    );
+    await refreshReadModel();
+  }
+}

@@ -105,7 +105,13 @@ void main() {
     expect(boardOperations.last.kind, OperationKind.documentDelete);
     expect(await store.isTombstoned(board.uid, 'document', board.uid), isTrue);
     expect(commits, 4);
-    await expectLater(repository.createPlanner(), throwsUnsupportedError);
+    final planner = await repository.createPlanner();
+    expect(planner.kind.index, 2);
+    expect((await repository.getNotebook(planner.uid))?.kind.index, 2);
+    expect(
+      (await store.pending(documentId: planner.uid)).map((op) => op.kind),
+      [OperationKind.documentCreate, OperationKind.pageCreate],
+    );
     await expectLater(
       writer.writeCreateNotebook(notebook: board),
       throwsStateError,

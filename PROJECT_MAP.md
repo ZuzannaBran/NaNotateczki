@@ -1,5 +1,46 @@
 # PROJECT_MAP.md
 
+## Pakiet 5 — Planner, foldery, zadania i ustawienia v2 (2026-11-12)
+
+- `lib/data/sync/library_v2_operation_service.dart`: `LibraryV2OperationReducer`
+  odtwarza hierarchię folderów i zadania z trwałego `@library` SQLite;
+  `LibraryV2OperationService` zapisuje indywidualne operacje, chroni
+  tombstones i cykle, przenosi poddrzewa przez stabilne folder ID.
+  `library_folders.json` jest odbudowywanym read-modelem, nie writerem v2.
+- `lib/features/library/presentation/library_controller.dart`: po podłączeniu
+  v2 foldery, okładki i zadania przechodzą przez writer operacyjny. Stary
+  JSON writer nadal służy wyłącznie Local i kontom v1.
+- `lib/data/sync/editor_v2_account_runtime.dart`: kieruje zmiany
+  `@library` do reduktora i odświeża projekcję po zdalnym commicie,
+  bez uruchamiania edytorowego SQLite projectora dla folder/task.
+- `lib/app/app_scope.dart`: na potwierdzonym koncie v2 uruchamia
+  `PlannerSyncService(useRevisions:true)` i
+  `AccountSettingsSyncService(useV2:true)` z poll/pull po starcie,
+  wznawia je po restarcie, wyłącza v1.
+- `lib/data/sync/local_account_import_service.dart`: import Local
+  przenosi foldery, okładki, zadania, Study Sessions i dokument Planner
+  przez właściwe writery; import idempotentny, nie wskrzesza tombstones.
+- `lib/features/notebook/data/notebook_repository.dart`,
+  `lib/features/editor/state/editor_v2_operation_writer.dart`,
+  `lib/data/sync/editor_sqlite_projector.dart`: `kindIndex=2` planera
+  jest obsługiwany od dokumentu i strony po delete i metadata update.
+- `server/api/app/routers/account_settings.py` i
+  `NaNotateczki-serwer/api/app/routers/account_settings.py`:
+  chroniony protokołem endpoint `/v2/account-settings` z CAS, bez
+  `libraryState`; folder/task mają jednego writera `/v2/operations`.
+- Regresje: `test/library_v2_operation_service_test.dart`,
+  `test/library_v2_operation_integration_test.dart`,
+  `test/local_account_import_service_test.dart`,
+  `test/notebook_repository_v2_account_test.dart`,
+  `test/account_settings_sync_service_test.dart`,
+  `server/api/tests/test_account_settings.py`.
+- Granica bezpieczeństwa: `v2` nadal wymaga potwierdzonego cutover konta;
+  nie zmienia domyślnej flagi preview, backupu, Share ani v1 klientów.
+  Dla folderów i dokumentów operacje różnych `documentId` mają oddzielne
+  dzienniki; folderowy move z wieloma dokumentami musi dokończyć każdą
+  zmianę dokumentu, a błędy nie są zamiatane kopiami konfliktowymi.
+
+
 ## Pakiet 4 — Local → konto (2026-11-11)
 
 `LocalImportPlan`: `lib/data/sync/local_import_plan.dart`

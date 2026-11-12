@@ -633,9 +633,6 @@ class NotebookRepository {
     if (writer == null) {
       await importNotebooksAtomically([notebook]);
     } else {
-      if (notebook.kind.index > 1) {
-        throw UnsupportedError('Planner documents need v2 planner cutover.');
-      }
       final committed = await writer.writeCreateNotebook(notebook: notebook);
       if (writer.onCommitted == null) {
         reportOperationCommit(notebook.uid, committed);
@@ -711,9 +708,6 @@ class NotebookRepository {
   }
 
   Future<Notebook> createPlanner({String? title, String? folder}) async {
-    if (_accountOperationWriter != null) {
-      throw UnsupportedError('Planner v2 is not enabled yet.');
-    }
     final now = DateTime.now();
     final planner = Notebook(
       uid: _uuid.v4(),
@@ -733,7 +727,15 @@ class NotebookRepository {
         ),
       ],
     );
-    await saveNotebook(planner);
+    final writer = _accountOperationWriter;
+    if (writer == null) {
+      await saveNotebook(planner);
+    } else {
+      final committed = await writer.writeCreateNotebook(notebook: planner);
+      if (writer.onCommitted == null) {
+        reportOperationCommit(planner.uid, committed);
+      }
+    }
     return planner;
   }
 

@@ -133,6 +133,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       await waitForPendingTextStorageOperations();
       await _liveSync?.stop();
       await _v2AccountRuntime?.stop();
+      _libraryController?.attachV2LibraryOperations(null);
       _plannerSync?.stop();
       _accountSettingsSync?.stop();
       await _remoteBackupScheduler?.stop();
@@ -521,7 +522,8 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     // Settings can be triggered by listeners before the account bootstrap.
     // Do not issue v1 requests until this account's protocol is verified.
     if (_accountSession?.isSignedIn == true &&
-        _legacyProtocolReadyUser != _accountSession?.userId) {
+        _legacyProtocolReadyUser != _accountSession?.userId &&
+        _bootstrappedAccount != _accountSession?.userId) {
       return;
     }
     try {
@@ -551,7 +553,8 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
 
   Future<void> _syncPlanner() async {
     if (_bootstrappedAccount == null ||
-        _legacyProtocolReadyUser != _bootstrappedAccount ||
+        (_legacyProtocolReadyUser != _bootstrappedAccount &&
+            _v2AccountRuntime == null) ||
         _plannerSync == null) {
       return;
     }
@@ -659,6 +662,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         planner: planner,
         isCurrentAccount: current,
         onLibraryChanged: library.reloadFromAccount,
+        libraryV2: _v2AccountRuntime?.libraryOperations,
       ).run();
       if (!current()) {
         return;
@@ -672,8 +676,15 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         if (runtime.engine.lastError != null ||
             (await runtime.store.pending()).isNotEmpty) {
           throw StateError(
-            'Imported v2 document operations are still waiting for ACK.',
+            'Imported document/library operations are waiting for ACK.',
           );
+        }
+        await _plannerSync?.syncNow();
+        if (!current()) {
+          return;
+        }
+        if (_plannerSync?.lastError != null) {
+          throw StateError('Imported study entries have not synchronized.');
         }
       } else {
         final sync = _liveSync;
@@ -740,27 +751,66 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         apiClient: apiClient,
         accountId: userId,
         actorId: actorId,
-        onLibraryChanged: library.loadItems,
+        onLibraryChanged: library.reloadFromAccount,
       );
       // Publish ownership before startup so logout can stop this transport.
       _v2AccountRuntime = runtime;
     }
+    library.attachV2LibraryOperations(runtime.libraryOperations);
     if (!await runtime.startForCurrentAccount(isCurrent: isCurrent)) {
       return;
     }
-    await library.loadItems();
+    await runtime.libraryOperations.refreshReadModel();
+    await library.reloadFromAccount();
     if (!isCurrent()) {
       await runtime.stop();
       return;
     }
+    // Stage 8: planner entries use their independent revision/CAS ledger;
+    // folder and task changes use only the @library operation journal.
+    _plannerSync?.stop();
+    _plannerSync = PlannerSyncService(
+      apiClient: apiClient,
+      session: _accountSession!,
+      planner: _studyPlanner!,
+      useRevisions: true,
+    );
+    _accountSettingsSync?.stop();
+    _accountSettingsSync = AccountSettingsSyncService(
+      apiClient: apiClient,
+      session: _accountSession!,
+      useV2: true,
+      onRemoteApplied: () async {
+        await _preferences?.load();
+        await _remoteBackupScheduler?.refreshAccountPreference();
+      },
+    );
     await _importPendingLocalData(userId, generation);
     if (!isCurrent()) {
       await runtime.stop();
       return;
     }
     _bootstrappedAccount = userId;
-    // Planner, Share and legacy remote snapshot services remain disabled
-    // until they have their own verified v2 cutover.
+    try {
+      await _syncAccountSettings();
+      await _syncPlanner();
+    } catch (error, stackTrace) {
+      AppErrorLog.instance.record(
+        error,
+        stackTrace,
+        source: 'AppScope.initialV2MetadataSync',
+      );
+    }
+    if (!isCurrent()) {
+      await runtime.stop();
+      return;
+    }
+    _settingsPoll?.cancel();
+    _settingsPoll = Timer.periodic(const Duration(seconds: 45), (_) {
+      unawaited(_syncAccountSettings());
+      unawaited(_syncPlanner());
+    });
+    // Legacy remote snapshot services and Share v1 stay disabled.
     setState(() {
       _incompatibleProtocolUser = null;
     });
@@ -826,6 +876,26 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         }
         if (!isCurrent()) {
           return;
+        }
+        // A legacy protocol account cannot reuse a v2 metadata client.
+        if (_accountSettingsSync?.useV2 == true) {
+          _accountSettingsSync = AccountSettingsSyncService(
+            apiClient: _apiClient!,
+            session: session,
+            onRemoteApplied: () async {
+              await library.reloadFromAccount();
+              await preferences.load();
+              await scheduler.refreshAccountPreference();
+              scheduler.markDirty();
+            },
+          );
+        }
+        if (_plannerSync?.useRevisions == true) {
+          _plannerSync = PlannerSyncService(
+            apiClient: _apiClient!,
+            session: session,
+            planner: planner,
+          );
         }
         if (_incompatibleProtocolUser == userId && mounted) {
           setState(() => _incompatibleProtocolUser = null);

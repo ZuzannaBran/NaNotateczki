@@ -3,6 +3,8 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 
+import '../../core/storage/active_storage_namespace.dart';
+import '../../core/storage/storage_namespace_manager.dart';
 import '../../core/storage/text_storage.dart';
 import 'account_session_controller.dart';
 import 'api_client.dart';
@@ -14,11 +16,16 @@ class AccountSettingsSyncService {
     required this.apiClient,
     required this.session,
     this.onRemoteApplied,
+    this.useV2 = false,
   });
 
   final ApiClient apiClient;
   final AccountSessionController session;
   final Future<void> Function()? onRemoteApplied;
+  final bool useV2;
+
+  String get _endpoint =>
+      useV2 ? '/v2/account-settings' : '/v1/account-settings';
 
   static const categories = <String>[
     'appPreferences',
@@ -29,7 +36,17 @@ class AccountSettingsSyncService {
   ];
   Future<void>? _running;
   bool _applying = false;
+  bool _stopped = false;
+  int _generation = 0;
   String? lastError;
+
+  bool _current(String userId, int generation) =>
+      !_stopped &&
+      _generation == generation &&
+      session.isSignedIn &&
+      session.userId == userId &&
+      (!useV2 ||
+          ActiveStorageNamespace.current == StorageNamespace.account(userId));
 
   bool get isApplying => _applying;
 
@@ -38,7 +55,8 @@ class AccountSettingsSyncService {
     if (previous != null) {
       return previous;
     }
-    final operation = _syncWithRefresh();
+    _stopped = false;
+    final operation = _syncWithRefresh(++_generation);
     _running = operation;
     return operation.whenComplete(() {
       if (identical(_running, operation)) {
@@ -47,24 +65,29 @@ class AccountSettingsSyncService {
     });
   }
 
-  Future<void> _syncWithRefresh() async {
+  Future<void> _syncWithRefresh(int generation) async {
     try {
-      await _syncNow();
+      await _syncNow(generation);
     } on ApiException catch (error) {
       if (error.statusCode != 401 || !session.isSignedIn) {
         rethrow;
       }
+      if (_stopped || _generation != generation) {
+        return;
+      }
       await session.refresh();
-      await _syncNow();
+      await _syncNow(generation);
     }
   }
 
-  Future<void> _syncNow() async {
+  Future<void> _syncNow(int generation) async {
     final userId = session.userId;
-    if (!session.isSignedIn || userId == null) {
+    if (userId == null || !_current(userId, generation)) {
       return;
     }
-    final key = _checkpointKey(userId);
+    final key = useV2
+        ? 'account_settings_v2_cursor_${_hash(userId)}.json'
+        : _checkpointKey(userId);
     final saved = await readStoredText(key);
     final checkpoint = saved == null
         ? <String, dynamic>{}
@@ -75,17 +98,27 @@ class AccountSettingsSyncService {
           )
         : <String, dynamic>{};
     final response = _object(
-      (await apiClient.get('/v1/account-settings')).decodeJson(),
+      (await apiClient.get(_endpoint)).decodeJson(),
     );
+    if (!_current(userId, generation)) {
+      return;
+    }
     final remote = _object(response['settings']);
     var applied = false;
     try {
       for (final category in categories) {
-        if (session.userId != userId || !session.isSignedIn) {
+        // Folder and task state belongs to the v2 operation journal.
+        if (useV2 && category == 'libraryState') {
+          continue;
+        }
+        if (!_current(userId, generation)) {
           return;
         }
         final fileKey = _fileKey(category, userId);
         final localText = await readStoredText(fileKey);
+        if (!_current(userId, generation)) {
+          return;
+        }
         final local = localText == null || localText.isEmpty
             ? null
             : jsonDecode(localText);
@@ -123,6 +156,9 @@ class AccountSettingsSyncService {
               'revision': remoteRevision,
               'value': remoteValue,
             };
+            if (!_current(userId, generation)) {
+              return;
+            }
             await writeStoredText(
               key,
               jsonEncode({'version': 1, 'settings': entries}),
@@ -137,18 +173,27 @@ class AccountSettingsSyncService {
             );
           }
           final update = _object(
-            (await apiClient.putJson('/v1/account-settings/$category', {
+            (await apiClient.putJson('$_endpoint/$category', {
               'expectedRevision': remoteRevision,
               'value': local,
             })).decodeJson(),
           );
+          if (!_current(userId, generation)) {
+            return;
+          }
           entries[category] = {'revision': update['revision'], 'value': local};
         } else if (serverEntry != null) {
           if (!_equivalent(local, remoteValue)) {
             _applying = true;
             try {
               if (known == null && local != null) {
+                if (!_current(userId, generation)) {
+                  return;
+                }
                 await _savePreimportCopy(userId, category, local);
+              }
+              if (!_current(userId, generation)) {
+                return;
               }
               await writeStoredText(fileKey, jsonEncode(remoteValue));
               applied = true;
@@ -162,12 +207,18 @@ class AccountSettingsSyncService {
           };
         } else if (local != null) {
           final update = _object(
-            (await apiClient.putJson('/v1/account-settings/$category', {
+            (await apiClient.putJson('$_endpoint/$category', {
               'expectedRevision': 0,
               'value': local,
             })).decodeJson(),
           );
+          if (!_current(userId, generation)) {
+            return;
+          }
           entries[category] = {'revision': update['revision'], 'value': local};
+        }
+        if (!_current(userId, generation)) {
+          return;
         }
         await writeStoredText(
           key,
@@ -175,7 +226,7 @@ class AccountSettingsSyncService {
         );
       }
       lastError = null;
-      if (applied && session.userId == userId) {
+      if (applied && _current(userId, generation)) {
         _applying = true;
         try {
           await onRemoteApplied?.call();
@@ -203,7 +254,7 @@ class AccountSettingsSyncService {
     }
     var currentRemote = serverEntry;
     for (var attempt = 0; attempt < 4; attempt++) {
-      if (!session.isSignedIn || session.userId != userId) {
+      if (_stopped || !session.isSignedIn || session.userId != userId) {
         return false;
       }
       final revision = currentRemote?['revision'] as int? ?? 0;
@@ -228,7 +279,7 @@ class AccountSettingsSyncService {
       if (shouldUpload) {
         try {
           currentRemote = _object(
-            (await apiClient.putJson('/v1/account-settings/libraryState', {
+            (await apiClient.putJson('$_endpoint/libraryState', {
               'expectedRevision': revision,
               'value': desired,
             })).decodeJson(),
@@ -296,6 +347,8 @@ class AccountSettingsSyncService {
   }
 
   void stop() {
+    _stopped = true;
+    _generation++;
     lastError = null;
   }
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
@@ -5,16 +6,106 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:program/core/storage/text_storage.dart';
+import 'package:program/core/storage/active_storage_namespace.dart';
+import 'package:program/core/storage/storage_namespace_manager.dart';
 import 'package:program/data/sync/account_session_controller.dart';
 import 'package:program/data/sync/account_settings_sync_service.dart';
 import 'package:program/data/sync/api_client.dart';
 
 void main() {
+  test('v2 settings use guarded CAS without library JSON writes', () async {
+    ActiveStorageNamespace.activate(StorageNamespace.account('account-v2'));
+    final files = <String, String>{
+      'app_prefs.json': '{"darkMode":true}',
+      'library_folders.json': '{"folders":["Local"]}',
+    };
+    textStorageReadOverride = (key) async => files[key];
+    textStorageWriteOverride = (key, value) async => files[key] = value;
+    final remote = <String, dynamic>{};
+    final paths = <String>[];
+    final api = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        paths.add(request.url.path);
+        if (request.method == 'GET' &&
+            request.url.path == '/v2/account-settings') {
+          return http.Response(jsonEncode({'settings': remote}), 200);
+        }
+        if (request.method == 'PUT' &&
+            request.url.path.startsWith('/v2/account-settings/')) {
+          final category = request.url.pathSegments.last;
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          final next = {
+            'revision': (remote[category]?['revision'] as int? ?? 0) + 1,
+            'value': body['value'],
+          };
+          remote[category] = next;
+          return http.Response(jsonEncode(next), 200);
+        }
+        fail('Unexpected v2 settings request: ${request.url.path}');
+      }),
+    )..setAccessToken('test-token');
+    addTearDown(api.close);
+    final session = AccountSessionController(api)
+      ..mode = AccountDataMode.account
+      ..userId = 'account-v2';
+    addTearDown(session.dispose);
+    final service = AccountSettingsSyncService(
+      apiClient: api,
+      session: session,
+      useV2: true,
+    );
+    await service.syncNow();
+    expect(remote['appPreferences']['value'], {'darkMode': true});
+    expect(paths, everyElement(startsWith('/v2/account-settings')));
+    expect(paths, isNot(contains('/v2/account-settings/libraryState')));
+    expect(files['library_folders.json'], '{"folders":["Local"]}');
+  });
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   tearDown(() {
     textStorageReadOverride = null;
     textStorageWriteOverride = null;
+    ActiveStorageNamespace.activate(StorageNamespace.local());
+  });
+
+  test('stopped v2 sync cannot write after an account switch', () async {
+    ActiveStorageNamespace.activate(StorageNamespace.account('account-a'));
+    final files = <String, String>{};
+    textStorageReadOverride = (key) async => files[key];
+    textStorageWriteOverride = (key, content) async => files[key] = content;
+    final delayed = Completer<http.Response>();
+    final api = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((_) => delayed.future),
+    )..setAccessToken('test-token');
+    addTearDown(api.close);
+    final session = AccountSessionController(api)
+      ..mode = AccountDataMode.account
+      ..userId = 'account-a';
+    addTearDown(session.dispose);
+    final sync = AccountSettingsSyncService(
+      apiClient: api,
+      session: session,
+      useV2: true,
+    );
+    final pending = sync.syncNow();
+    await Future<void>.delayed(Duration.zero);
+    sync.stop();
+    session.userId = 'account-b';
+    ActiveStorageNamespace.activate(StorageNamespace.account('account-b'));
+    delayed.complete(http.Response(jsonEncode({
+      'settings': {
+        'appPreferences': {
+          'revision': 1,
+          'value': {'darkMode': true},
+        },
+      },
+    }), 200));
+    await pending;
+    expect(files.containsKey('app_prefs.json'), isFalse);
+    expect(files.keys.where((key) => key.contains('cursor')), isEmpty);
   });
 
   test(

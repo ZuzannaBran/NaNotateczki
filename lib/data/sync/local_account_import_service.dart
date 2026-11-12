@@ -8,6 +8,7 @@ import '../../features/notebook/data/notebook_repository.dart';
 import '../../features/planner/state/study_planner_controller.dart';
 import '../drift/notes_database.dart';
 import 'local_import_plan.dart';
+import 'library_v2_operation_service.dart';
 
 /// Copies one explicitly authorized Local library into the active account.
 ///
@@ -20,6 +21,7 @@ class LocalAccountImportService {
     required this.planner,
     required this.isCurrentAccount,
     required this.onLibraryChanged,
+    this.libraryV2,
   });
 
   static const checkpointKey = 'local_account_import_v1.json';
@@ -29,6 +31,7 @@ class LocalAccountImportService {
   final StudyPlannerController planner;
   final bool Function() isCurrentAccount;
   final Future<void> Function() onLibraryChanged;
+  final LibraryV2OperationService? libraryV2;
 
   void _requireCurrent() {
     if (!isCurrentAccount()) {
@@ -102,51 +105,16 @@ class LocalAccountImportService {
       local: local,
       account: account,
     );
-    // v2 cannot yet represent the legacy Planner document kind. Reject the
-    // entire batch before writing anything, rather than silently dropping it.
-    if (repository.usesAccountOperations &&
-        local.any((item) => item.kind.index > 1)) {
-      throw UnsupportedError(
-        'Planner documents must be migrated after v2 planner cutover.',
-      );
-    }
     final sourceLibrary = decodeLocalImportMetadata(localLibraryText);
     final sourcePlanner = decodeLocalImportMetadata(localPlannerText);
-    if (repository.usesAccountOperations) {
-      // Folder, task and planner account operations belong to package 5.
-      // Do not mark an import complete when its metadata could never sync.
-      final sourceFolders = sourceLibrary['folders'];
-      final allFolderPaths = <String>{};
-      for (final document in local) {
-        var folder = document.folder;
-        while (folder.isNotEmpty) {
-          allFolderPaths.add(folder);
-          final separator = folder.lastIndexOf('/');
-          if (separator < 0) {
-            break;
-          }
-          folder = folder.substring(0, separator);
-        }
-      }
-      if ((sourcePlanner['sessions'] is List &&
-              (sourcePlanner['sessions'] as List).isNotEmpty) ||
-          (sourceLibrary['plannerTasks'] is Map &&
-              (sourceLibrary['plannerTasks'] as Map).isNotEmpty) ||
-          (sourceLibrary['covers'] is Map &&
-              (sourceLibrary['covers'] as Map).isNotEmpty) ||
-          (sourceFolders is List &&
-              sourceFolders.whereType<String>().any(
-                (folder) => !allFolderPaths.contains(folder),
-              ))) {
-        throw UnsupportedError(
-          'Planner, tasks and standalone folder metadata must be '
-          'migrated after package 5 enables their v2 synchronization.',
-        );
-      }
+    if (repository.usesAccountOperations && libraryV2 == null) {
+      throw StateError('Library v2 writer is required for Local import.');
     }
-    final destinationLibrary = decodeLocalImportMetadata(
-      await readStoredText('library_folders.json'),
-    );
+    final destinationLibrary = libraryV2 == null
+        ? decodeLocalImportMetadata(
+            await readStoredText('library_folders.json'),
+          )
+        : (await libraryV2!.snapshot()).value;
     final newStudyEntries = plan.newPlannerEntries(
       local: sourcePlanner,
       accountIds: planner.sessions.map((session) => session.id),
@@ -228,8 +196,61 @@ class LocalAccountImportService {
       }
     }
     _requireCurrent();
-    if (!repository.usesAccountOperations &&
-        jsonEncode(destinationLibrary) != jsonEncode(remappedLibrary)) {
+    if (libraryV2 case final v2?) {
+      // All v2 metadata is first committed to the durable operation journal.
+      final paths = (remappedLibrary['folders'] as List)
+          .whereType<String>()
+          .toSet()
+          .toList()
+        ..sort((left, right) => left.length.compareTo(right.length));
+      for (final path in paths) {
+        _requireCurrent();
+        await v2.ensureFolderPath(path);
+      }
+      final existing = await v2.snapshot();
+      final importedCovers = remappedLibrary['covers'] as Map;
+      final currentCovers = existing.value['covers'] as Map;
+      for (final pair in importedCovers.entries) {
+        if (pair.key is String &&
+            !currentCovers.containsKey(pair.key) &&
+            pair.value is Map) {
+          _requireCurrent();
+          await v2.updateCover(
+            pair.key as String,
+            Map<String, dynamic>.from(pair.value as Map),
+          );
+        }
+      }
+      final importedTasks = remappedLibrary['plannerTasks'] as Map;
+      final currentTasks = existing.value['plannerTasks'] as Map;
+      for (final pair in importedTasks.entries) {
+        if (pair.key is! String || pair.value is! List) {
+          throw const FormatException('Invalid imported planner tasks.');
+        }
+        final plannerUid = pair.key as String;
+        final known = <String>{
+          if (currentTasks[plannerUid] is List)
+            for (final task in currentTasks[plannerUid] as List)
+              if (task is Map && task['id'] is String) task['id'] as String,
+        };
+        for (final raw in pair.value as List) {
+          if (raw is! Map || raw['id'] is! String) {
+            throw const FormatException('Invalid imported planner task.');
+          }
+          final id = raw['id'] as String;
+          if (!known.add(id) || await v2.wasTaskDeleted(id)) {
+            continue;
+          }
+          _requireCurrent();
+          await v2.createTask(
+            plannerUid,
+            Map<String, dynamic>.from(raw),
+            known.length - 1,
+          );
+        }
+      }
+    } else if (jsonEncode(destinationLibrary) !=
+        jsonEncode(remappedLibrary)) {
       await writeStoredText(
         'library_folders.json',
         jsonEncode(remappedLibrary),

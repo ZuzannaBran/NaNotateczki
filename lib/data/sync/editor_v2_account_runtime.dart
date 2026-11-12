@@ -6,6 +6,7 @@ import 'api_client.dart';
 import 'editor_sqlite_projector.dart';
 import 'operation_asset_gateway.dart';
 import 'operation_gateway.dart';
+import 'library_v2_operation_service.dart';
 import 'operation_protocol.dart';
 import 'operation_store.dart';
 import 'share_ink_preview_codec.dart';
@@ -26,6 +27,7 @@ class EditorV2AccountRuntime {
     required this.projector,
     required this.store,
     required this.assetGateway,
+    required this.libraryOperations,
     required this.onLibraryChanged,
   });
 
@@ -51,6 +53,7 @@ class EditorV2AccountRuntime {
     );
     final assetGateway = OperationAssetGateway(apiClient);
     late EditorV2AccountRuntime runtime;
+    late LibraryV2OperationService libraryOperations;
     final engine = SyncEngine(
       store: store,
       gateway: HttpOperationGateway(apiClient),
@@ -59,8 +62,11 @@ class EditorV2AccountRuntime {
       apiClient: apiClient,
       enableRealtime: enableRealtime,
       applyRemote: (operation, pendingLocal) async {
-        // Disjoint objects and scalar fields merge without snapshots.
-        // Shared fields, assets and containers require full rebase.
+        if (operation.documentId == OperationEnvelope.libraryDocumentId) {
+          await libraryOperations.apply(operation);
+          return;
+        }
+        // Editor mutations never use the library projection.
         if (!V2OutboxConflictPolicy.canApply(operation, pendingLocal)) {
           throw StateError('Remote v2 operation awaits local outbox ACK.');
         }
@@ -74,6 +80,10 @@ class EditorV2AccountRuntime {
       ),
       onRemoteCommitted: (operation) => runtime._onRemoteCommitted(operation),
     );
+    libraryOperations = LibraryV2OperationService(
+      engine: engine,
+      accountId: accountId,
+    );
     runtime = EditorV2AccountRuntime._(
       repository: repository,
       writer: EditorV2OperationWriter(
@@ -86,6 +96,7 @@ class EditorV2AccountRuntime {
       projector: projector,
       store: store,
       assetGateway: assetGateway,
+      libraryOperations: libraryOperations,
       onLibraryChanged: onLibraryChanged,
     );
     return runtime;
@@ -97,6 +108,7 @@ class EditorV2AccountRuntime {
   final EditorSqliteProjector projector;
   final OperationStore store;
   final OperationAssetGateway assetGateway;
+  final LibraryV2OperationService libraryOperations;
   final Future<void> Function()? onLibraryChanged;
 
   EditorController? _activeEditor;
@@ -181,6 +193,11 @@ class EditorV2AccountRuntime {
   }
 
   Future<void> _onRemoteCommitted(OperationEnvelope operation) async {
+    if (operation.documentId == OperationEnvelope.libraryDocumentId) {
+      await libraryOperations.refreshReadModel();
+      await onLibraryChanged?.call();
+      return;
+    }
     final editor = _activeEditor;
     if (editor != null) {
       await EditorV2RemotePatchDispatcher(

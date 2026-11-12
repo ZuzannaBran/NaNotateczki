@@ -1,1 +1,1 @@
-Requested final full package 4 verification on dev, 2026-11-12, attempt 3 after Local login regression fix.
+package5-final-all-platforms-and-planner-2026-11-12
