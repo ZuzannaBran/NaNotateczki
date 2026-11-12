@@ -7,7 +7,6 @@ if [[ -z "$device" || "$#" -ne 1 ]]; then
   exit 2
 fi
 
-flutter test integration_test/native_platform_matrix_test.dart \
-  -d "$device" \
-  --dart-define=NANOTATECZKI_ISOLATED_CI=true \
-  --reporter expanded --timeout 3m
+# Flutter 3.47 can lose the simulator VM-service log before attachment.
+# Retry only that verified infrastructure stall, not failing test cases.
+python3 .github/scripts/ios_integration_watchdog.py "$device"
