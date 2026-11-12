@@ -949,6 +949,15 @@ class _AccountDialogState extends State<_AccountDialog> {
     if (!session.isSignedIn) {
       return;
     }
+    if (session.onBeforeLogout != null) {
+      if (preserveOffline) {
+        await session.logoutOffline();
+      } else {
+        await session.logout();
+      }
+      return;
+    }
+    // Compatibility with standalone session controllers used by embedders.
     final sync = context.read<LiveWebSyncService>();
     final backup = context.read<RemoteBackupScheduler>();
     final coordinator = ShutdownCoordinator(
