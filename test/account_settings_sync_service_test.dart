@@ -129,6 +129,67 @@ void main() {
     expect((remote['value'] as Map)['uiScale'], 1.5);
   });
 
+  test('v2 preimport backup cannot follow an account namespace switch', () async {
+    ActiveStorageNamespace.activate(StorageNamespace.account('account-a'));
+    final files = <String, String>{
+      'app_prefs.json': '{"darkMode":false}',
+    };
+    final preimportRead = Completer<void>();
+    final releaseRead = Completer<String?>();
+    textStorageReadOverride = (key) async {
+      if (key.startsWith('account_preimport_')) {
+        if (!preimportRead.isCompleted) {
+          preimportRead.complete();
+        }
+        return releaseRead.future;
+      }
+      return files[key];
+    };
+    textStorageWriteOverride = (key, value) async {
+      files[key] = value;
+    };
+    final api = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        expect(request.method, 'GET');
+        expect(request.url.path, '/v2/account-settings');
+        return http.Response(
+          jsonEncode({
+            'settings': {
+              'appPreferences': {
+                'revision': 3,
+                'value': {'darkMode': true},
+              },
+            },
+          }),
+          200,
+        );
+      }),
+    )..setAccessToken('test-token');
+    addTearDown(api.close);
+    final session = AccountSessionController(api)
+      ..mode = AccountDataMode.account
+      ..userId = 'account-a';
+    addTearDown(session.dispose);
+    final sync = AccountSettingsSyncService(
+      apiClient: api,
+      session: session,
+      useV2: true,
+    );
+
+    final pending = sync.syncNow();
+    await preimportRead.future;
+    sync.stop();
+    session.userId = 'account-b';
+    ActiveStorageNamespace.activate(StorageNamespace.account('account-b'));
+    releaseRead.complete(null);
+    await pending;
+    expect(files['app_prefs.json'], '{"darkMode":false}');
+    expect(files.keys.where((key) => key.startsWith('account_preimport_')),
+        isEmpty);
+    expect(files.keys.where((key) => key.contains('cursor')), isEmpty);
+  });
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   tearDown(() {
