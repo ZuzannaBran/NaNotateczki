@@ -1,3 +1,37 @@
+## Pakiet 7 — shutdown, logout i restart (2026-11-12)
+
+- `lib/app/app_scope.dart`: wspólna sekwencja `ShutdownCoordinator`
+  dla zamknięcia okna i wylogowania: koniec kontaktu rysika, flush
+  aktywnych edytorów, planera, metadanych biblioteki, SQLite,
+  tekstowego storage i lokalnego backupu, potem synchronizacja v1/v2,
+  CAS planera i ustawień oraz zweryfikowany zdalny backup.
+  Konto v2 weryfikuje ACK również odroczonego outboxu, nie miesza
+  zapisu snapshotów v1. Timeout 45 s nie anuluje arbitralnie
+  transakcji — przy niepewnym stanie nie wolno zmienić namespace.
+  Overlay pokazuje bieżący etap, a offline exit jest dostępny wyłącznie
+  po udanym lokalnym flush.
+- `lib/data/sync/account_session_controller.dart`: `onBeforeLogout`,
+  `logoutOffline()`; tożsamość, tokeny i kolejka pozostają nietknięte,
+  jeżeli lokalny zapis lub drenaż transportu kończy się błędem.
+  Po bezpiecznym wylogowaniu offline nie wysyła się revoke, zaś
+  operacje pozostają w namespace konta do ponownego logowania.
+- `lib/data/sync/planner_sync_service.dart` i
+  `account_settings_sync_service.dart`: `stopAndDrain` czeka na
+  stare żądania HTTP przed wymianą tożsamości.
+  `lib/features/library/presentation/library_account_slot.dart`,
+  `lib/app/account_protocol_editor_gate.dart` i
+  `unsupported_account_protocol_screen.dart` oferują
+  kontrolowane ponowienie albo logout offline, również przy blokadzie v2.
+- Regresje: `test/shutdown_coordinator_test.dart`,
+  `test/account_session_controller_test.dart`,
+  `test/planner_sync_service_test.dart`,
+  `test/account_settings_sync_service_test.dart`,
+  `test/account_protocol_editor_gate_test.dart`,
+  `test/unsupported_account_protocol_screen_test.dart`,
+  `test/cross_platform/save_and_exit_test.dart`.
+  Scenariusze ręczne: `docs/ETAP_10_SHUTDOWN.md`.
+- Nie uruchamia produkcyjnego cutover v1→v2 i nie usuwa legacy writerów.
+
 # PROJECT_MAP.md
 
 ## Pakiet 5 — Planner, foldery, zadania i ustawienia v2 (2026-11-12)

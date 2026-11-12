@@ -1,3 +1,29 @@
+## Pakiet 7: zamykanie, wylogowanie i restart (2026-11-12)
+
+Zarówno desktop exit, jak i explicit logout korzystają z tej samej kolejności:
+koniec gestu → trwały flush edytora, planera, biblioteki, SQLite, tekstowych
+plików i lokalnego backupu → próba synchronizacji → weryfikacja backupu
+konto/wersja → zatrzymanie transportów przed zmianą konta. V2 sprawdza
+niewysłany i odroczony outbox po `SyncEngine.syncNow`; oczekujące wpisy
+oznaczają brak ACK, a nie zgodę na wyczyszczenie kolejki. Planner i ustawienia
+CAS muszą zostać sprawdzone przed backupem.
+
+Całość ma limit 45 s i raport etapu błędu. Timeout na Future nie jest
+anulowaniem operacji: przy nieukończonym drenażu starego transportu konto
+zostaje aktywne, aby późny zapis nie przeszedł do innego namespace.
+Na wyraźny wybór użytkownika tryb offline pomija tylko żądania zdalne;
+wymaga trwałego zapisu lokalnego i zatrzymania transportów, zachowuje
+niepotwierdzony outbox w namespace konta i usuwa wyłącznie credentiale.
+Powrót na to samo konto odtwarza jego niezmienione UUID i actorSeq oraz
+ponawia synchronizację. Przymusowe zabicie procesu nie może gwarantować
+domknięcia aktywnego gestu; zatwierdzone transakcje pozostają trwałe.
+
+`AccountSessionController.logoutOffline`, `AppScope._prepareAccountLogout`
+oraz `PlannerSyncService.stopAndDrain` /
+`AccountSettingsSyncService.stopAndDrain` implementują te granice.
+Testy i ręczne scenariusze: `docs/ETAP_10_SHUTDOWN.md`.
+Bez produkcyjnej aktywacji v2.
+
 ## Pakiet 6: backup i odtwarzanie kont v2 (2026-11-12)
 
 - Dopiero protokół serwera v2 dopuszcza `/v2/backups` z envelope
