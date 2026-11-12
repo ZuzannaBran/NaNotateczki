@@ -10,7 +10,8 @@ OperationEnvelope operation(
   String actor = 'device-a',
 }) {
   final serial = clock.toString().padLeft(12, '0');
-  final uuid = '11111111-2222-4333-8444-' +
+  final uuid =
+      '11111111-2222-4333-8444-' +
       (actor == 'device-z' ? '999999999999' : serial);
   return OperationEnvelope(
     operationId: uuid,
@@ -46,37 +47,45 @@ void main() {
       }),
     ]);
     expect(moved.folderIdsByPath['Renamed/B'], child);
-    expect(() => LibraryV2OperationReducer.replay([
-      ...created,
-      operation(OperationKind.folderMove, root, 3, {
-        'properties': {'parentId': child},
-      }),
-    ]), throwsStateError);
+    expect(
+      () => LibraryV2OperationReducer.replay([
+        ...created,
+        operation(OperationKind.folderMove, root, 3, {
+          'properties': {'parentId': child},
+        }),
+      ]),
+      throwsStateError,
+    );
   });
 
-  test('field ranks converge after concurrent edits and deletes never revive', () {
-    final create = operation(OperationKind.folderCreate, root, 1, {
-      'value': {'name': 'Original', 'parentId': null},
-    });
-    final older = operation(OperationKind.folderSet, root, 4, {
-      'properties': {'name': 'Old'},
-    }, actor: 'device-a');
-    final newer = operation(OperationKind.folderSet, root, 4, {
-      'properties': {'name': 'New'},
-    }, actor: 'device-z');
-    for (final changes in [[older, newer], [newer, older]]) {
-      final state = LibraryV2OperationReducer.replay([create, ...changes]);
-      expect(state.folderIdsByPath.keys, ['New']);
-    }
-    final deleted = operation(OperationKind.folderDelete, root, 5, {});
-    final state = LibraryV2OperationReducer.replay([
-      create, deleted, older,
-    ]);
-    expect(state.folderIdsByPath, isEmpty);
-    expect(() => LibraryV2OperationReducer.replay([
-      create, deleted, create,
-    ]), throwsStateError);
-  });
+  test(
+    'field ranks converge after concurrent edits and deletes never revive',
+    () {
+      final create = operation(OperationKind.folderCreate, root, 1, {
+        'value': {'name': 'Original', 'parentId': null},
+      });
+      final older = operation(OperationKind.folderSet, root, 4, {
+        'properties': {'name': 'Old'},
+      }, actor: 'device-a');
+      final newer = operation(OperationKind.folderSet, root, 4, {
+        'properties': {'name': 'New'},
+      }, actor: 'device-z');
+      for (final changes in [
+        [older, newer],
+        [newer, older],
+      ]) {
+        final state = LibraryV2OperationReducer.replay([create, ...changes]);
+        expect(state.folderIdsByPath.keys, ['New']);
+      }
+      final deleted = operation(OperationKind.folderDelete, root, 5, {});
+      final state = LibraryV2OperationReducer.replay([create, deleted, older]);
+      expect(state.folderIdsByPath, isEmpty);
+      expect(
+        () => LibraryV2OperationReducer.replay([create, deleted, create]),
+        throwsStateError,
+      );
+    },
+  );
 
   test('simultaneous same-name folders retain both UIDs after replay', () {
     final first = operation(OperationKind.folderCreate, root, 1, {
@@ -85,7 +94,10 @@ void main() {
     final second = operation(OperationKind.folderCreate, child, 2, {
       'value': {'name': 'School', 'parentId': null},
     });
-    for (final order in [[first, second], [second, first]]) {
+    for (final order in [
+      [first, second],
+      [second, first],
+    ]) {
       final view = LibraryV2OperationReducer.replay(order);
       expect(view.folderIdsByPath['School'], root);
       expect(view.folderIdsByPath['School (bbbbbbbb)'], child);
@@ -112,9 +124,14 @@ void main() {
     expect(entries.single['completed'], true);
     final deleted = operation(OperationKind.taskDelete, task, 3, {});
     expect(
-      (LibraryV2OperationReducer.replay(
-        [created, updated, deleted, updated],
-      ).value['plannerTasks'] as Map).isEmpty,
+      (LibraryV2OperationReducer.replay([
+                created,
+                updated,
+                deleted,
+                updated,
+              ]).value['plannerTasks']
+              as Map)
+          .isEmpty,
       true,
     );
   });

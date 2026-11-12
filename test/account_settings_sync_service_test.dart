@@ -95,14 +95,19 @@ void main() {
     sync.stop();
     session.userId = 'account-b';
     ActiveStorageNamespace.activate(StorageNamespace.account('account-b'));
-    delayed.complete(http.Response(jsonEncode({
-      'settings': {
-        'appPreferences': {
-          'revision': 1,
-          'value': {'darkMode': true},
-        },
-      },
-    }), 200));
+    delayed.complete(
+      http.Response(
+        jsonEncode({
+          'settings': {
+            'appPreferences': {
+              'revision': 1,
+              'value': {'darkMode': true},
+            },
+          },
+        }),
+        200,
+      ),
+    );
     await pending;
     expect(files.containsKey('app_prefs.json'), isFalse);
     expect(files.keys.where((key) => key.contains('cursor')), isEmpty);

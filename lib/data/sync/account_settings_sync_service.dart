@@ -97,9 +97,7 @@ class AccountSettingsSyncService {
             checkpoint['settings'] as Map<String, dynamic>,
           )
         : <String, dynamic>{};
-    final response = _object(
-      (await apiClient.get(_endpoint)).decodeJson(),
-    );
+    final response = _object((await apiClient.get(_endpoint)).decodeJson());
     if (!_current(userId, generation)) {
       return;
     }

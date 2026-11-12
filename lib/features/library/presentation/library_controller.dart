@@ -205,9 +205,7 @@ class LibraryController extends ChangeNotifier {
             source: 'LibraryController.loadItems(reset_restore_failed)',
           );
         }
-      } else if (_v2LibraryOperations == null &&
-          items.isEmpty &&
-          wasReset) {
+      } else if (_v2LibraryOperations == null && items.isEmpty && wasReset) {
         AppErrorLog.instance.record(
           'Database recovery is pending, but no local backup snapshot was '
           'available for automatic restore.',

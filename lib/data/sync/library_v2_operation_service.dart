@@ -84,14 +84,18 @@ class LibraryV2OperationReducer {
       final isFolder = kind.target == OperationTarget.folder;
       final nodes = isFolder ? folders : tasks;
       final deleted = isFolder ? deletedFolders : deletedTasks;
-      final isCreate = kind == OperationKind.folderCreate ||
+      final isCreate =
+          kind == OperationKind.folderCreate ||
           kind == OperationKind.taskCreate;
-      final isDelete = kind == OperationKind.folderDelete ||
+      final isDelete =
+          kind == OperationKind.folderDelete ||
           kind == OperationKind.taskDelete;
       if (isDelete) {
         if (isFolder &&
-            folders.entries.any((entry) =>
-                entry.key != id && entry.value.fields['parentId'] == id)) {
+            folders.entries.any(
+              (entry) =>
+                  entry.key != id && entry.value.fields['parentId'] == id,
+            )) {
           throw StateError('Folder still contains a child.');
         }
         nodes.remove(id);
@@ -171,15 +175,12 @@ class LibraryV2OperationReducer {
       }
     }
     final folderNames = paths.keys.toList()..sort();
-    return LibraryV2Snapshot(
-      Map.unmodifiable(paths),
-      {
-        'folders': folderNames,
-        'covers': covers,
-        'plannerTasks': tasksByPlanner,
-        'recentCoverColors': colors.take(12).toList(),
-      },
-    );
+    return LibraryV2Snapshot(Map.unmodifiable(paths), {
+      'folders': folderNames,
+      'covers': covers,
+      'plannerTasks': tasksByPlanner,
+      'recentCoverColors': colors.take(12).toList(),
+    });
   }
 
   static void _validateFolders(Map<String, _LibraryNode> folders) {
@@ -261,10 +262,7 @@ class LibraryV2OperationReducer {
 /// The library_folders.json file is a disposable compatibility read-model.
 /// It is regenerated from SQLite on startup and after remote commits.
 class LibraryV2OperationService {
-  LibraryV2OperationService({
-    required this.engine,
-    required this.accountId,
-  });
+  LibraryV2OperationService({required this.engine, required this.accountId});
 
   final SyncEngine engine;
   final String accountId;
@@ -273,20 +271,21 @@ class LibraryV2OperationService {
   NotesDatabase get _database => engine.store.database;
 
   void _requireNamespace() {
-    if (ActiveStorageNamespace.current !=
-        StorageNamespace.account(accountId)) {
+    if (ActiveStorageNamespace.current != StorageNamespace.account(accountId)) {
       throw StateError('Library v2 belongs to another account.');
     }
   }
 
   Future<List<OperationEnvelope>> _history() async {
-    final rows = await _database.customSelect(
-      'SELECT envelope_json FROM operations WHERE document_id = ? '
-      'ORDER BY rowid',
-      variables: [
-        const Variable<String>(OperationEnvelope.libraryDocumentId),
-      ],
-    ).get();
+    final rows = await _database
+        .customSelect(
+          'SELECT envelope_json FROM operations WHERE document_id = ? '
+          'ORDER BY rowid',
+          variables: [
+            const Variable<String>(OperationEnvelope.libraryDocumentId),
+          ],
+        )
+        .get();
     return [
       for (final row in rows)
         OperationEnvelope.fromJson(
@@ -305,10 +304,7 @@ class LibraryV2OperationService {
   /// Invoked inside the journal transaction before an envelope is appended.
   Future<void> apply(OperationEnvelope operation) async {
     _requireNamespace();
-    LibraryV2OperationReducer.replay([
-      ...await _history(),
-      operation,
-    ]);
+    LibraryV2OperationReducer.replay([...await _history(), operation]);
   }
 
   Future<void> refreshReadModel() {
@@ -366,10 +362,7 @@ class LibraryV2OperationService {
           'library-folder:$accountId:$parentPath',
         ),
         {
-          'value': {
-            'name': segments[count - 1],
-            'parentId': parent,
-          },
+          'value': {'name': segments[count - 1], 'parentId': parent},
         },
       );
     }
@@ -384,7 +377,6 @@ class LibraryV2OperationService {
     if (state.folderIdsByPath.containsKey(path)) {
       throw StateError('Folder already exists.');
     }
-    final separator = path.lastIndexOf('/');
     final name = separator < 0 ? path : path.substring(separator + 1);
     final parentPath = separator < 0 ? null : path.substring(0, separator);
     final parent = parentPath == null
@@ -393,13 +385,9 @@ class LibraryV2OperationService {
     if (parentPath != null && parent == null) {
       throw StateError('Folder parent is missing.');
     }
-    await _commit(
-      OperationKind.folderCreate,
-      const Uuid().v4(),
-      {
-        'value': {'name': name, 'parentId': parent},
-      },
-    );
+    await _commit(OperationKind.folderCreate, const Uuid().v4(), {
+      'value': {'name': name, 'parentId': parent},
+    });
   }
 
   Future<void> renameFolder(String path, String nextPath) async {
@@ -431,10 +419,7 @@ class LibraryV2OperationService {
     });
   }
 
-  Future<void> updateCover(
-    String path,
-    Map<String, dynamic> cover,
-  ) async {
+  Future<void> updateCover(String path, Map<String, dynamic> cover) async {
     await ensureFolderPath(path);
     final state = await snapshot();
     final id = state.folderIdsByPath[path];
@@ -449,10 +434,11 @@ class LibraryV2OperationService {
   Future<void> deleteTree(String root) async {
     await ensureFolderPath(root);
     final state = await snapshot();
-    final children = state.folderIdsByPath.keys
-        .where((path) => path == root || path.startsWith(root + '/'))
-        .toList()
-      ..sort((a, b) => b.length.compareTo(a.length));
+    final children =
+        state.folderIdsByPath.keys
+            .where((path) => path == root || path.startsWith(root + '/'))
+            .toList()
+          ..sort((a, b) => b.length.compareTo(a.length));
     if (children.isEmpty) {
       throw StateError('Folder is missing.');
     }
@@ -491,18 +477,11 @@ class LibraryV2OperationService {
       throw ArgumentError.value(id, 'id', 'Task ID is required.');
     }
     await _commit(OperationKind.taskCreate, id, {
-      'value': {
-        ...task,
-        'plannerUid': plannerUid,
-        'sortIndex': sortIndex,
-      },
+      'value': {...task, 'plannerUid': plannerUid, 'sortIndex': sortIndex},
     });
   }
 
-  Future<void> updateTask(
-    String id,
-    Map<String, dynamic> task,
-  ) async {
+  Future<void> updateTask(String id, Map<String, dynamic> task) async {
     final fields = Map<String, dynamic>.from(task)..remove('id');
     await _commit(OperationKind.taskSet, id, {'properties': fields});
   }

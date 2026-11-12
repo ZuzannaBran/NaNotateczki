@@ -38,8 +38,7 @@ void main() {
     ActiveStorageNamespace.activate(StorageNamespace.local());
   });
 
-  test('planner, folder subtree and task changes use the v2 journal',
-      () async {
+  test('planner, folder subtree and task changes use the v2 journal', () async {
     const user = 'v2-integration-account';
     ActiveStorageNamespace.activate(StorageNamespace.account(user));
     final files = <String, String>{};
@@ -49,10 +48,7 @@ void main() {
     final database = NotesDatabase(NativeDatabase.memory());
     addTearDown(database.close);
     final repository = NotebookRepository(database);
-    final store = OperationStore(
-      database,
-      checkpointScope: 'account:$user',
-    );
+    final store = OperationStore(database, checkpointScope: 'account:$user');
     final projector = EditorSqliteProjector(database);
     final engine = SyncEngine(
       store: store,
@@ -71,10 +67,7 @@ void main() {
       ),
     );
 
-    final journal = LibraryV2OperationService(
-      engine: engine,
-      accountId: user,
-    );
+    final journal = LibraryV2OperationService(engine: engine, accountId: user);
     final library = LibraryController(
       repository,
       CloudSyncService(repository),
@@ -94,16 +87,22 @@ void main() {
       completed: true,
     );
     expect(library.plannerTasks(planner.uid).single.completed, isTrue);
-    expect((await journal.snapshot()).value['plannerTasks'][planner.uid],
-        hasLength(1));
+    expect(
+      (await journal.snapshot()).value['plannerTasks'][planner.uid],
+      hasLength(1),
+    );
 
     await library.createFolder('Archive');
     final moved = await library.moveFolderToFolder('School', 'Archive');
     expect(moved, 'Archive/School');
-    expect((await journal.snapshot()).folderIdsByPath.keys,
-        contains('Archive/School/Physics'));
-    expect((await repository.getNotebook(planner.uid))?.folder,
-        'Archive/School/Physics');
+    expect(
+      (await journal.snapshot()).folderIdsByPath.keys,
+      contains('Archive/School/Physics'),
+    );
+    expect(
+      (await repository.getNotebook(planner.uid))?.folder,
+      'Archive/School/Physics',
+    );
 
     await library.deleteItem(planner.uid);
     await library.deleteFolder('Archive');
@@ -115,15 +114,22 @@ void main() {
     expect(stored['plannerTasks'], isEmpty);
 
     final operations = await store.pending();
-    expect(operations.where((op) =>
-        op.documentId == OperationEnvelope.libraryDocumentId), isNotEmpty);
+    expect(
+      operations.where(
+        (op) => op.documentId == OperationEnvelope.libraryDocumentId,
+      ),
+      isNotEmpty,
+    );
     expect(operations.map((op) => op.kind), contains(OperationKind.taskDelete));
     expect(operations.map((op) => op.kind), contains(OperationKind.folderMove));
-    expect(await store.isTombstoned(
-      OperationEnvelope.libraryDocumentId,
-      'task',
-      task.id,
-    ), isTrue);
+    expect(
+      await store.isTombstoned(
+        OperationEnvelope.libraryDocumentId,
+        'task',
+        task.id,
+      ),
+      isTrue,
+    );
   });
 
   test('writes are rejected when the account namespace changes', () async {
@@ -141,10 +147,7 @@ void main() {
       applyRemote: (_, __) async {},
     );
     addTearDown(engine.stop);
-    final journal = LibraryV2OperationService(
-      engine: engine,
-      accountId: user,
-    );
+    final journal = LibraryV2OperationService(engine: engine, accountId: user);
     await expectLater(journal.createFolder('Leaked'), throwsStateError);
     expect(await store.pending(), isEmpty);
   });

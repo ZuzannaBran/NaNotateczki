@@ -198,11 +198,12 @@ class LocalAccountImportService {
     _requireCurrent();
     if (libraryV2 case final v2?) {
       // All v2 metadata is first committed to the durable operation journal.
-      final paths = (remappedLibrary['folders'] as List)
-          .whereType<String>()
-          .toSet()
-          .toList()
-        ..sort((left, right) => left.length.compareTo(right.length));
+      final paths =
+          (remappedLibrary['folders'] as List)
+              .whereType<String>()
+              .toSet()
+              .toList()
+            ..sort((left, right) => left.length.compareTo(right.length));
       for (final path in paths) {
         _requireCurrent();
         await v2.ensureFolderPath(path);
@@ -249,8 +250,7 @@ class LocalAccountImportService {
           );
         }
       }
-    } else if (jsonEncode(destinationLibrary) !=
-        jsonEncode(remappedLibrary)) {
+    } else if (jsonEncode(destinationLibrary) != jsonEncode(remappedLibrary)) {
       await writeStoredText(
         'library_folders.json',
         jsonEncode(remappedLibrary),

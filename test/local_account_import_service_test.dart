@@ -224,85 +224,93 @@ void main() {
     },
   );
 
-  test('v2 Local import persists planner folders and tasks as operations',
-      () async {
-    ActiveStorageNamespace.activate(StorageNamespace.account('account-a'));
-    final sourcePlanner = await local.createPlanner(folder: 'School');
-    final importedTaskId = importedLocalUid(
-      'account-a', 'task:${sourcePlanner.uid}', 'task-local-1',
-    );
-    final store = OperationStore(
-      accountDb,
-      checkpointScope: 'account:account-a',
-    );
-    final projector = EditorSqliteProjector(accountDb);
-    final engine = SyncEngine(
-      store: store,
-      gateway: _OfflineGateway(),
-      actorId: 'import-v2-actor',
-      checkpointScope: 'account:account-a',
-      enableRealtime: false,
-      applyRemote: (op, pending) => projector.apply(op),
-    );
-    addTearDown(engine.stop);
-    await account.enableAccountOperations(
-      EditorV2OperationWriter(
-        syncEngine: engine,
-        projector: projector,
-        onCommitted: account.reportOperationCommit,
-      ),
-    );
-    final journal = LibraryV2OperationService(
-      engine: engine,
-      accountId: 'account-a',
-    );
-    final importer = LocalAccountImportService(
-      accountId: 'account-a',
-      repository: account,
-      planner: planner,
-      libraryV2: journal,
-      isCurrentAccount: () => active,
-      onLibraryChanged: () async {},
-    );
-    final localLibrary = jsonEncode({
-      'folders': ['School', 'School/Lab'],
-      'covers': {
-        'School': {'shape': 'star'},
-      },
-      'plannerTasks': {
-        sourcePlanner.uid: [
-          {'id': 'task-local-1', 'title': 'Lab review', 'completed': true},
-        ],
-      },
-    });
-    expect(
+  test(
+    'v2 Local import persists planner folders and tasks as operations',
+    () async {
+      ActiveStorageNamespace.activate(StorageNamespace.account('account-a'));
+      final sourcePlanner = await local.createPlanner(folder: 'School');
+      final importedTaskId = importedLocalUid(
+        'account-a',
+        'task:${sourcePlanner.uid}',
+        'task-local-1',
+      );
+      final store = OperationStore(
+        accountDb,
+        checkpointScope: 'account:account-a',
+      );
+      final projector = EditorSqliteProjector(accountDb);
+      final engine = SyncEngine(
+        store: store,
+        gateway: _OfflineGateway(),
+        actorId: 'import-v2-actor',
+        checkpointScope: 'account:account-a',
+        enableRealtime: false,
+        applyRemote: (op, pending) => projector.apply(op),
+      );
+      addTearDown(engine.stop);
+      await account.enableAccountOperations(
+        EditorV2OperationWriter(
+          syncEngine: engine,
+          projector: projector,
+          onCommitted: account.reportOperationCommit,
+        ),
+      );
+      final journal = LibraryV2OperationService(
+        engine: engine,
+        accountId: 'account-a',
+      );
+      final importer = LocalAccountImportService(
+        accountId: 'account-a',
+        repository: account,
+        planner: planner,
+        libraryV2: journal,
+        isCurrentAccount: () => active,
+        onLibraryChanged: () async {},
+      );
+      final localLibrary = jsonEncode({
+        'folders': ['School', 'School/Lab'],
+        'covers': {
+          'School': {'shape': 'star'},
+        },
+        'plannerTasks': {
+          sourcePlanner.uid: [
+            {'id': 'task-local-1', 'title': 'Lab review', 'completed': true},
+          ],
+        },
+      });
+      expect(
+        await importer.runWithSource(
+          sourceRepository: local,
+          localLibraryText: localLibrary,
+          localPlannerText: null,
+        ),
+        2,
+      );
+      final projected = await journal.snapshot();
+      expect(projected.folderIdsByPath.keys, contains('School/Lab'));
+      final plannerUid = importedLocalUid(
+        'account-a',
+        'document',
+        sourcePlanner.uid,
+      );
+      expect(projected.value['plannerTasks'][plannerUid], hasLength(1));
+      expect(await account.getNotebook(plannerUid), isNotNull);
+      expect(
+        (await store.pending()).map((op) => op.kind),
+        contains(OperationKind.taskCreate),
+      );
+
+      await journal.deleteTask(importedTaskId);
+      files.remove(LocalAccountImportService.checkpointKey);
       await importer.runWithSource(
         sourceRepository: local,
         localLibraryText: localLibrary,
         localPlannerText: null,
-      ),
-      2,
-    );
-    final projected = await journal.snapshot();
-    expect(projected.folderIdsByPath.keys, contains('School/Lab'));
-    final plannerUid = importedLocalUid(
-      'account-a', 'document', sourcePlanner.uid,
-    );
-    expect(projected.value['plannerTasks'][plannerUid], hasLength(1));
-    expect(await account.getNotebook(plannerUid), isNotNull);
-    expect((await store.pending()).map((op) => op.kind),
-        contains(OperationKind.taskCreate));
-
-    await journal.deleteTask(importedTaskId);
-    files.remove(LocalAccountImportService.checkpointKey);
-    await importer.runWithSource(
-      sourceRepository: local,
-      localLibraryText: localLibrary,
-      localPlannerText: null,
-    );
-    expect(await journal.wasTaskDeleted(importedTaskId), isTrue);
-    expect((await journal.snapshot()).value['plannerTasks'], isEmpty);
-  });
+      );
+      expect(await journal.wasTaskDeleted(importedTaskId), isTrue);
+      expect((await journal.snapshot()).value['plannerTasks'], isEmpty);
+    },
+  );
 
   test(
     'account switch fence retains pending import and Local source',
