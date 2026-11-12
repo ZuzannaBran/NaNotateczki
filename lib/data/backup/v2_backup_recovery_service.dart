@@ -54,6 +54,16 @@ class V2BackupRecoveryService {
 
   String get _scope => 'account:${_accountId}';
 
+  Future<void> _refreshCredentials() async {
+    final expiresAt = session.accessExpiresAt;
+    if (expiresAt != null &&
+        DateTime.now().toUtc().isAfter(
+          expiresAt.subtract(const Duration(minutes: 1)),
+        )) {
+      await session.refresh();
+    }
+  }
+
   void _assertAccount(String id) {
     if (_accountId != id ||
         ActiveStorageNamespace.current != StorageNamespace.account(id)) {
@@ -96,6 +106,8 @@ class V2BackupRecoveryService {
     required String deviceId,
   }) async {
     final accountId = _accountId;
+    _assertAccount(accountId);
+    await _refreshCredentials();
     _assertAccount(accountId);
     if (!_uuidPattern.hasMatch(deviceId)) {
       throw const FormatException('Backup device ID must be a UUID.');
@@ -272,6 +284,8 @@ class V2BackupRecoveryService {
   /// A failed or interrupted replay retains the pending marker and cursor.
   Future<bool> recoverVerifiedArchive({required bool databaseWasReset}) async {
     final accountId = _accountId;
+    _assertAccount(accountId);
+    await _refreshCredentials();
     _assertAccount(accountId);
     final listing = _asObject((await apiClient.get('/v2/backups')).decodeJson());
     final backups = listing['backups'];
