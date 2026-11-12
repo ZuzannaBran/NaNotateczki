@@ -1015,6 +1015,12 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   zatwierdzonych uprawnieniami i ograniczonych rozmiarem podglądów przez
   WebSocket, poza PostgreSQL i ACK; test
   `server/api/tests/test_share_preview_protocol.py`. Lustro w serwerze.
+  Zalogowany WebSocket v2 przyjmuje także dokładny komunikat
+  `{"type":"unsubscribe"}`, zwraca `{"type":"unsubscribed"}` po
+  zakończeniu subskrypcji i zwalnia kolejkę bez zmiany operacji/ACK.
+  Nie mieszać `unsubscribed` (dobrowolne wyjście klienta) z `ended`
+  (koniec udziału). Testy: `server/api/tests/test_native_realtime.py`
+  i `server/api/tests/test_stage12_real_stack.py` na prawdziwym PostgreSQL.
 - `server/api/app/routers/assets.py`: dla zaproszonego gościa historyczne
   `asset.attach` tej samej pary właściciel–UID uprawnia do ponownego
   odczytu SHA przy odtwarzaniu pełnego dziennika; inne dokumenty zabronione.
