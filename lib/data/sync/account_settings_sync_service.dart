@@ -351,6 +351,9 @@ class AccountSettingsSyncService {
               generation,
             );
           }
+          if (!_current(userId, generation)) {
+            return false;
+          }
           await writeStoredText(fileKey, jsonEncode(mergedLocal));
           applied = true;
         } finally {
