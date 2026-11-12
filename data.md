@@ -1,3 +1,29 @@
+## Pakiet 6: backup i odtwarzanie kont v2 (2026-11-12)
+
+- Dopiero protokół serwera v2 dopuszcza `/v2/backups` z envelope
+  `version=3`, `protocol=operations-v2`; konto v1 i stare kopie v2
+  pozostają na `/v1/backups`, bez mieszanego writera.
+- Pełna historia zaakceptowanych `OperationEnvelope` do checkpointu,
+  sumy SHA-256 i `schemaVersion` są weryfikowane po obu stronach.
+  Niewysłany outbox blokuje backup; lokalnego stanu nie zastępuje się
+  snapshotowym writerem `NotebookRepository`.
+- Assety JPEG/PNG/WebP/PDF są niezmiennymi rekordami SHA-256 w
+  `assets-v2`. Backup wskazuje ich sumy/rozmiar/MIME; serwer sprawdza
+  rzeczywisty plik przy finalize. Przy recovery klient pobiera zweryfikowane
+  bajty; brak/uszkodzenie jest błędem, nie pustym obrazem.
+- Lost SQLite/IndexedDB lub recovery `pending` wywołują bezstratny,
+  idempotentny replay do lokalnej bazy i catch-up nowych operacji przed
+  odblokowaniem edycji. Starszy checkpoint nie cofa zachowanego nowszego;
+  tombstone trwa po restarcie. Marker pending wiąże próbę z backupId.
+- Scheduler korzysta z dotychczasowych opóźnień 15/30/60/120/300/900/1800
+  sekund i trybu dirty; nie serializuje niezmienionych dokumentów do
+  pełnych JSON. Zachowuje limit 64 MiB oraz pełnego archiwum 100000 zdarzeń.
+  Po stronie serwera kopia awaryjna musi zawierać także katalog `assets-v2`.
+- Zakres zmian: `lib/data/backup/v2_backup_recovery_service.dart`,
+  `lib/app/app_scope.dart`, `remote_backup_scheduler.dart`,
+  `api/app/routers/backups.py`, `api/app/main.py`, `api/app/schemas.py`,
+  testy `v2_backup_recovery_test.dart`, `test_backup_v2*.py`.
+
 ## Import Local → konto (pakiet 4, 2026-11-11)
 
 - Import tylko po jawnym wyborze użytkownika; Local pozostaje nienaruszony.
