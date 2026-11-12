@@ -23,9 +23,7 @@ void main() {
     expect(logoutCalls, 1);
   });
 
-  testWidgets('can preserve local changes when v2 sync fails', (
-    tester,
-  ) async {
+  testWidgets('can preserve local changes when v2 sync fails', (tester) async {
     var offline = 0;
     await tester.pumpWidget(
       MaterialApp(

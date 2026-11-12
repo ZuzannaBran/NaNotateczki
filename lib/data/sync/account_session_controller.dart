@@ -455,15 +455,16 @@ class AccountSessionController extends ChangeNotifier {
       return running;
     }
     late final Future<void> pending;
-    pending = Future<void>.microtask(
-      () => _logout(preserveOffline: preserveOffline),
-    ).whenComplete(() {
-      if (identical(_logoutInProgress, pending)) {
-        _logoutInProgress = null;
-        isBusy = false;
-        _notifyIfActive();
-      }
-    });
+    pending =
+        Future<void>.microtask(
+          () => _logout(preserveOffline: preserveOffline),
+        ).whenComplete(() {
+          if (identical(_logoutInProgress, pending)) {
+            _logoutInProgress = null;
+            isBusy = false;
+            _notifyIfActive();
+          }
+        });
     // Keep startup blocked through HTTP revocation and credential deletion,
     // after the writer drain itself has already released its barrier.
     _logoutInProgress = pending;

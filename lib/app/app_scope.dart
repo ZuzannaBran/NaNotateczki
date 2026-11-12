@@ -102,8 +102,9 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   bool _databaseFreshFile = false;
   final ValueNotifier<bool> _finishingExit = ValueNotifier<bool>(false);
   final ValueNotifier<String?> _exitFailure = ValueNotifier<String?>(null);
-  final ValueNotifier<ShutdownPhase> _exitPhase =
-      ValueNotifier<ShutdownPhase>(ShutdownPhase.idle);
+  final ValueNotifier<ShutdownPhase> _exitPhase = ValueNotifier<ShutdownPhase>(
+    ShutdownPhase.idle,
+  );
   final ValueNotifier<bool> _allowOfflineExit = ValueNotifier<bool>(false);
   Future<void>? _exitDrain;
   bool _allowExit = false;

@@ -137,10 +137,7 @@ class _AccountProtocolEditorGateState extends State<AccountProtocolEditorGate> {
                       TextButton(
                         onPressed: _signingOut
                             ? null
-                            : () => _attempt(
-                                loggingOut: true,
-                                offline: true,
-                              ),
+                            : () => _attempt(loggingOut: true, offline: true),
                         child: const Text('Log out offline'),
                       ),
                   ],

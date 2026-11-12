@@ -40,8 +40,7 @@ class _UnsupportedAccountProtocolScreenState
       if (mounted) {
         setState(() {
           _error = 'Log out failed: $error';
-          _canSignOutOffline =
-              error is ShutdownInterrupted && error.localSafe;
+          _canSignOutOffline = error is ShutdownInterrupted && error.localSafe;
         });
       }
     } finally {
