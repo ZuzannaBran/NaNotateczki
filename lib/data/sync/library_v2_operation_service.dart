@@ -323,8 +323,9 @@ class LibraryV2OperationService {
   Future<void> _commit(
     OperationKind kind,
     String id,
-    Map<String, dynamic> payload,
-  ) async {
+    Map<String, dynamic> payload, {
+    bool refresh = true,
+  }) async {
     _requireNamespace();
     await engine.writeLocal(
       documentId: OperationEnvelope.libraryDocumentId,
@@ -333,7 +334,34 @@ class LibraryV2OperationService {
       payload: payload,
       apply: apply,
     );
-    await refreshReadModel();
+    if (refresh) {
+      await refreshReadModel();
+    }
+  }
+
+  /// Relocates a subtree and its document metadata in one SQLite commit.
+  ///
+  /// A failed document write rolls back the folder envelope, all earlier
+  /// document envelopes, their projections and the pending outbox rows.
+  /// The compatibility read model is refreshed only after that commit.
+  Future<void> _commitRelocation(
+    OperationKind kind,
+    String id,
+    Map<String, dynamic> payload,
+    Future<void> Function()? updateDocuments,
+  ) async {
+    if (updateDocuments == null) {
+      await _commit(kind, id, payload);
+      return;
+    }
+    try {
+      await _database.transaction(() async {
+        await _commit(kind, id, payload, refresh: false);
+        await updateDocuments();
+      });
+    } finally {
+      await refreshReadModel();
+    }
   }
 
   /// Registers a parent inferred from an existing document folder path.
@@ -383,19 +411,27 @@ class LibraryV2OperationService {
     });
   }
 
-  Future<void> renameFolder(String path, String nextPath) async {
+  Future<void> renameFolder(
+    String path,
+    String nextPath, {
+    Future<void> Function()? updateDocuments,
+  }) async {
     await ensureFolderPath(path);
     final state = await snapshot();
     final id = state.folderIdsByPath[path];
     if (id == null || state.folderIdsByPath.containsKey(nextPath)) {
       throw StateError('Folder rename collides or is missing.');
     }
-    await _commit(OperationKind.folderSet, id, {
+    await _commitRelocation(OperationKind.folderSet, id, {
       'properties': {'name': nextPath.split('/').last},
-    });
+    }, updateDocuments);
   }
 
-  Future<void> moveFolder(String path, String targetParent) async {
+  Future<void> moveFolder(
+    String path,
+    String targetParent, {
+    Future<void> Function()? updateDocuments,
+  }) async {
     await ensureFolderPath(path);
     await ensureFolderPath(targetParent);
     final state = await snapshot();
@@ -407,9 +443,9 @@ class LibraryV2OperationService {
         targetParent.startsWith(path + '/')) {
       throw StateError('Folder move would create a cycle.');
     }
-    await _commit(OperationKind.folderMove, id, {
+    await _commitRelocation(OperationKind.folderMove, id, {
       'properties': {'parentId': parent},
-    });
+    }, updateDocuments);
   }
 
   Future<void> updateCover(String path, Map<String, dynamic> cover) async {
