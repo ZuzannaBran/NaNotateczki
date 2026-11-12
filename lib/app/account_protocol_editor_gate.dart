@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/storage/shutdown_coordinator.dart';
+
 /// Blocks account edits until the server's storage protocol is established.
 ///
 /// A previously verified user cannot unlock another account's editor.
@@ -13,6 +15,7 @@ class AccountProtocolEditorGate extends StatefulWidget {
     this.blockingReason,
     required this.onRetry,
     required this.onLogOut,
+    this.onLogOutOffline,
     required this.child,
     super.key,
   });
@@ -24,6 +27,7 @@ class AccountProtocolEditorGate extends StatefulWidget {
   final String? blockingReason;
   final Future<void> Function() onRetry;
   final Future<void> Function() onLogOut;
+  final Future<void> Function()? onLogOutOffline;
   final Widget child;
 
   bool get canEdit =>
@@ -40,9 +44,10 @@ class AccountProtocolEditorGate extends StatefulWidget {
 class _AccountProtocolEditorGateState extends State<AccountProtocolEditorGate> {
   bool _retrying = false;
   bool _signingOut = false;
+  bool _canSignOutOffline = false;
   String? _error;
 
-  Future<void> _attempt({required bool loggingOut}) async {
+  Future<void> _attempt({required bool loggingOut, bool offline = false}) async {
     if (loggingOut ? _signingOut : _retrying) {
       return;
     }
@@ -53,10 +58,15 @@ class _AccountProtocolEditorGateState extends State<AccountProtocolEditorGate> {
         _retrying = true;
       }
       _error = null;
+      _canSignOutOffline = false;
     });
     try {
       if (loggingOut) {
-        await widget.onLogOut();
+        if (offline) {
+          await widget.onLogOutOffline?.call();
+        } else {
+          await widget.onLogOut();
+        }
       } else {
         await widget.onRetry();
       }
@@ -64,6 +74,9 @@ class _AccountProtocolEditorGateState extends State<AccountProtocolEditorGate> {
       if (mounted) {
         setState(() {
           _error = '${loggingOut ? 'Log out' : 'Retry'} failed: $error';
+          _canSignOutOffline = loggingOut &&
+              error is ShutdownInterrupted &&
+              error.localSafe;
         });
       }
     } finally {
@@ -118,6 +131,16 @@ class _AccountProtocolEditorGateState extends State<AccountProtocolEditorGate> {
                           : () => _attempt(loggingOut: true),
                       child: const Text('Log out'),
                     ),
+                    if (_canSignOutOffline && widget.onLogOutOffline != null)
+                      TextButton(
+                        onPressed: _signingOut
+                            ? null
+                            : () => _attempt(
+                                loggingOut: true,
+                                offline: true,
+                              ),
+                        child: const Text('Log out offline'),
+                      ),
                   ],
                 ),
                 if (_error != null) ...[
