@@ -65,9 +65,7 @@ void main() {
   test('v2 download retains an edit made during preimport backup', () async {
     const user = 'account-v2-settings-race';
     ActiveStorageNamespace.activate(StorageNamespace.account(user));
-    final files = <String, String>{
-      'app_prefs.json': '{"darkMode":false}',
-    };
+    final files = <String, String>{'app_prefs.json': '{"darkMode":false}'};
     var injected = false;
     textStorageReadOverride = (key) async => files[key];
     textStorageWriteOverride = (key, value) async {
@@ -88,7 +86,9 @@ void main() {
         if (request.method == 'GET' &&
             request.url.path == '/v2/account-settings') {
           return http.Response(
-            jsonEncode({'settings': {'appPreferences': remote}}),
+            jsonEncode({
+              'settings': {'appPreferences': remote},
+            }),
             200,
           );
         }
@@ -98,10 +98,7 @@ void main() {
           final revision = remote['revision'] as int;
           expect(body['expectedRevision'], revision);
           expectedRevisions.add(revision);
-          remote = {
-            'revision': revision + 1,
-            'value': body['value'],
-          };
+          remote = {'revision': revision + 1, 'value': body['value']};
           return http.Response(jsonEncode(remote), 200);
         }
         fail('Unexpected settings request: ${request.method} ${request.url}');
@@ -131,9 +128,7 @@ void main() {
 
   test('v2 backup respects account namespace changes', () async {
     ActiveStorageNamespace.activate(StorageNamespace.account('account-a'));
-    final files = <String, String>{
-      'app_prefs.json': '{"darkMode":false}',
-    };
+    final files = <String, String>{'app_prefs.json': '{"darkMode":false}'};
     final preimportRead = Completer<void>();
     final releaseRead = Completer<String?>();
     textStorageReadOverride = (key) async {
