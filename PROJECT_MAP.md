@@ -17,6 +17,9 @@
   `PlannerSyncService(useRevisions:true)` i
   `AccountSettingsSyncService(useV2:true)` z poll/pull po starcie,
   wznawia je po restarcie, wyłącza v1.
+  Pobieranie ustawień sprawdza ponownie lokalny plik po asynchronicznej
+  kopii preimportowej; nowa edycja nie jest nadpisywana, tylko otrzymuje
+  bazową rewizję CAS do wysłania przy następnej synchronizacji.
 - `lib/data/sync/local_account_import_service.dart`: import Local
   przenosi foldery, okładki, zadania, Study Sessions i dokument Planner
   przez właściwe writery; import idempotentny, nie wskrzesza tombstones.
