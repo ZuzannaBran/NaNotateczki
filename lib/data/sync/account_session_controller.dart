@@ -15,6 +15,7 @@ class AccountSessionController extends ChangeNotifier {
     AccountCredentialStore? credentialStore,
     this.onBeforeAccountRestore,
     this.onBeforeAccountChange,
+    this.onBeforeLogout,
   }) : _credentialStore =
            credentialStore ?? const SecureAccountCredentialStore();
 
@@ -23,6 +24,7 @@ class AccountSessionController extends ChangeNotifier {
   final ApiClient apiClient;
   final VoidCallback? onBeforeAccountRestore;
   final Future<void> Function()? onBeforeAccountChange;
+  final Future<void> Function(bool preserveOffline)? onBeforeLogout;
   final AccountCredentialStore _credentialStore;
   Future<void> _credentialQueue = Future<void>.value();
   int _sessionGeneration = 0;
@@ -442,13 +444,20 @@ class AccountSessionController extends ChangeNotifier {
     }
   }
 
-  Future<void> logout() {
+  Future<void> logout() => _startLogout(preserveOffline: false);
+
+  /// Preserve locally queued operations when signing out without a server.
+  Future<void> logoutOffline() => _startLogout(preserveOffline: true);
+
+  Future<void> _startLogout({required bool preserveOffline}) {
     final running = _logoutInProgress;
     if (running != null) {
       return running;
     }
     late final Future<void> pending;
-    pending = Future<void>.microtask(_logout).whenComplete(() {
+    pending = Future<void>.microtask(
+      () => _logout(preserveOffline: preserveOffline),
+    ).whenComplete(() {
       if (identical(_logoutInProgress, pending)) {
         _logoutInProgress = null;
         isBusy = false;
@@ -463,15 +472,20 @@ class AccountSessionController extends ChangeNotifier {
     return pending;
   }
 
-  Future<void> _logout() async {
-    // Drain writers while the identity and token are still valid.
-    // A failed flush must not revoke an account with unsaved local edits.
-    await onBeforeAccountChange?.call();
+  Future<void> _logout({required bool preserveOffline}) async {
+    // Never revoke credentials if local persistence or transport drain fails.
+    if (onBeforeLogout != null) {
+      await onBeforeLogout!(preserveOffline);
+    } else {
+      await onBeforeAccountChange?.call();
+    }
     final refreshToken = _refreshToken;
     Object? remoteFailure;
     StackTrace? remoteStack;
     try {
-      if (refreshToken != null && apiClient.accessToken != null) {
+      if (!preserveOffline &&
+          refreshToken != null &&
+          apiClient.accessToken != null) {
         await apiClient
             .postJson('/v1/auth/logout', {'refreshToken': refreshToken})
             .timeout(const Duration(seconds: 5));
