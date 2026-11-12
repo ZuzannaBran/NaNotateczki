@@ -310,54 +310,56 @@ void main() {
     expect(scheduler.hasPendingBackup, isTrue);
   });
 
-  test('v2 scheduler uses verified operational API, never legacy backup',
-      () async {
-    final values = <String, String>{};
-    textStorageReadOverride = (key) async => values[key];
-    textStorageWriteOverride = (key, value) async => values[key] = value;
-    final database = NotesDatabase(NativeDatabase.memory());
-    addTearDown(database.close);
-    final repository = NotebookRepository(database);
-    final api = ApiClient(
-      baseUri: Uri.parse('https://api.example.com'),
-      httpClient: MockClient((request) async {
-        fail('The v2 backup callback must not access legacy transport.');
-      }),
-    );
-    addTearDown(api.close);
-    final session = AccountSessionController(api)
-      ..mode = AccountDataMode.account
-      ..userId = 'user-1';
-    addTearDown(session.dispose);
-    final legacyCalls = <String>[];
-    final scheduler = RemoteBackupScheduler(
-      service: _RecordingRemoteBackupService(
-        repository: repository,
-        apiClient: api,
-        session: session,
-        deviceIds: legacyCalls,
-      ),
-      session: session,
-    );
-    addTearDown(scheduler.dispose);
-    final operationalCalls = <String>[];
-    scheduler.uploadOperationalSnapshot = (deviceId) async {
-      operationalCalls.add(deviceId);
-      return RemoteBackupReceipt(
-        backupId: 'operational-1',
-        checksum: 'sha-v2',
-        verifiedAt: DateTime.utc(2026, 11, 12),
+  test(
+    'v2 scheduler uses verified operational API, never legacy backup',
+    () async {
+      final values = <String, String>{};
+      textStorageReadOverride = (key) async => values[key];
+      textStorageWriteOverride = (key, value) async => values[key] = value;
+      final database = NotesDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      final repository = NotebookRepository(database);
+      final api = ApiClient(
+        baseUri: Uri.parse('https://api.example.com'),
+        httpClient: MockClient((request) async {
+          fail('The v2 backup callback must not access legacy transport.');
+        }),
       );
-    };
-    scheduler.enableForSignedInAccount();
-    await scheduler.backupNow();
-    expect(scheduler.lastVerifiedBackup?.backupId, 'operational-1');
-    expect(operationalCalls, hasLength(1));
-    expect(legacyCalls, isEmpty);
-    scheduler.uploadOperationalSnapshot = null;
-    await scheduler.backupNow();
-    expect(legacyCalls, hasLength(1));
-  });
+      addTearDown(api.close);
+      final session = AccountSessionController(api)
+        ..mode = AccountDataMode.account
+        ..userId = 'user-1';
+      addTearDown(session.dispose);
+      final legacyCalls = <String>[];
+      final scheduler = RemoteBackupScheduler(
+        service: _RecordingRemoteBackupService(
+          repository: repository,
+          apiClient: api,
+          session: session,
+          deviceIds: legacyCalls,
+        ),
+        session: session,
+      );
+      addTearDown(scheduler.dispose);
+      final operationalCalls = <String>[];
+      scheduler.uploadOperationalSnapshot = (deviceId) async {
+        operationalCalls.add(deviceId);
+        return RemoteBackupReceipt(
+          backupId: 'operational-1',
+          checksum: 'sha-v2',
+          verifiedAt: DateTime.utc(2026, 11, 12),
+        );
+      };
+      scheduler.enableForSignedInAccount();
+      await scheduler.backupNow();
+      expect(scheduler.lastVerifiedBackup?.backupId, 'operational-1');
+      expect(operationalCalls, hasLength(1));
+      expect(legacyCalls, isEmpty);
+      scheduler.uploadOperationalSnapshot = null;
+      await scheduler.backupNow();
+      expect(legacyCalls, hasLength(1));
+    },
+  );
 
   test('isolates status and device identity between accounts', () async {
     final values = <String, String>{};
