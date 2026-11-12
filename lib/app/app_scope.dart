@@ -20,6 +20,7 @@ import '../core/storage/text_storage.dart';
 import '../core/theme/app_theme.dart';
 import '../data/backup/local_backup_service.dart';
 import '../data/backup/remote_backup_service.dart';
+import '../data/backup/v2_backup_recovery_service.dart';
 import '../data/backup/remote_backup_scheduler.dart';
 import '../data/drift/notes_database.dart';
 import '../data/sync/account_session_controller.dart';
@@ -384,10 +385,6 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       },
       verifyBackup: () async {
         if (_accountSession?.isSignedIn != true) {
-          return;
-        }
-        if (_v2AccountRuntime != null) {
-          // The legacy snapshot protocol must not back up a v2 account.
           return;
         }
         final remote = _remoteBackupScheduler;
@@ -756,10 +753,52 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       // Publish ownership before startup so logout can stop this transport.
       _v2AccountRuntime = runtime;
     }
+    final verifiedBackup = _remoteBackupService;
+    final backupScheduler = _remoteBackupScheduler;
+    if (verifiedBackup == null || backupScheduler == null) {
+      throw StateError('V2 recovery requires the account backup services.');
+    }
+    final recovery = V2BackupRecoveryService(
+      runtime: runtime,
+      repository: repository,
+      apiClient: apiClient,
+      session: _accountSession!,
+    );
+    final interrupted = await recovery.hasInterruptedRecovery(userId);
+    final missingDatabase = _databaseWasReset ||
+        (_databaseFreshFile &&
+            await verifiedBackup.wasDatabaseInitialized(userId));
+    if (missingDatabase || interrupted) {
+      // Replay must finish before the editor writer or REST pull can run.
+      await recovery.recoverVerifiedArchive(
+        databaseWasReset: missingDatabase,
+      );
+      if (!isCurrent()) {
+        await runtime.stop();
+        return;
+      }
+      await _studyPlanner?.load();
+      await _preferences?.load();
+    }
     library.attachV2LibraryOperations(runtime.libraryOperations);
     if (!await runtime.startForCurrentAccount(isCurrent: isCurrent)) {
       return;
     }
+    if (runtime.engine.lastError != null) {
+      throw StateError('V2 replay and catch-up failed: '
+          '${runtime.engine.lastError}');
+    }
+    final cursorResponse = await apiClient.get('/v2/sync/checkpoint');
+    final currentCursor = (cursorResponse.decodeJson()
+        as Map<String, dynamic>)['cursor'];
+    if (currentCursor is! int ||
+        await runtime.store.checkpoint('account:$userId') != currentCursor) {
+      throw StateError('V2 recovery has not reached the server checkpoint.');
+    }
+    await recovery.completeRecovery();
+    await verifiedBackup.markDatabaseInitialized(userId);
+    _databaseWasReset = false;
+    _databaseFreshFile = false;
     await runtime.libraryOperations.refreshReadModel();
     await library.reloadFromAccount();
     if (!isCurrent()) {
@@ -805,12 +844,34 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       await runtime.stop();
       return;
     }
+    backupScheduler.uploadOperationalSnapshot = (deviceId) =>
+        recovery.uploadVerifiedSnapshot(deviceId: deviceId);
+    backupScheduler.reconcileBeforeBackup = () async {
+      await runtime!.engine.syncNow();
+      if (runtime.engine.lastError != null ||
+          (await runtime.store.pending(
+            limit: 1,
+            includeDeferred: true,
+          )).isNotEmpty) {
+        throw StateError('V2 outbox must be ACKed before remote backup.');
+      }
+      await _accountSettingsSync?.syncNow();
+      if (_accountSettingsSync?.lastError != null) {
+        throw StateError('Account preferences have not synchronized.');
+      }
+      await _plannerSync?.syncNow();
+      if (_plannerSync?.lastError != null) {
+        throw StateError('Planner has not synchronized.');
+      }
+    };
+    backupScheduler.enableForSignedInAccount();
+    _observedIdleSeconds = backupScheduler.idleSeconds;
     _settingsPoll?.cancel();
     _settingsPoll = Timer.periodic(const Duration(seconds: 45), (_) {
       unawaited(_syncAccountSettings());
       unawaited(_syncPlanner());
     });
-    // Legacy remote snapshot services and Share v1 stay disabled.
+    // Share v1 remains disabled for operational accounts.
     setState(() {
       _incompatibleProtocolUser = null;
     });
@@ -877,7 +938,8 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         if (!isCurrent()) {
           return;
         }
-        // A legacy protocol account cannot reuse a v2 metadata client.
+        // An account using v1 must never upload its snapshot to v2.
+        scheduler.uploadOperationalSnapshot = null;
         if (_accountSettingsSync?.useV2 == true) {
           _accountSettingsSync = AccountSettingsSyncService(
             apiClient: _apiClient!,
