@@ -498,8 +498,8 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   }
 
   void _scheduleAccountSettingsSync() {
-    if (_accountSession?.hasPendingLocalImport(_accountSession?.userId ?? '')
-            == true ||
+    if (_accountSession?.hasPendingLocalImport(_accountSession?.userId ?? '') ==
+            true ||
         (_accountSettingsSync?.isApplying ?? false)) {
       return;
     }
@@ -539,8 +539,8 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   }
 
   void _schedulePlannerSync() {
-    if (_accountSession?.hasPendingLocalImport(_accountSession?.userId ?? '')
-        == true) {
+    if (_accountSession?.hasPendingLocalImport(_accountSession?.userId ?? '') ==
+        true) {
       return;
     }
     _plannerDebounce?.cancel();
@@ -634,10 +634,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       _namespace == StorageNamespace.account(userId);
 
   /// Completes a previously authorized Local import before enabling backups.
-  Future<void> _importPendingLocalData(
-    String userId,
-    int generation,
-  ) async {
+  Future<void> _importPendingLocalData(String userId, int generation) async {
     final session = _accountSession;
     if (session == null || !session.hasPendingLocalImport(userId)) {
       return;

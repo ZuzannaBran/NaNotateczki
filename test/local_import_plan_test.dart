@@ -48,55 +48,69 @@ void main() {
       account: [notebook('existing', 'Math')],
     );
     final b = LocalImportPlan(
-      accountId: 'account-b', local: [source], account: [],
+      accountId: 'account-b',
+      local: [source],
+      account: [],
     );
     final copy = await a.materialize(a.documents.single);
     expect(copy.title, 'Math (1)');
     expect(copy.uid, isNot(source.uid));
     expect(copy.uid, isNot(b.documentUid(source.uid)));
     expect(copy.pages.single.id, isNot(source.pages.single.id));
-    expect(copy.pages.single.textBlocks.single.id,
-        isNot(source.pages.single.textBlocks.single.id));
+    expect(
+      copy.pages.single.textBlocks.single.id,
+      isNot(source.pages.single.textBlocks.single.id),
+    );
     expect(copy.pages.single.textBlocks.single.text, 'Preserved');
 
     final resumed = LocalImportPlan(
-      accountId: 'account-a', local: [source], account: [copy],
+      accountId: 'account-a',
+      local: [source],
+      account: [copy],
     );
     expect(resumed.documents.single.exists, isTrue);
     expect(resumed.documentUid(source.uid), copy.uid);
   });
 
-  test('library tasks add idempotently; account covers remain authoritative', () {
-    final plan = LocalImportPlan(
-      accountId: 'account-a',
-      local: [notebook('local-doc', 'Planner')],
-      account: [],
-    );
-    const source = {
-      'folders': ['School', 'Notes'],
-      'covers': {'School': {'shape': 'star'}},
-      'plannerTasks': {
-        'local-doc': [
-          {'id': 'task-1', 'title': 'Read', 'completed': true},
-        ],
-      },
-      'recentCoverColors': [1],
-    };
-    const account = {
-      'folders': ['School', 'Account'],
-      'covers': {'School': {'shape': 'heart'}},
-      'plannerTasks': {},
-      'recentCoverColors': [2],
-    };
-    final first = plan.mergeLibrary(local: source, account: account);
-    final second = plan.mergeLibrary(local: source, account: first);
-    expect(jsonEncode(second), jsonEncode(first));
-    expect(first['folders'], ['Account', 'Notes', 'School']);
-    expect(first['covers']['School']['shape'], 'heart');
-    expect(first['recentCoverColors'], [2]);
-    final tasks = first['plannerTasks'][plan.documentUid('local-doc')] as List;
-    expect(tasks.single['completed'], isTrue);
-  });
+  test(
+    'library tasks add idempotently; account covers remain authoritative',
+    () {
+      final plan = LocalImportPlan(
+        accountId: 'account-a',
+        local: [notebook('local-doc', 'Planner')],
+        account: [],
+      );
+      const source = {
+        'folders': ['School', 'Notes'],
+        'covers': {
+          'School': {'shape': 'star'},
+        },
+        'plannerTasks': {
+          'local-doc': [
+            {'id': 'task-1', 'title': 'Read', 'completed': true},
+          ],
+        },
+        'recentCoverColors': [1],
+      };
+      const account = {
+        'folders': ['School', 'Account'],
+        'covers': {
+          'School': {'shape': 'heart'},
+        },
+        'plannerTasks': {},
+        'recentCoverColors': [2],
+      };
+      final first = plan.mergeLibrary(local: source, account: account);
+      final second = plan.mergeLibrary(local: source, account: first);
+      expect(jsonEncode(second), jsonEncode(first));
+      expect(first['folders'], ['Account', 'Notes', 'School']);
+      expect(first['covers']['School']['shape'], 'heart');
+      expect(first['recentCoverColors'], [2]);
+      final tasks =
+          first['plannerTasks'][plan.documentUid('local-doc')] as List;
+      expect(tasks.single['completed'], isTrue);
+    },
+  );
 
   test('planner IDs and series are remapped without reviving tombstones', () {
     final plan = LocalImportPlan(accountId: 'A', local: [], account: []);
@@ -109,23 +123,34 @@ void main() {
       'status': 'completed',
     };
     final mapped = plan.newPlannerEntries(
-      local: {'sessions': [entry]},
+      local: {
+        'sessions': [entry],
+      },
       accountIds: [],
       accountTombstones: [],
     );
-    expect(mapped.single['seriesId'],
-        importedLocalUid('A', 'study', 'parent'));
+    expect(mapped.single['seriesId'], importedLocalUid('A', 'study', 'parent'));
     expect(mapped.single['status'], 'completed');
-    expect(plan.newPlannerEntries(
-      local: {'sessions': [entry]},
-      accountIds: [],
-      accountTombstones: [mapped.single['id'] as String],
-    ), isEmpty);
-    expect(plan.newPlannerEntries(
-      local: {'sessions': [entry]},
-      accountIds: [mapped.single['id'] as String],
-      accountTombstones: [],
-    ), isEmpty);
+    expect(
+      plan.newPlannerEntries(
+        local: {
+          'sessions': [entry],
+        },
+        accountIds: [],
+        accountTombstones: [mapped.single['id'] as String],
+      ),
+      isEmpty,
+    );
+    expect(
+      plan.newPlannerEntries(
+        local: {
+          'sessions': [entry],
+        },
+        accountIds: [mapped.single['id'] as String],
+        accountTombstones: [],
+      ),
+      isEmpty,
+    );
   });
 
   test('corrupt local metadata fails before replacing account data', () {
@@ -134,37 +159,47 @@ void main() {
     expect(() => importedLocalUid('', 'doc', 'x'), throwsArgumentError);
   });
 
-  test('literal asset text does not trigger a false embed rejection',
-      () async {
+  test('literal asset text does not trigger a false embed rejection', () async {
     final source = notebook('source', 'Text');
     final text = source.pages.single.textBlocks.single;
-    final rich = source.copyWith(pages: [
-      source.pages.single.copyWith(textBlocks: [
-        text.copyWith(
-          text: 'asset:token is plain text',
-          deltaJson: '[{"insert":"asset:token is plain text"}]',
+    final rich = source.copyWith(
+      pages: [
+        source.pages.single.copyWith(
+          textBlocks: [
+            text.copyWith(
+              text: 'asset:token is plain text',
+              deltaJson: '[{"insert":"asset:token is plain text"}]',
+            ),
+          ],
         ),
-      ]),
-    ]);
-    final plan = LocalImportPlan(
-      accountId: 'A', local: [rich], account: [],
+      ],
     );
+    final plan = LocalImportPlan(accountId: 'A', local: [rich], account: []);
     final copy = await plan.materialize(plan.documents.single);
-    expect(copy.pages.single.textBlocks.single.text,
-        'asset:token is plain text');
+    expect(
+      copy.pages.single.textBlocks.single.text,
+      'asset:token is plain text',
+    );
   });
 
   test('unverified Quill embed is not silently imported', () async {
     final source = notebook('source', 'Text');
     final original = source.pages.single.textBlocks.single;
-    final withEmbed = source.copyWith(pages: [
-      source.pages.single.copyWith(textBlocks: [
-        original.copyWith(deltaJson:
-            '[{"insert":{"image":"asset:missing"}}]'),
-      ]),
-    ]);
+    final withEmbed = source.copyWith(
+      pages: [
+        source.pages.single.copyWith(
+          textBlocks: [
+            original.copyWith(
+              deltaJson: '[{"insert":{"image":"asset:missing"}}]',
+            ),
+          ],
+        ),
+      ],
+    );
     final plan = LocalImportPlan(
-      accountId: 'A', local: [withEmbed], account: [],
+      accountId: 'A',
+      local: [withEmbed],
+      account: [],
     );
     await expectLater(
       plan.materialize(plan.documents.single),
@@ -172,31 +207,33 @@ void main() {
     );
   });
 
-  test('materialized pages and images are detached from Local identity',
-      () async {
-    final source = notebook('image-source', 'Biology');
-    final localImage = ImageBlock(
-      id: 'image-source-id',
-      path: '',
-      ocrText: '',
-      position: Offset.zero,
-      width: 100,
-      height: 200,
-      bytes: Uint8List.fromList([1, 2, 3, 4]),
-      imageExt: 'png',
-    );
-    final rich = source.copyWith(pages: [
-      source.pages.single.copyWith(imageBlocks: [localImage]),
-    ]);
-    final plan = LocalImportPlan(
-      accountId: 'A', local: [rich], account: [],
-    );
-    final copy = await plan.materialize(plan.documents.single);
-    final importedImage = copy.pages.single.imageBlocks.single;
-    expect(importedImage.id, isNot(localImage.id));
-    expect(importedImage.path, isEmpty);
-    expect(importedImage.bytes, orderedEquals([1, 2, 3, 4]));
-    expect(importedImage.bytes, isNot(same(localImage.bytes)));
-    expect(rich.pages.single.imageBlocks.single.id, 'image-source-id');
-  });
+  test(
+    'materialized pages and images are detached from Local identity',
+    () async {
+      final source = notebook('image-source', 'Biology');
+      final localImage = ImageBlock(
+        id: 'image-source-id',
+        path: '',
+        ocrText: '',
+        position: Offset.zero,
+        width: 100,
+        height: 200,
+        bytes: Uint8List.fromList([1, 2, 3, 4]),
+        imageExt: 'png',
+      );
+      final rich = source.copyWith(
+        pages: [
+          source.pages.single.copyWith(imageBlocks: [localImage]),
+        ],
+      );
+      final plan = LocalImportPlan(accountId: 'A', local: [rich], account: []);
+      final copy = await plan.materialize(plan.documents.single);
+      final importedImage = copy.pages.single.imageBlocks.single;
+      expect(importedImage.id, isNot(localImage.id));
+      expect(importedImage.path, isEmpty);
+      expect(importedImage.bytes, orderedEquals([1, 2, 3, 4]));
+      expect(importedImage.bytes, isNot(same(localImage.bytes)));
+      expect(rich.pages.single.imageBlocks.single.id, 'image-source-id');
+    },
+  );
 }

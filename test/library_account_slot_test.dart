@@ -246,6 +246,21 @@ void main() {
             find.byKey(const ValueKey('account-login-submit')),
           )
           .onPressed!();
+      for (var i = 0;
+          i < 100 &&
+              find.byKey(const ValueKey('account-keep-local-separate'))
+                  .evaluate()
+                  .isEmpty;
+          i++) {
+        await tester.pump(const Duration(milliseconds: 10));
+      }
+      expect(
+        find.byKey(const ValueKey('account-import-local')),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('account-keep-local-separate')),
+      );
       for (var i = 0; i < 100 && !session.isSignedIn; i++) {
         await tester.pump(const Duration(milliseconds: 10));
       }
@@ -366,6 +381,7 @@ void main() {
       await tester.pump();
 
       expect(session.isSignedIn, isTrue);
+      expect(session.lastImportLocalData, isFalse);
       expect(backup.isEnabled, isFalse);
       backup.enableForSignedInAccount();
       await tester.pump();
@@ -745,11 +761,17 @@ class _FakeAccountSessionController extends AccountSessionController {
     : super(credentialStore: _MemoryAccountCredentialStore());
 
   bool changedPassword = false;
+  bool? lastImportLocalData;
   String? currentPassword;
   String? newPassword;
 
   @override
-  Future<void> login(String rawUsername, String password) async {
+  Future<void> login(
+    String rawUsername,
+    String password, {
+    bool importLocalData = false,
+  }) async {
+    lastImportLocalData = importLocalData;
     mode = AccountDataMode.account;
     preferredMode = AccountDataMode.account;
     onboardingComplete = true;

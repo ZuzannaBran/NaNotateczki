@@ -71,8 +71,7 @@ void main() {
     expect(manager.isActive, isTrue);
   });
 
-  test('Local to A to B to A to Local fences stale HTTP callbacks',
-      () async {
+  test('Local to A to B to A to Local fences stale HTTP callbacks', () async {
     final manager = StorageNamespaceManager();
     final local = StorageNamespace.local();
     final a = StorageNamespace.account('account-a');
@@ -111,33 +110,35 @@ void main() {
     expect(abandoned.every((isCurrent) => !isCurrent()), isTrue);
   });
 
-  test('concurrent switch operations serialize and reject old generation',
-      () async {
-    final manager = StorageNamespaceManager();
-    final a = StorageNamespace.account('A');
-    final b = StorageNamespace.account('B');
-    final flushed = Completer<void>();
-    final release = Completer<void>();
-    final first = manager.switchTo(
-      a,
-      stopAndFlush: () async {
-        flushed.complete();
-        await release.future;
-      },
-      open: (_) async {},
-    );
-    await flushed.future;
-    final initial = manager.generation;
-    final second = manager.switchTo(
-      b,
-      stopAndFlush: () async {},
-      open: (_) async {},
-    );
-    expect(manager.accepts(StorageNamespace.local(), initial), isFalse);
-    release.complete();
-    await Future.wait([first, second]);
-    expect(manager.current, b);
-    expect(manager.isActive, isTrue);
-    expect(manager.accepts(a, manager.generation), isFalse);
-  });
+  test(
+    'concurrent switch operations serialize and reject old generation',
+    () async {
+      final manager = StorageNamespaceManager();
+      final a = StorageNamespace.account('A');
+      final b = StorageNamespace.account('B');
+      final flushed = Completer<void>();
+      final release = Completer<void>();
+      final first = manager.switchTo(
+        a,
+        stopAndFlush: () async {
+          flushed.complete();
+          await release.future;
+        },
+        open: (_) async {},
+      );
+      await flushed.future;
+      final initial = manager.generation;
+      final second = manager.switchTo(
+        b,
+        stopAndFlush: () async {},
+        open: (_) async {},
+      );
+      expect(manager.accepts(StorageNamespace.local(), initial), isFalse);
+      release.complete();
+      await Future.wait([first, second]);
+      expect(manager.current, b);
+      expect(manager.isActive, isTrue);
+      expect(manager.accepts(a, manager.generation), isFalse);
+    },
+  );
 }

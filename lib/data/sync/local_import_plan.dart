@@ -22,7 +22,8 @@ String importedLocalUid(String accountId, String type, String sourceId) {
       .toList();
   bytes[6] = (bytes[6] & 0x0f) | 0x50;
   bytes[8] = (bytes[8] & 0x3f) | 0x80;
-  final hex = bytes.map((value) => value.toRadixString(16).padLeft(2, '0'))
+  final hex = bytes
+      .map((value) => value.toRadixString(16).padLeft(2, '0'))
       .join();
   return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
       '${hex.substring(12, 16)}-${hex.substring(16, 20)}-'
@@ -66,8 +67,7 @@ class LocalImportPlan {
   }) {
     final targetIds = {for (final item in account) item.uid};
     final titles = {
-      for (final item in account)
-        _titleKey(item.folder, item.title),
+      for (final item in account) _titleKey(item.folder, item.title),
     };
     final sources = <String>{};
     for (final notebook in local) {
@@ -76,32 +76,35 @@ class LocalImportPlan {
       }
       final targetId = documentUid(notebook.uid);
       if (targetIds.contains(targetId)) {
-        documents.add(LocalImportDocument(
-          source: notebook,
-          targetId: targetId,
-          title: notebook.title,
-          exists: true,
-        ));
+        documents.add(
+          LocalImportDocument(
+            source: notebook,
+            targetId: targetId,
+            title: notebook.title,
+            exists: true,
+          ),
+        );
         continue;
       }
       var title = notebook.title;
       if (titles.contains(_titleKey(notebook.folder, title))) {
         var suffix = 1;
-        while (titles.contains(_titleKey(
-          notebook.folder,
-          '${notebook.title} ($suffix)',
-        ))) {
+        while (titles.contains(
+          _titleKey(notebook.folder, '${notebook.title} ($suffix)'),
+        )) {
           suffix++;
         }
         title = '${notebook.title} ($suffix)';
       }
       titles.add(_titleKey(notebook.folder, title));
-      documents.add(LocalImportDocument(
-        source: notebook,
-        targetId: targetId,
-        title: title,
-        exists: false,
-      ));
+      documents.add(
+        LocalImportDocument(
+          source: notebook,
+          targetId: targetId,
+          title: title,
+          exists: false,
+        ),
+      );
     }
   }
 
@@ -140,11 +143,7 @@ class LocalImportPlan {
             .toLowerCase();
         images.add(
           image.copyWith(
-            id: importedLocalUid(
-              accountId,
-              'image:${source.uid}',
-              image.id,
-            ),
+            id: importedLocalUid(accountId, 'image:${source.uid}', image.id),
             path: '',
             bytes: bytes,
             imageExt: extension.isEmpty ? null : extension,
@@ -159,24 +158,24 @@ class LocalImportPlan {
           );
         }
       }
-      pages.add(page.copyWith(
-        id: importedLocalUid(accountId, 'page:${source.uid}', page.id),
-        textBlocks: [
-          for (final block in page.textBlocks)
-            block.copyWith(
-              id: importedLocalUid(
-                accountId, 'text:${source.uid}', block.id),
-            ),
-        ],
-        imageBlocks: images,
-        inkStrokes: [
-          for (final stroke in page.inkStrokes)
-            stroke.copyWith(
-              id: importedLocalUid(
-                accountId, 'ink:${source.uid}', stroke.id),
-            ),
-        ],
-      ));
+      pages.add(
+        page.copyWith(
+          id: importedLocalUid(accountId, 'page:${source.uid}', page.id),
+          textBlocks: [
+            for (final block in page.textBlocks)
+              block.copyWith(
+                id: importedLocalUid(accountId, 'text:${source.uid}', block.id),
+              ),
+          ],
+          imageBlocks: images,
+          inkStrokes: [
+            for (final stroke in page.inkStrokes)
+              stroke.copyWith(
+                id: importedLocalUid(accountId, 'ink:${source.uid}', stroke.id),
+              ),
+          ],
+        ),
+      );
     }
     return source.copyWith(
       uid: entry.targetId,
@@ -222,15 +221,17 @@ class LocalImportPlan {
         final existing = (tasks[item.targetId] as List?) ?? [];
         final byId = <String, dynamic>{
           for (final raw in existing)
-            if (raw is Map && raw['id'] is String)
-              raw['id'] as String: raw,
+            if (raw is Map && raw['id'] is String) raw['id'] as String: raw,
         };
         for (final raw in list) {
           if (raw is! Map || raw['id'] is! String) {
             throw const FormatException('Invalid imported planner task.');
           }
           final id = importedLocalUid(
-            accountId, 'task:${item.source.uid}', raw['id'] as String);
+            accountId,
+            'task:${item.source.uid}',
+            raw['id'] as String,
+          );
           byId.putIfAbsent(id, () => {...raw, 'id': id});
         }
         tasks[item.targetId] = byId.values.toList();
@@ -276,7 +277,10 @@ class LocalImportPlan {
         'id': newId,
         if (raw['seriesId'] is String)
           'seriesId': importedLocalUid(
-            accountId, 'study', raw['seriesId'] as String),
+            accountId,
+            'study',
+            raw['seriesId'] as String,
+          ),
       });
     }
     return result;

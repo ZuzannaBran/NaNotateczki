@@ -27,8 +27,7 @@ void main() {
     planner.dispose();
   });
 
-  test('Local import retries an interrupted planner snapshot write',
-      () async {
+  test('Local import retries an interrupted planner snapshot write', () async {
     final disk = <String, String>{};
     var failNext = true;
     final imported = StudyPlannerController(

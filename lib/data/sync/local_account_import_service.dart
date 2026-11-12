@@ -54,9 +54,13 @@ class LocalAccountImportService {
       return await runWithSource(
         sourceRepository: NotebookRepository(result.database),
         localLibraryText: await readStoredTextForNamespace(
-          namespace, 'library_folders.json'),
+          namespace,
+          'library_folders.json',
+        ),
         localPlannerText: await readStoredTextForNamespace(
-          namespace, StudyPlannerController.storageKey),
+          namespace,
+          StudyPlannerController.storageKey,
+        ),
       );
     } finally {
       await result.database.close();
@@ -167,37 +171,50 @@ class LocalAccountImportService {
       account: destinationLibrary,
     );
     final uidMap = {
-      for (final entry in plan.documents)
-        entry.source.uid: entry.targetId,
+      for (final entry in plan.documents) entry.source.uid: entry.targetId,
     };
     _requireCurrent();
-    await writeStoredText(checkpointKey, jsonEncode({
-      'version': 1,
-      'accountId': accountId,
-      'state': 'pending',
-      'documents': uidMap,
-      'pages': {
-        for (final entry in plan.documents)
-          for (final page in entry.source.pages)
-            '${entry.source.uid}/${page.id}': importedLocalUid(
-              accountId, 'page:${entry.source.uid}', page.id),
-      },
-      'objects': {
-        for (final entry in plan.documents)
-          for (final page in entry.source.pages)
-            ...{
+    await writeStoredText(
+      checkpointKey,
+      jsonEncode({
+        'version': 1,
+        'accountId': accountId,
+        'state': 'pending',
+        'documents': uidMap,
+        'pages': {
+          for (final entry in plan.documents)
+            for (final page in entry.source.pages)
+              '${entry.source.uid}/${page.id}': importedLocalUid(
+                accountId,
+                'page:${entry.source.uid}',
+                page.id,
+              ),
+        },
+        'objects': {
+          for (final entry in plan.documents)
+            for (final page in entry.source.pages) ...{
               for (final block in page.textBlocks)
                 '${entry.source.uid}/text/${block.id}': importedLocalUid(
-                  accountId, 'text:${entry.source.uid}', block.id),
+                  accountId,
+                  'text:${entry.source.uid}',
+                  block.id,
+                ),
               for (final block in page.imageBlocks)
                 '${entry.source.uid}/image/${block.id}': importedLocalUid(
-                  accountId, 'image:${entry.source.uid}', block.id),
+                  accountId,
+                  'image:${entry.source.uid}',
+                  block.id,
+                ),
               for (final stroke in page.inkStrokes)
                 '${entry.source.uid}/ink/${stroke.id}': importedLocalUid(
-                  accountId, 'ink:${entry.source.uid}', stroke.id),
+                  accountId,
+                  'ink:${entry.source.uid}',
+                  stroke.id,
+                ),
             },
-      },
-    }));
+        },
+      }),
+    );
     var inserted = 0;
     for (final entry in plan.documents) {
       _requireCurrent();
@@ -228,12 +245,15 @@ class LocalAccountImportService {
       }
     }
     _requireCurrent();
-    await writeStoredText(checkpointKey, jsonEncode({
-      'version': 1,
-      'accountId': accountId,
-      'state': 'complete',
-      'documents': uidMap,
-    }));
+    await writeStoredText(
+      checkpointKey,
+      jsonEncode({
+        'version': 1,
+        'accountId': accountId,
+        'state': 'complete',
+        'documents': uidMap,
+      }),
+    );
     return inserted;
   }
 }

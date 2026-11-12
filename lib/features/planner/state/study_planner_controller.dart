@@ -213,9 +213,7 @@ class StudySession {
       allDay: json['allDay'] == true,
       eventEndDate: date(json['eventEndDate']),
       repeat: parseEnum(StudyRepeat.values, json['repeat'], StudyRepeat.none),
-      seriesId: json['seriesId'] is String
-          ? json['seriesId'] as String
-          : null,
+      seriesId: json['seriesId'] is String ? json['seriesId'] as String : null,
       repeatEvery: ((json['repeatEvery'] as num?)?.toInt() ?? 1)
           .clamp(1, 365)
           .toInt(),
@@ -930,9 +928,7 @@ class StudyPlannerController extends ChangeNotifier {
 
   /// Adds explicitly imported Local entries without modifying account edits
   /// or resurrecting IDs already deleted on this account.
-  Future<int> importLocalEntries(
-    Iterable<Map<String, dynamic>> entries,
-  ) async {
+  Future<int> importLocalEntries(Iterable<Map<String, dynamic>> entries) async {
     if (_disposed || !isLoaded) {
       throw StateError('Planner must be loaded before importing Local data.');
     }

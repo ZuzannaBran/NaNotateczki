@@ -159,8 +159,12 @@ class AccountSessionController extends ChangeNotifier {
     String password, {
     bool importLocalData = false,
   }) async {
-    await _authenticate('/v1/auth/register', username, password,
-        importLocalData: importLocalData);
+    await _authenticate(
+      '/v1/auth/register',
+      username,
+      password,
+      importLocalData: importLocalData,
+    );
   }
 
   Future<void> login(
@@ -168,8 +172,12 @@ class AccountSessionController extends ChangeNotifier {
     String password, {
     bool importLocalData = false,
   }) async {
-    await _authenticate('/v1/auth/login', username, password,
-        importLocalData: importLocalData);
+    await _authenticate(
+      '/v1/auth/login',
+      username,
+      password,
+      importLocalData: importLocalData,
+    );
   }
 
   Future<void> _authenticate(

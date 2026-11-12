@@ -55,11 +55,15 @@ void main() {
     libraryReloads = 0;
     active = true;
     textStorageReadOverride = (key) async => files[key];
-    textStorageWriteOverride = (key, value) async { files[key] = value; };
+    textStorageWriteOverride = (key, value) async {
+      files[key] = value;
+    };
     planner = StudyPlannerController(
       autoTick: false,
       read: (key) async => plannerFiles[key],
-      write: (key, value) async { plannerFiles[key] = value; },
+      write: (key, value) async {
+        plannerFiles[key] = value;
+      },
     );
     await planner.load();
     await local.saveNotebook(_note());
@@ -68,7 +72,9 @@ void main() {
       repository: account,
       planner: planner,
       isCurrentAccount: () => active,
-      onLibraryChanged: () async { libraryReloads++; },
+      onLibraryChanged: () async {
+        libraryReloads++;
+      },
     );
   });
 
@@ -92,10 +98,14 @@ void main() {
     );
     final localLibrary = jsonEncode({
       'folders': ['School'],
-      'covers': {'School': {'shape': 'star'}},
-      'plannerTasks': {'local-document': [
-        {'id':'source-task','title':'Chapter 1','completed':true},
-      ]},
+      'covers': {
+        'School': {'shape': 'star'},
+      },
+      'plannerTasks': {
+        'local-document': [
+          {'id': 'source-task', 'title': 'Chapter 1', 'completed': true},
+        ],
+      },
     });
     final localPlanner = jsonEncode({
       'version': 2,
@@ -103,22 +113,33 @@ void main() {
     });
     files['library_folders.json'] = jsonEncode({
       'folders': ['School'],
-      'covers': {'School': {'shape': 'heart'}},
+      'covers': {
+        'School': {'shape': 'heart'},
+      },
       'recentCoverColors': [123],
     });
 
-    expect(await service.runWithSource(
-      sourceRepository: local,
-      localLibraryText: localLibrary,
-      localPlannerText: localPlanner,
-    ), 1);
-    expect(await service.runWithSource(
-      sourceRepository: local,
-      localLibraryText: localLibrary,
-      localPlannerText: localPlanner,
-    ), 0);
+    expect(
+      await service.runWithSource(
+        sourceRepository: local,
+        localLibraryText: localLibrary,
+        localPlannerText: localPlanner,
+      ),
+      1,
+    );
+    expect(
+      await service.runWithSource(
+        sourceRepository: local,
+        localLibraryText: localLibrary,
+        localPlannerText: localPlanner,
+      ),
+      0,
+    );
     final importedId = importedLocalUid(
-      'account-a', 'document', 'local-document');
+      'account-a',
+      'document',
+      'local-document',
+    );
     final copied = await account.getNotebook(importedId);
     expect(copied, isNotNull);
     expect(copied!.pages.single.id, isNot('local-page'));
@@ -139,56 +160,72 @@ void main() {
     );
   });
 
-  test('resumes after a post-document failure without duplicating UID',
-      () async {
-    var failOnce = true;
-    final interrupted = LocalAccountImportService(
-      accountId: 'account-a',
-      repository: account,
-      planner: planner,
-      isCurrentAccount: () => active,
-      onLibraryChanged: () async {
-        if (failOnce) {
-          failOnce = false;
-          throw StateError('Interrupted after document commit');
-        }
-      },
-    );
-    await expectLater(interrupted.runWithSource(
-      sourceRepository: local,
-      localLibraryText: '{"folders":["School"]}',
-      localPlannerText: null,
-    ), throwsStateError);
-    expect(
-      (jsonDecode(files[LocalAccountImportService.checkpointKey]!)
-          as Map<String, dynamic>)['state'],
-      'pending',
-    );
-    expect(await account.fetchNotebooks(), hasLength(1));
-    expect(await interrupted.runWithSource(
-      sourceRepository: local,
-      localLibraryText: '{"folders":["School"]}',
-      localPlannerText: null,
-    ), 0);
-    expect(await account.fetchNotebooks(), hasLength(1));
-    expect(await local.fetchNotebooks(), hasLength(1));
-  });
+  test(
+    'resumes after a post-document failure without duplicating UID',
+    () async {
+      var failOnce = true;
+      final interrupted = LocalAccountImportService(
+        accountId: 'account-a',
+        repository: account,
+        planner: planner,
+        isCurrentAccount: () => active,
+        onLibraryChanged: () async {
+          if (failOnce) {
+            failOnce = false;
+            throw StateError('Interrupted after document commit');
+          }
+        },
+      );
+      await expectLater(
+        interrupted.runWithSource(
+          sourceRepository: local,
+          localLibraryText: '{"folders":["School"]}',
+          localPlannerText: null,
+        ),
+        throwsStateError,
+      );
+      expect(
+        (jsonDecode(files[LocalAccountImportService.checkpointKey]!)
+            as Map<String, dynamic>)['state'],
+        'pending',
+      );
+      expect(await account.fetchNotebooks(), hasLength(1));
+      expect(
+        await interrupted.runWithSource(
+          sourceRepository: local,
+          localLibraryText: '{"folders":["School"]}',
+          localPlannerText: null,
+        ),
+        0,
+      );
+      expect(await account.fetchNotebooks(), hasLength(1));
+      expect(await local.fetchNotebooks(), hasLength(1));
+    },
+  );
 
-  test('account switch fence retains pending import and Local source',
-      () async {
-    active = false;
-    await expectLater(service.runWithSource(
-      sourceRepository: local,
-      localLibraryText: null,
-      localPlannerText: null,
-    ), throwsStateError);
-    expect(await account.fetchNotebooks(), isEmpty);
-    expect(await local.fetchNotebooks(), hasLength(1));
-    active = true;
-    expect(await service.runWithSource(
-      sourceRepository: local,
-      localLibraryText: null,
-      localPlannerText: null,
-    ), 1);
-  });
+  test(
+    'account switch fence retains pending import and Local source',
+    () async {
+      active = false;
+      await expectLater(
+        service.runWithSource(
+          sourceRepository: local,
+          localLibraryText: null,
+          localPlannerText: null,
+        ),
+        throwsStateError,
+      );
+      expect(await account.fetchNotebooks(), isEmpty);
+      expect(await local.fetchNotebooks(), hasLength(1));
+      active = true;
+      expect(
+        await service.runWithSource(
+          sourceRepository: local,
+          localLibraryText: null,
+          localPlannerText: null,
+        ),
+        1,
+      );
+    },
+  );
 }
