@@ -1,1 +1,1 @@
-Requested full package 4 validation on dev, 2026-11-11, attempt 1.
+Requested full package 4 validation on dev, 2026-11-12, attempt 2 after formatter and login mock fix.
