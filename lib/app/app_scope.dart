@@ -765,14 +765,13 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       session: _accountSession!,
     );
     final interrupted = await recovery.hasInterruptedRecovery(userId);
-    final missingDatabase = _databaseWasReset ||
+    final missingDatabase =
+        _databaseWasReset ||
         (_databaseFreshFile &&
             await verifiedBackup.wasDatabaseInitialized(userId));
     if (missingDatabase || interrupted) {
       // Replay must finish before the editor writer or REST pull can run.
-      await recovery.recoverVerifiedArchive(
-        databaseWasReset: missingDatabase,
-      );
+      await recovery.recoverVerifiedArchive(databaseWasReset: missingDatabase);
       if (!isCurrent()) {
         await runtime.stop();
         return;
@@ -785,12 +784,14 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       return;
     }
     if (runtime.engine.lastError != null) {
-      throw StateError('V2 replay and catch-up failed: '
-          '${runtime.engine.lastError}');
+      throw StateError(
+        'V2 replay and catch-up failed: '
+        '${runtime.engine.lastError}',
+      );
     }
     final cursorResponse = await apiClient.get('/v2/sync/checkpoint');
-    final currentCursor = (cursorResponse.decodeJson()
-        as Map<String, dynamic>)['cursor'];
+    final currentCursor =
+        (cursorResponse.decodeJson() as Map<String, dynamic>)['cursor'];
     if (currentCursor is! int ||
         await runtime.store.checkpoint('account:$userId') != currentCursor) {
       throw StateError('V2 recovery has not reached the server checkpoint.');
@@ -1197,24 +1198,24 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
             _v2AccountRuntime == null) {
           remoteBackupScheduler.reconcileBeforeBackup = () async {
             if (!liveSync.isStarted) {
-            throw StateError('Account sync must start before remote backup.');
-          }
-          // Pull changes even when this device has made no local edits.
-          await liveSync.syncNow();
-          if (liveSync.lastError != null || liveSync.hasPendingChanges) {
-            throw StateError(
-              'Pending notebook changes must sync before remote backup.',
-            );
-          }
-          await libraryController.flushPlannerTasks();
-          await _accountSettingsSync?.syncNow();
-          if (_accountSettingsSync?.lastError != null) {
-            throw StateError('Account preferences have not synchronized.');
-          }
-          await _plannerSync?.syncNow();
-          if (_plannerSync?.lastError != null) {
-            throw StateError('Planner has not synchronized.');
-          }
+              throw StateError('Account sync must start before remote backup.');
+            }
+            // Pull changes even when this device has made no local edits.
+            await liveSync.syncNow();
+            if (liveSync.lastError != null || liveSync.hasPendingChanges) {
+              throw StateError(
+                'Pending notebook changes must sync before remote backup.',
+              );
+            }
+            await libraryController.flushPlannerTasks();
+            await _accountSettingsSync?.syncNow();
+            if (_accountSettingsSync?.lastError != null) {
+              throw StateError('Account preferences have not synchronized.');
+            }
+            await _plannerSync?.syncNow();
+            if (_plannerSync?.lastError != null) {
+              throw StateError('Planner has not synchronized.');
+            }
           };
         }
         _accountSettingsSync ??= AccountSettingsSyncService(
