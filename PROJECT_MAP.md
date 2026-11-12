@@ -44,8 +44,13 @@
 - Granica bezpieczeństwa: `v2` nadal wymaga potwierdzonego cutover konta;
   nie zmienia domyślnej flagi preview, backupu, Share ani v1 klientów.
   Dla folderów i dokumentów operacje różnych `documentId` mają oddzielne
-  dzienniki; folderowy move z wieloma dokumentami musi dokończyć każdą
-  zmianę dokumentu, a błędy nie są zamiatane kopiami konfliktowymi.
+  dzienniki; przenoszenie poddrzewa w SQLite wykonuje jednak atomową
+  transakcję nadrzędną nad operacją `@library` i zapisami dokumentów.
+  Niepowodzenie dowolnego metadata writer wycofuje folder, dokumenty
+  i outbox, a read-model jest odbudowywany po commit/rollback.
+  Test `library_v2_operation_integration_test.dart` wymusza awarię
+  drugiego dokumentu przy rename i move, a potem bezpieczne ponowienie.
+  Zdalne operacje nadal zachowują osobne identyfikatory i checkpointy.
 
 
 ## Pakiet 4 — Local → konto (2026-11-11)
