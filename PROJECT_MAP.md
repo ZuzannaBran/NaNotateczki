@@ -14,7 +14,8 @@ i nie nadpisuje ustawień konta. Native/Web `text_storage` wspierają
 odczyt z jawnego namespace bez przełączania bieżącej tożsamości.
 Testy: `test/local_import_plan_test.dart`,
 `test/local_account_import_service_test.dart`,
-`test/account_session_controller_test.dart` oraz
+`test/account_session_controller_test.dart`,
+`test/library_account_slot_test.dart` (wybór importu w UI) oraz
 `test/storage_namespace_manager_test.dart`.
 Nieobsługiwane dokumenty Planner v2 i embedy bez zweryfikowanych bajtów
 blokują transfer, nie są po cichu gubione.

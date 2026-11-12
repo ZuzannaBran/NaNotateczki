@@ -3,7 +3,8 @@
 - Import tylko po jawnym wyborze użytkownika; Local pozostaje nienaruszony.
 - Docelowe UID są deterministyczne dla pary (konto, źródłowy UID);
   ponowienie używa tych samych tożsamości i nie nadpisuje późniejszych
-  edycji na koncie. Trwały checkpoint w bazie konta ma stany pending/complete.
+  edycji na koncie. Trwały plik checkpointu w namespace konta ma
+  stany pending/complete.
 - Odmienna historia konta i jej ustawienia mają pierwszeństwo. Foldery
   i zadania dodaje się bez zastępowania już obecnych identyfikatorów.
 - Zmiana konta unieważnia rozpoczęty transfer; dopóki import czeka na
