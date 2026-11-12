@@ -262,6 +262,35 @@ void main() {
     );
   });
 
+  test('post-snapshot remote deletion is replayed, never resurrected',
+      () async {
+    final server = _Server();
+    final source = _Client(server);
+    addTearDown(source.close);
+    await source.seed();
+    await source.backup.uploadVerifiedSnapshot(deviceId: deviceId);
+    server.history.add(event(3, OperationKind.documentDelete));
+    final target = _Client(server);
+    addTearDown(target.close);
+    expect(
+      await target.backup.recoverVerifiedArchive(databaseWasReset: true),
+      true,
+    );
+    expect((await target.repo.fetchNotebooks()), hasLength(1));
+    expect(
+      await target.runtime.startForCurrentAccount(isCurrent: () => true),
+      true,
+    );
+    expect(await target.runtime.store.checkpoint('account:$accountId'), 3);
+    expect(await target.repo.fetchNotebooks(), isEmpty);
+    expect(
+      await target.runtime.store.isTombstoned(
+        'notebook-1', 'document', 'notebook-1',
+      ),
+      isTrue,
+    );
+  });
+
   test('restart mid-restore is idempotent with durable pending marker',
       () async {
     final server = _Server();
