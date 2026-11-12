@@ -1,1 +1,1 @@
-full-ci-ios-vm-service-discovery-stall-watchdog-regression-2026-11-12
+full-ci-2026-11-12-stage12-websocket-cleanup-graceful-unsubscribe-repeated-e2e
