@@ -446,21 +446,41 @@ class LibraryController extends ChangeNotifier {
       return null;
     }
 
-    await _v2LibraryOperations?.renameFolder(oldPath, nextPath);
-
     String relocate(String path) => nextPath + path.substring(oldPath.length);
 
     final updatedItems = <Notebook>[];
-    for (final item in items) {
-      if (!isInFolderTree(item.folder, oldPath)) {
-        updatedItems.add(item);
-        continue;
+    Future<void> relocateDocuments() async {
+      for (final item in items) {
+        if (!isInFolderTree(item.folder, oldPath)) {
+          updatedItems.add(item);
+          continue;
+        }
+        final updated = await repository.updateNotebookMetadata(
+          item.uid,
+          folder: relocate(item.folder),
+        );
+        if (updated == null && _v2LibraryOperations != null) {
+          throw StateError('V2 folder rename lost a document.');
+        }
+        updatedItems.add(updated ?? item);
       }
-      final updated = await repository.updateNotebookMetadata(
-        item.uid,
-        folder: relocate(item.folder),
-      );
-      updatedItems.add(updated ?? item);
+    }
+
+    final v2 = _v2LibraryOperations;
+    if (v2 == null) {
+      await relocateDocuments();
+    } else {
+      try {
+        await v2.renameFolder(
+          oldPath,
+          nextPath,
+          updateDocuments: relocateDocuments,
+        );
+      } catch (_) {
+        // Clear cached projections from a failed nested journal transaction.
+        await repository.fetchNotebooks();
+        rethrow;
+      }
     }
     items = updatedItems;
     final updatedFolders = _folders
@@ -520,24 +540,49 @@ class LibraryController extends ChangeNotifier {
       return null;
     }
     final destination = '$targetPath/${folderLabel(sourcePath)}';
-    await _v2LibraryOperations?.moveFolder(sourcePath, targetPath);
     String relocate(String path) =>
         destination + path.substring(sourcePath.length);
 
     final updatedItems = <Notebook>[];
-    for (final item in items) {
-      if (!isInFolderTree(item.folder, sourcePath)) {
-        updatedItems.add(item);
-        continue;
+    final v2 = _v2LibraryOperations;
+    var missingDocument = false;
+    Future<void> relocateDocuments() async {
+      for (final item in items) {
+        if (!isInFolderTree(item.folder, sourcePath)) {
+          updatedItems.add(item);
+          continue;
+        }
+        final updated = await repository.updateNotebookMetadata(
+          item.uid,
+          folder: relocate(item.folder),
+        );
+        if (updated == null) {
+          if (v2 != null) {
+            throw StateError('V2 folder move lost a document.');
+          }
+          missingDocument = true;
+          return;
+        }
+        updatedItems.add(updated);
       }
-      final updated = await repository.updateNotebookMetadata(
-        item.uid,
-        folder: relocate(item.folder),
-      );
-      if (updated == null) {
+    }
+
+    if (v2 == null) {
+      await relocateDocuments();
+      if (missingDocument) {
         return null;
       }
-      updatedItems.add(updated);
+    } else {
+      try {
+        await v2.moveFolder(
+          sourcePath,
+          targetPath,
+          updateDocuments: relocateDocuments,
+        );
+      } catch (_) {
+        await repository.fetchNotebooks();
+        rethrow;
+      }
     }
     items = updatedItems;
     final updatedFolders = _folders
