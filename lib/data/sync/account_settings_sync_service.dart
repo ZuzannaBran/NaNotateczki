@@ -344,12 +344,7 @@ class AccountSettingsSyncService {
         _applying = true;
         try {
           if (known == null && local != null) {
-            await _savePreimportCopy(
-              userId,
-              'libraryState',
-              local,
-              generation,
-            );
+            await _savePreimportCopy(userId, 'libraryState', local, generation);
           }
           if (!_current(userId, generation)) {
             return false;
