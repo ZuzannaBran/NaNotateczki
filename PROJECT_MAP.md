@@ -78,6 +78,14 @@ blokują transfer, nie są po cichu gubione.
 Testy iPhone/iPad korzystają z 30-minutowego limitu integracji, ponieważ
 zimna kompilacja Xcode może znacząco wydłużyć uruchomienie; kontrakt CI
 weryfikuje `.github/scripts/test_ios_integration_matrix.sh`.
+Po awarii iPhone CI #43263486206: narzędzie Flutter 3.47.6 może zgubić
+log VM Service symulatora po udanej kompilacji Xcode (znany upstream
+race, naprawiony tam w październiku 2026). Skrypt
+`.github/scripts/ios_integration_watchdog.py` odlicza 240 s po
+`Xcode build done` bez pierwszego testu, kończy zawieszony proces
+i jeden raz restartuje symulator; zwykłe błędy testów nie są ponawiane.
+`.github/scripts/test_ios_integration_watchdog.py` obejmuje tę regresję
+i jest uruchamiany przez `test_ios_integration_matrix.sh`.
 
 Regresja mediów rebase (2026-11-11): weryfikowane `asset.attach`,
 `object.set(assetId)` i `asset.detach` po przeniesieniu obrazu
