@@ -1193,8 +1193,10 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
           session: accountSession,
           planner: planner,
         );
-        remoteBackupScheduler.reconcileBeforeBackup = () async {
-          if (!liveSync.isStarted) {
+        if (_bootstrappedAccount != accountSession.userId ||
+            _v2AccountRuntime == null) {
+          remoteBackupScheduler.reconcileBeforeBackup = () async {
+            if (!liveSync.isStarted) {
             throw StateError('Account sync must start before remote backup.');
           }
           // Pull changes even when this device has made no local edits.
@@ -1213,7 +1215,8 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
           if (_plannerSync?.lastError != null) {
             throw StateError('Planner has not synchronized.');
           }
-        };
+          };
+        }
         _accountSettingsSync ??= AccountSettingsSyncService(
           apiClient: apiClient,
           session: accountSession,
