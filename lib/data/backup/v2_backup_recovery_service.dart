@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
-import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../core/storage/app_save_coordinator.dart';
@@ -174,41 +173,17 @@ class V2BackupRecoveryService {
       throw const FormatException('Backup feed did not reach its checkpoint.');
     }
 
-    // A digest is archived once, not once per occurrence or document.
-    final assetBlobs = <String, Map<String, dynamic>>{};
-    for (final entry in receipts.entries) {
-      _assertAccount(accountId);
-      final digest = entry.key;
-      final receipt = entry.value;
-      final rows = await repository.database.customSelect(
-        'SELECT bytes, media_type, byte_length FROM operation_asset_bytes '
-        'WHERE checksum_sha256 = ?',
-        variables: [Variable<String>(digest)],
-      ).get();
-      Uint8List bytes;
-      if (rows.isEmpty) {
-        bytes = await runtime.assetGateway.download(
-          sha256: digest,
-          sizeBytes: receipt['sizeBytes'] as int,
-        );
-      } else {
-        final row = rows.single;
-        if (row.read<String>('media_type') != receipt['mediaType'] ||
-            row.read<int>('byte_length') != receipt['sizeBytes']) {
-          throw const FormatException('Invalid stored media receipt.');
-        }
-        bytes = row.read<Uint8List>('bytes');
-      }
-      if (bytes.length != receipt['sizeBytes'] ||
-          sha256.convert(bytes).toString() != digest) {
-        throw const FormatException('Corrupted v2 media bytes.');
-      }
-      assetBlobs[digest] = {
-        'sizeBytes': bytes.length,
-        'mediaType': receipt['mediaType'],
-        'bytesBase64': base64Encode(bytes),
-      };
-    }
+    // Verified content-addressed assets are stored once by the v2 server.
+    // Do not duplicate unchanged PDFs/images in each new backup envelope.
+    // Server finalize checks that every referenced digest is still durable.
+    final assetBlobs = <String, Map<String, dynamic>>{
+      for (final entry in receipts.entries)
+        entry.key: {
+          'sizeBytes': entry.value['sizeBytes'],
+          'mediaType': entry.value['mediaType'],
+          'storage': 'verified-v2',
+        },
+    };
     _assertAccount(accountId);
     if (await runtime.store.checkpoint(_scope) != localCursor ||
         await _serverCursor() != checkpoint ||
@@ -516,16 +491,33 @@ class V2BackupRecoveryService {
           final item = _asObject(entry.value);
           final receipt = required[hash]!;
           if (item['sizeBytes'] != receipt['sizeBytes'] ||
-              item['mediaType'] != receipt['mediaType'] ||
-              item['bytesBase64'] is! String) {
+              item['mediaType'] != receipt['mediaType']) {
             throw const FormatException('Backup asset receipt mismatch.');
           }
-          final bytes = base64Decode(item['bytesBase64'] as String);
+          Uint8List bytes;
+          if (item['storage'] == 'verified-v2' &&
+              item.length == 3) {
+            // A missing or altered remote asset is a recovery failure,
+            // never a blank image or an implicitly successful restore.
+            _assertAccount(accountId);
+            bytes = await runtime.assetGateway.download(
+              sha256: hash,
+              sizeBytes: receipt['sizeBytes'] as int,
+            );
+          } else if (item['storage'] == null &&
+              item['bytesBase64'] is String &&
+              item.length == 3) {
+            bytes = Uint8List.fromList(
+              base64Decode(item['bytesBase64'] as String),
+            );
+          } else {
+            throw const FormatException('Unsupported asset archive record.');
+          }
           if (bytes.length != item['sizeBytes'] ||
               sha256.convert(bytes).toString() != hash) {
             throw const FormatException('Corrupted archived asset bytes.');
           }
-          assets[hash] = Uint8List.fromList(bytes);
+          assets[hash] = bytes;
         }
         final files = <String, String?>{};
         for (final key in _keys(accountId)) {
