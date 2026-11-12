@@ -30,8 +30,7 @@ OperationEnvelope event(
   String? pageId,
 }) {
   return OperationEnvelope(
-    operationId:
-        '11111111-1111-4111-8111-${seq.toString().padLeft(12, '0')}',
+    operationId: '11111111-1111-4111-8111-${seq.toString().padLeft(12, '0')}',
     actorId: 'actor-1',
     actorSeq: seq,
     documentId: documentId,
@@ -87,14 +86,17 @@ class _Server {
     }
     if (path == '/v2/operations') {
       final after = int.parse(request.url.queryParameters['after']!);
-      return http.Response(jsonEncode({
-        'cursor': history.length,
-        'hasMore': false,
-        'operations': [
-          for (var i = after; i < history.length; i++)
-            {'cursor': i + 1, 'operation': history[i].toJson()},
-        ],
-      }), 200);
+      return http.Response(
+        jsonEncode({
+          'cursor': history.length,
+          'hasMore': false,
+          'operations': [
+            for (var i = after; i < history.length; i++)
+              {'cursor': i + 1, 'operation': history[i].toJson()},
+          ],
+        }),
+        200,
+      );
     }
     if (request.method == 'POST' && path == '/v2/backups') {
       final create = jsonDecode(request.body) as Map;
@@ -110,24 +112,30 @@ class _Server {
     }
     if (request.method == 'POST' && path.endsWith('/finalize')) {
       verified = pending;
-      return http.Response(jsonEncode({
-        'status': 'verified',
-        'sha256': sha256.convert(verified!).toString(),
-        'verifiedAt': '2026-11-12T12:00:00Z',
-      }), 200);
+      return http.Response(
+        jsonEncode({
+          'status': 'verified',
+          'sha256': sha256.convert(verified!).toString(),
+          'verifiedAt': '2026-11-12T12:00:00Z',
+        }),
+        200,
+      );
     }
     if (request.method == 'GET' && path == '/v2/backups') {
-      return http.Response(jsonEncode({
-        'backups': [
-          if (verified != null)
-            {
-              'backupId': backupId,
-              'deviceId': deviceId,
-              'sha256': sha256.convert(verified!).toString(),
-              'sizeBytes': verified!.length,
-            },
-        ],
-      }), 200);
+      return http.Response(
+        jsonEncode({
+          'backups': [
+            if (verified != null)
+              {
+                'backupId': backupId,
+                'deviceId': deviceId,
+                'sha256': sha256.convert(verified!).toString(),
+                'sizeBytes': verified!.length,
+              },
+          ],
+        }),
+        200,
+      );
     }
     if (request.method == 'GET' && path.endsWith('/download')) {
       return verified == null
@@ -218,115 +226,127 @@ void main() {
     ActiveStorageNamespace.activate(StorageNamespace.local());
   });
 
-  test('captures committed journal without serializing notebook snapshots',
-      () async {
-    final server = _Server();
-    final client = _Client(server);
-    addTearDown(client.close);
-    await client.seed();
-    final receipt = await client.backup.uploadVerifiedSnapshot(
-      deviceId: deviceId,
-    );
-    expect(receipt.backupId, backupId);
-    final envelope = jsonDecode(utf8.decode(server.verified!)) as Map;
-    final payload = envelope['payload'] as Map;
-    expect(envelope['version'], 3);
-    expect(envelope['operationCheckpoint'],
-        containsPair('account:$accountId', 2));
-    expect(payload['notebooks'], isEmpty);
-    expect(payload['operationHistory'], hasLength(2));
-    expect(payload['assetBlobs'], isEmpty);
-    expect(payload['studyPlannerState']['sessions'], hasLength(1));
-    expect(payload['appPreferences']['darkMode'], true);
-    expect(server.paths.where((p) => p.contains('/v1/')), isEmpty);
-  });
+  test(
+    'captures committed journal without serializing notebook snapshots',
+    () async {
+      final server = _Server();
+      final client = _Client(server);
+      addTearDown(client.close);
+      await client.seed();
+      final receipt = await client.backup.uploadVerifiedSnapshot(
+        deviceId: deviceId,
+      );
+      expect(receipt.backupId, backupId);
+      final envelope = jsonDecode(utf8.decode(server.verified!)) as Map;
+      final payload = envelope['payload'] as Map;
+      expect(envelope['version'], 3);
+      expect(
+        envelope['operationCheckpoint'],
+        containsPair('account:$accountId', 2),
+      );
+      expect(payload['notebooks'], isEmpty);
+      expect(payload['operationHistory'], hasLength(2));
+      expect(payload['assetBlobs'], isEmpty);
+      expect(payload['studyPlannerState']['sessions'], hasLength(1));
+      expect(payload['appPreferences']['darkMode'], true);
+      expect(server.paths.where((p) => p.contains('/v1/')), isEmpty);
+    },
+  );
 
-  test('a missing SQLite database restores and replays original envelopes',
-      () async {
-    final server = _Server();
-    final first = _Client(server);
-    addTearDown(first.close);
-    await first.seed();
-    await first.backup.uploadVerifiedSnapshot(deviceId: deviceId);
-    final missing = _Client(server);
-    addTearDown(missing.close);
-    files.remove('app_prefs.json');
-    final restored = await missing.backup.recoverVerifiedArchive(
-      databaseWasReset: true,
-    );
-    expect(restored, true);
-    expect(await missing.runtime.store.checkpoint('account:$accountId'), 2);
-    expect((await missing.repo.fetchNotebooks()).single.title, 'History');
-    expect(files['app_prefs.json'], '{"darkMode":true}');
-    expect(await missing.backup.hasInterruptedRecovery(accountId), true);
-    await missing.backup.completeRecovery();
-    expect(await missing.backup.hasInterruptedRecovery(accountId), false);
-    expect(
-      (await missing.db.customSelect('SELECT * FROM operation_outbox').get()),
-      isEmpty,
-    );
-  });
+  test(
+    'a missing SQLite database restores and replays original envelopes',
+    () async {
+      final server = _Server();
+      final first = _Client(server);
+      addTearDown(first.close);
+      await first.seed();
+      await first.backup.uploadVerifiedSnapshot(deviceId: deviceId);
+      final missing = _Client(server);
+      addTearDown(missing.close);
+      files.remove('app_prefs.json');
+      final restored = await missing.backup.recoverVerifiedArchive(
+        databaseWasReset: true,
+      );
+      expect(restored, true);
+      expect(await missing.runtime.store.checkpoint('account:$accountId'), 2);
+      expect((await missing.repo.fetchNotebooks()).single.title, 'History');
+      expect(files['app_prefs.json'], '{"darkMode":true}');
+      expect(await missing.backup.hasInterruptedRecovery(accountId), true);
+      await missing.backup.completeRecovery();
+      expect(await missing.backup.hasInterruptedRecovery(accountId), false);
+      expect(
+        (await missing.db.customSelect('SELECT * FROM operation_outbox').get()),
+        isEmpty,
+      );
+    },
+  );
 
-  test('post-snapshot remote deletion is replayed, never resurrected',
-      () async {
-    final server = _Server();
-    final source = _Client(server);
-    addTearDown(source.close);
-    await source.seed();
-    await source.backup.uploadVerifiedSnapshot(deviceId: deviceId);
-    server.history.add(event(3, OperationKind.documentDelete));
-    final target = _Client(server);
-    addTearDown(target.close);
-    expect(
-      await target.backup.recoverVerifiedArchive(databaseWasReset: true),
-      true,
-    );
-    expect((await target.repo.fetchNotebooks()), hasLength(1));
-    expect(
-      await target.runtime.startForCurrentAccount(isCurrent: () => true),
-      true,
-    );
-    expect(await target.runtime.store.checkpoint('account:$accountId'), 3);
-    expect(await target.repo.fetchNotebooks(), isEmpty);
-    expect(
-      await target.runtime.store.isTombstoned(
-        'notebook-1', 'document', 'notebook-1',
-      ),
-      isTrue,
-    );
-  });
+  test(
+    'post-snapshot remote deletion is replayed, never resurrected',
+    () async {
+      final server = _Server();
+      final source = _Client(server);
+      addTearDown(source.close);
+      await source.seed();
+      await source.backup.uploadVerifiedSnapshot(deviceId: deviceId);
+      server.history.add(event(3, OperationKind.documentDelete));
+      final target = _Client(server);
+      addTearDown(target.close);
+      expect(
+        await target.backup.recoverVerifiedArchive(databaseWasReset: true),
+        true,
+      );
+      expect((await target.repo.fetchNotebooks()), hasLength(1));
+      expect(
+        await target.runtime.startForCurrentAccount(isCurrent: () => true),
+        true,
+      );
+      expect(await target.runtime.store.checkpoint('account:$accountId'), 3);
+      expect(await target.repo.fetchNotebooks(), isEmpty);
+      expect(
+        await target.runtime.store.isTombstoned(
+          'notebook-1',
+          'document',
+          'notebook-1',
+        ),
+        isTrue,
+      );
+    },
+  );
 
-  test('restart mid-restore is idempotent with durable pending marker',
-      () async {
-    final server = _Server();
-    final source = _Client(server);
-    addTearDown(source.close);
-    await source.seed();
-    await source.backup.uploadVerifiedSnapshot(deviceId: deviceId);
-    final target = _Client(server);
-    addTearDown(target.close);
-    target.backup.afterRecoveryOperation = (index) async {
-      if (index == 1) {
-        throw StateError('Simulated crash after first SQLite commit');
-      }
-    };
-    await expectLater(
-      target.backup.recoverVerifiedArchive(databaseWasReset: true),
-      throwsStateError,
-    );
-    expect(await target.backup.hasInterruptedRecovery(accountId), true);
-    expect(await target.runtime.store.checkpoint('account:$accountId'), 1);
-    target.backup.afterRecoveryOperation = null;
-    expect(
-      await target.backup.recoverVerifiedArchive(databaseWasReset: false),
-      true,
-    );
-    expect(await target.runtime.store.checkpoint('account:$accountId'), 2);
-    expect(
-      (await target.db.customSelect('SELECT * FROM operations').get()),
-      hasLength(2),
-    );
-  });
+  test(
+    'restart mid-restore is idempotent with durable pending marker',
+    () async {
+      final server = _Server();
+      final source = _Client(server);
+      addTearDown(source.close);
+      await source.seed();
+      await source.backup.uploadVerifiedSnapshot(deviceId: deviceId);
+      final target = _Client(server);
+      addTearDown(target.close);
+      target.backup.afterRecoveryOperation = (index) async {
+        if (index == 1) {
+          throw StateError('Simulated crash after first SQLite commit');
+        }
+      };
+      await expectLater(
+        target.backup.recoverVerifiedArchive(databaseWasReset: true),
+        throwsStateError,
+      );
+      expect(await target.backup.hasInterruptedRecovery(accountId), true);
+      expect(await target.runtime.store.checkpoint('account:$accountId'), 1);
+      target.backup.afterRecoveryOperation = null;
+      expect(
+        await target.backup.recoverVerifiedArchive(databaseWasReset: false),
+        true,
+      );
+      expect(await target.runtime.store.checkpoint('account:$accountId'), 2);
+      expect(
+        (await target.db.customSelect('SELECT * FROM operations').get()),
+        hasLength(2),
+      );
+    },
+  );
 
   test('corrupt archived media is rejected before SQLite writes', () async {
     final server = _Server();
@@ -344,7 +364,8 @@ void main() {
       },
     };
     envelope['checksum'] = sha256
-        .convert(utf8.encode(jsonEncode(payload))).toString();
+        .convert(utf8.encode(jsonEncode(payload)))
+        .toString();
     server.verified = Uint8List.fromList(utf8.encode(jsonEncode(envelope)));
     final target = _Client(server);
     addTearDown(target.close);
@@ -389,9 +410,9 @@ void main() {
         'storage': 'verified-v2',
       },
     };
-    envelope['checksum'] = sha256.convert(
-      utf8.encode(jsonEncode(payload)),
-    ).toString();
+    envelope['checksum'] = sha256
+        .convert(utf8.encode(jsonEncode(payload)))
+        .toString();
     server.verified = Uint8List.fromList(utf8.encode(jsonEncode(envelope)));
     final target = _Client(server);
     addTearDown(target.close);
@@ -405,28 +426,29 @@ void main() {
     );
   });
 
-  test('interrupted upload and no-space failure retain previous verified copy',
-      () async {
-    final server = _Server();
-    final client = _Client(server);
-    addTearDown(client.close);
-    await client.seed();
-    await client.backup.uploadVerifiedSnapshot(deviceId: deviceId);
-    final oldHash = sha256.convert(server.verified!).toString();
-    server.rejectUpload = true;
-    await expectLater(
-      client.backup.uploadVerifiedSnapshot(deviceId: deviceId),
-      throwsA(isA<ApiException>()),
-    );
-    expect(sha256.convert(server.verified!).toString(), oldHash);
-    expect(
-      (await client.db.customSelect('SELECT * FROM operation_outbox').get()),
-      isEmpty,
-    );
-  });
+  test(
+    'interrupted upload and no-space failure retain previous verified copy',
+    () async {
+      final server = _Server();
+      final client = _Client(server);
+      addTearDown(client.close);
+      await client.seed();
+      await client.backup.uploadVerifiedSnapshot(deviceId: deviceId);
+      final oldHash = sha256.convert(server.verified!).toString();
+      server.rejectUpload = true;
+      await expectLater(
+        client.backup.uploadVerifiedSnapshot(deviceId: deviceId),
+        throwsA(isA<ApiException>()),
+      );
+      expect(sha256.convert(server.verified!).toString(), oldHash);
+      expect(
+        (await client.db.customSelect('SELECT * FROM operation_outbox').get()),
+        isEmpty,
+      );
+    },
+  );
 
-  test('older archive cannot roll back a surviving newer checkpoint',
-      () async {
+  test('older archive cannot roll back a surviving newer checkpoint', () async {
     final server = _Server();
     final source = _Client(server);
     addTearDown(source.close);
@@ -442,22 +464,26 @@ void main() {
     expect(await target.runtime.store.checkpoint('account:$accountId'), 3);
   });
 
-  test('offline outbox prevents uploading a misleading confirmed checkpoint',
-      () async {
-    final server = _Server();
-    final client = _Client(server);
-    addTearDown(client.close);
-    await client.seed();
-    await client.db.customStatement(
-      'INSERT INTO operation_outbox (operation_id, queued_at) VALUES (?, ?)',
-      [createDocument.operationId, 0],
-    );
-    await expectLater(
-      client.backup.uploadVerifiedSnapshot(deviceId: deviceId),
-      throwsStateError,
-    );
-    expect(server.paths.where((p) => p == 'POST /v2/backups'), isEmpty);
-    expect((await client.db.customSelect('SELECT * FROM operation_outbox').get()),
-        hasLength(1));
-  });
+  test(
+    'offline outbox prevents uploading a misleading confirmed checkpoint',
+    () async {
+      final server = _Server();
+      final client = _Client(server);
+      addTearDown(client.close);
+      await client.seed();
+      await client.db.customStatement(
+        'INSERT INTO operation_outbox (operation_id, queued_at) VALUES (?, ?)',
+        [createDocument.operationId, 0],
+      );
+      await expectLater(
+        client.backup.uploadVerifiedSnapshot(deviceId: deviceId),
+        throwsStateError,
+      );
+      expect(server.paths.where((p) => p == 'POST /v2/backups'), isEmpty);
+      expect(
+        (await client.db.customSelect('SELECT * FROM operation_outbox').get()),
+        hasLength(1),
+      );
+    },
+  );
 }
