@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:program/app/account_protocol_editor_gate.dart';
+import 'package:program/core/storage/shutdown_coordinator.dart';
 
 void main() {
   Widget app({
@@ -11,6 +12,7 @@ void main() {
     String? blockingReason,
     Future<void> Function()? onRetry,
     Future<void> Function()? onLogOut,
+    Future<void> Function()? onLogOutOffline,
   }) => MaterialApp(
     home: AccountProtocolEditorGate(
       isSignedIn: signedIn,
@@ -20,6 +22,7 @@ void main() {
       blockingReason: blockingReason,
       onRetry: onRetry ?? () async {},
       onLogOut: onLogOut ?? () async {},
+      onLogOutOffline: onLogOutOffline,
       child: const Scaffold(body: Text('Editor content')),
     ),
   );
@@ -113,6 +116,55 @@ void main() {
     await tester.pump();
     expect(logouts, 1);
     expect(find.text('Editor content'), findsNothing);
+  });
+
+  testWidgets('offline logout is offered only after local flush', (
+    tester,
+  ) async {
+    var offlineCalls = 0;
+    await tester.pumpWidget(
+      app(
+        signedIn: true,
+        userId: 'account-a',
+        onLogOut: () async {
+          throw const ShutdownInterrupted(
+            ShutdownPhase.syncRemote,
+            true,
+            'offline',
+          );
+        },
+        onLogOutOffline: () async {
+          offlineCalls++;
+        },
+      ),
+    );
+    await tester.tap(find.text('Log out'));
+    await tester.pump();
+    expect(find.text('Log out offline'), findsOneWidget);
+    await tester.tap(find.text('Log out offline'));
+    await tester.pump();
+    expect(offlineCalls, 1);
+
+    await tester.pumpWidget(
+      app(
+        signedIn: true,
+        userId: 'account-b',
+        onLogOut: () async {
+          throw const ShutdownInterrupted(
+            ShutdownPhase.flushLocal,
+            false,
+            'disk full',
+          );
+        },
+        onLogOutOffline: () async {
+          offlineCalls++;
+        },
+      ),
+    );
+    await tester.tap(find.text('Log out'));
+    await tester.pump();
+    expect(find.text('Log out offline'), findsNothing);
+    expect(offlineCalls, 1);
   });
 
   testWidgets('logout failure is shown without unlocking editing', (

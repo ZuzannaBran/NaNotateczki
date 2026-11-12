@@ -123,6 +123,39 @@ void main() {
     expect(loggedOut, isFalse);
   });
 
+  test('reports each stage and forbids signout after stop timeout', () async {
+    final stages = <ShutdownPhase>[];
+    final pendingStop = Completer<void>();
+    var clearedCredentials = false;
+    final coordinator = ShutdownCoordinator(
+      timeout: const Duration(milliseconds: 15),
+      flushLocal: () async {},
+      syncRemote: () async {},
+      verifyBackup: () async {},
+      stopServices: () => pendingStop.future,
+      endSession: () async {
+        clearedCredentials = true;
+      },
+      onPhase: stages.add,
+    );
+    await expectLater(
+      coordinator.run(),
+      throwsA(
+        isA<ShutdownInterrupted>()
+            .having((e) => e.phase, 'phase', ShutdownPhase.stopServices)
+            .having((e) => e.localSafe, 'durable', true),
+      ),
+    );
+    expect(clearedCredentials, isFalse);
+    expect(stages, [
+      ShutdownPhase.flushLocal,
+      ShutdownPhase.syncRemote,
+      ShutdownPhase.verifyBackup,
+      ShutdownPhase.stopServices,
+    ]);
+    pendingStop.complete();
+  });
+
   test('concurrent runs reuse one shutdown attempt', () async {
     final gate = Completer<void>();
     var calls = 0;

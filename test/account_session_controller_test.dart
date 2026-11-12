@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
+import 'package:program/core/storage/shutdown_coordinator.dart';
 import 'package:program/core/storage/text_storage.dart';
 import 'package:program/data/sync/account_credential_store.dart';
 import 'package:program/data/sync/account_session_controller.dart';
@@ -584,6 +585,149 @@ void main() {
     expect(session.isSignedIn, isFalse);
     expect(credentials.value, isNull);
     expect(session.onboardingComplete, isFalse);
+    session.dispose();
+    client.close();
+  });
+
+  test('v2 shutdown retry restores the same account after restart', () async {
+    final stored = <String, String>{};
+    textStorageReadOverride = (key) async => stored[key];
+    textStorageWriteOverride = (key, value) async => stored[key] = value;
+    final phases = <String>[];
+    var revocations = 0;
+    var refreshes = 0;
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/v1/auth/login' ||
+            request.url.path == '/v1/auth/refresh') {
+          if (request.url.path == '/v1/auth/refresh') {
+            refreshes++;
+          }
+          return http.Response(
+            jsonEncode({
+              'accessToken': 'access-v2',
+              'refreshToken': 'refresh-v2',
+              'expiresIn': 600,
+              'userId': 'user-v2',
+              'username': 'test_user',
+            }),
+            200,
+          );
+        }
+        if (request.url.path == '/v1/auth/logout') {
+          revocations++;
+          return http.Response('', 204);
+        }
+        fail('Unexpected request: ${request.url}');
+      }),
+    );
+    Future<void> beforeLogout(bool preserveOffline) {
+      return ShutdownCoordinator(
+        flushLocal: () async => phases.add('sqlite-outbox'),
+        syncRemote: () async {
+          phases.add('sync');
+          throw StateError('network unavailable');
+        },
+        verifyBackup: () async => phases.add('backup'),
+        stopServices: () async => phases.add('stop'),
+      ).run(preserveOffline: preserveOffline);
+    }
+
+    final first = AccountSessionController(
+      client,
+      credentialStore: credentials,
+      onBeforeLogout: beforeLogout,
+    );
+    await first.loadProfile();
+    await first.login('test_user', 'password');
+    await expectLater(
+      first.logout(),
+      throwsA(
+        isA<ShutdownInterrupted>()
+            .having((e) => e.phase, 'phase', ShutdownPhase.syncRemote)
+            .having((e) => e.localSafe, 'durable', true),
+      ),
+    );
+    expect(first.isSignedIn, isTrue);
+    expect(credentials.value, contains('refresh-v2'));
+    expect(revocations, 0);
+    expect(phases, ['sqlite-outbox', 'sync']);
+    first.dispose();
+
+    final restarted = AccountSessionController(
+      client,
+      credentialStore: credentials,
+      onBeforeLogout: beforeLogout,
+    );
+    await restarted.loadProfile();
+    expect(restarted.isSignedIn, isTrue);
+    expect(restarted.userId, 'user-v2');
+    expect(refreshes, 1);
+
+    await restarted.logoutOffline();
+    expect(phases, ['sqlite-outbox', 'sync', 'sqlite-outbox', 'stop']);
+    expect(revocations, 0);
+    expect(credentials.value, isNull);
+    expect(restarted.isSignedIn, isFalse);
+
+    final signedOut = AccountSessionController(
+      client,
+      credentialStore: credentials,
+    );
+    await signedOut.loadProfile();
+    expect(signedOut.isSignedIn, isFalse);
+    signedOut.dispose();
+    restarted.dispose();
+    client.close();
+  });
+
+  test('unsafe local flush cannot clear credentials offline', () async {
+    final stored = <String, String>{};
+    textStorageReadOverride = (key) async => stored[key];
+    textStorageWriteOverride = (key, value) async => stored[key] = value;
+    var revoked = false;
+    final client = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((request) async {
+        if (request.url.path == '/v1/auth/login') {
+          return http.Response(
+            jsonEncode({
+              'accessToken': 'access-v2',
+              'refreshToken': 'refresh-v2',
+              'expiresIn': 600,
+              'userId': 'user-v2',
+              'username': 'test_user',
+            }),
+            200,
+          );
+        }
+        revoked = true;
+        return http.Response('', 204);
+      }),
+    );
+    final session = AccountSessionController(
+      client,
+      credentialStore: credentials,
+      onBeforeLogout: (offline) => ShutdownCoordinator(
+        flushLocal: () async => throw StateError('disk full'),
+        stopServices: () async => fail('Must not stop a dirty writer'),
+      ).run(preserveOffline: offline),
+    );
+    await session.loadProfile();
+    await session.login('test_user', 'password');
+    await expectLater(
+      session.logoutOffline(),
+      throwsA(
+        isA<ShutdownInterrupted>()
+            .having((e) => e.phase, 'phase', ShutdownPhase.flushLocal)
+            .having((e) => e.localSafe, 'durable', false),
+      ),
+    );
+    expect(session.isSignedIn, isTrue);
+    expect(session.isBusy, isFalse);
+    expect(credentials.value, contains('refresh-v2'));
+    expect(revoked, isFalse);
     session.dispose();
     client.close();
   });
