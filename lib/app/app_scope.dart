@@ -128,6 +128,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       // A pending actor/protocol read must settle before its SQLite namespace
       // or API identity is replaced. The invalidated bootstrap cannot publish UI.
       await _accountBootstrap;
+      await InkActivityTracker.instance.waitForNoActiveContacts();
       _settingsPoll?.cancel();
       _settingsDebounce?.cancel();
       _plannerDebounce?.cancel();
@@ -136,6 +137,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       _plannerSync?.stop();
       _accountSettingsSync?.stop();
       await AppSaveCoordinator.instance.flushPending();
+      await _libraryController?.flushPlannerTasks();
       await _studyPlanner?.flush();
       await _repository?.waitForPendingSaves();
       await _backupScheduler?.flushForExit();
@@ -191,6 +193,9 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     }
     final v2 = _v2AccountRuntime;
     if (v2 != null) {
+      if (_bootstrappedAccount != session.userId) {
+        throw StateError('V2 runtime has not completed account startup.');
+      }
       await v2.engine.syncNow();
       if (v2.engine.lastError != null ||
           (await v2.store.pending(
