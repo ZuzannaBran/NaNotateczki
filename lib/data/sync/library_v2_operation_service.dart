@@ -460,7 +460,10 @@ class LibraryV2OperationService {
     });
   }
 
-  Future<void> deleteTree(String root) async {
+  Future<void> deleteTree(
+    String root, {
+    Future<void> Function()? deleteDocuments,
+  }) async {
     await ensureFolderPath(root);
     final state = await snapshot();
     final children =
@@ -471,19 +474,36 @@ class LibraryV2OperationService {
     if (children.isEmpty) {
       throw StateError('Folder is missing.');
     }
-    await engine.writeLocalBatch(
-      documentId: OperationEnvelope.libraryDocumentId,
-      operations: [
-        for (final path in children)
-          LocalOperationDraft(
-            kind: OperationKind.folderDelete,
-            objectId: state.folderIdsByPath[path],
-            payload: const {},
-          ),
-      ],
-      apply: apply,
-    );
-    await refreshReadModel();
+    Future<void> deleteFolders() async {
+      await engine.writeLocalBatch(
+        documentId: OperationEnvelope.libraryDocumentId,
+        operations: [
+          for (final path in children)
+            LocalOperationDraft(
+              kind: OperationKind.folderDelete,
+              objectId: state.folderIdsByPath[path],
+              payload: const {},
+            ),
+        ],
+        apply: apply,
+      );
+    }
+
+    if (deleteDocuments == null) {
+      await deleteFolders();
+      await refreshReadModel();
+      return;
+    }
+    try {
+      await _database.transaction(() async {
+        await deleteDocuments();
+        await deleteFolders();
+      });
+    } finally {
+      // Refresh the compatibility view from the final committed/rolled-back
+      // journal, never from an intermediate subtree deletion.
+      await refreshReadModel();
+    }
   }
 
   /// Deleted imported tasks must never be recreated with the same UID.
@@ -519,7 +539,10 @@ class LibraryV2OperationService {
     await _commit(OperationKind.taskDelete, id, const {});
   }
 
-  Future<void> deletePlannerTasks(String plannerUid) async {
+  Future<void> deletePlannerTasks(
+    String plannerUid, {
+    bool refresh = true,
+  }) async {
     final state = await snapshot();
     final tasks = state.value['plannerTasks'] as Map<String, dynamic>;
     final list = tasks[plannerUid];
@@ -538,6 +561,8 @@ class LibraryV2OperationService {
       ],
       apply: apply,
     );
-    await refreshReadModel();
+    if (refresh) {
+      await refreshReadModel();
+    }
   }
 }
