@@ -47,7 +47,10 @@ class _AccountProtocolEditorGateState extends State<AccountProtocolEditorGate> {
   bool _canSignOutOffline = false;
   String? _error;
 
-  Future<void> _attempt({required bool loggingOut, bool offline = false}) async {
+  Future<void> _attempt({
+    required bool loggingOut,
+    bool offline = false,
+  }) async {
     if (loggingOut ? _signingOut : _retrying) {
       return;
     }
@@ -74,9 +77,8 @@ class _AccountProtocolEditorGateState extends State<AccountProtocolEditorGate> {
       if (mounted) {
         setState(() {
           _error = '${loggingOut ? 'Log out' : 'Retry'} failed: $error';
-          _canSignOutOffline = loggingOut &&
-              error is ShutdownInterrupted &&
-              error.localSafe;
+          _canSignOutOffline =
+              loggingOut && error is ShutdownInterrupted && error.localSafe;
         });
       }
     } finally {
