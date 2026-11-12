@@ -102,6 +102,8 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   bool _databaseFreshFile = false;
   final ValueNotifier<bool> _finishingExit = ValueNotifier<bool>(false);
   final ValueNotifier<String?> _exitFailure = ValueNotifier<String?>(null);
+  final ValueNotifier<ShutdownPhase> _exitPhase =
+      ValueNotifier<ShutdownPhase>(ShutdownPhase.idle);
   final ValueNotifier<bool> _allowOfflineExit = ValueNotifier<bool>(false);
   Future<void>? _exitDrain;
   bool _allowExit = false;
@@ -142,6 +144,112 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       _legacyProtocolReadyUser = null;
       _incompatibleProtocolUser = null;
     });
+  }
+
+  /// Finishes local gestures, SQLite writers and queued file saves before I/O.
+  Future<void> _flushLocallyForShutdown() async {
+    final repository = _repository;
+    final scheduler = _backupScheduler;
+    final backupService = _backupService;
+    if (repository == null || scheduler == null || backupService == null) {
+      throw StateError('Local persistence has not finished initializing.');
+    }
+    await InkActivityTracker.instance.waitForNoActiveContacts();
+    for (var attempt = 0; attempt < 3; attempt++) {
+      await AppSaveCoordinator.instance.flushPending();
+      await _libraryController?.flushPlannerTasks();
+      await _studyPlanner?.flush();
+      await repository.waitForPendingSaves();
+      await waitForPendingTextStorageOperations();
+      if (!AppSaveCoordinator.instance.hasPendingWork &&
+          !repository.hasPendingSaves) {
+        break;
+      }
+    }
+    if (AppSaveCoordinator.instance.hasPendingWork ||
+        repository.hasPendingSaves) {
+      throw StateError('Pending editor saves did not settle.');
+    }
+    await scheduler.flushForExit();
+    await backupService.waitUntilIdle();
+    await waitForPendingTextStorageOperations();
+    if (_accountSession?.isSignedIn == true && _v2AccountRuntime == null) {
+      await _liveSync?.flushPersistedOutbox();
+    }
+  }
+
+  Future<void> _syncRemotelyForShutdown() async {
+    final session = _accountSession;
+    if (session == null || !session.isSignedIn) {
+      return;
+    }
+    final v2 = _v2AccountRuntime;
+    if (v2 != null) {
+      await v2.engine.syncNow();
+      if (v2.engine.lastError != null ||
+          (await v2.store.pending(
+            limit: 1,
+            includeDeferred: true,
+          )).isNotEmpty) {
+        throw StateError('V2 outbox has unacknowledged local operations.');
+      }
+    } else {
+      if (_legacyProtocolReadyUser != session.userId) {
+        throw StateError('Account sync protocol is not verified.');
+      }
+      final sync = _liveSync;
+      if (sync == null) {
+        throw StateError('Account synchronization is unavailable.');
+      }
+      if (!sync.isStarted) {
+        await sync.start(InitialSyncPolicy.mergeSafely);
+      }
+      await sync.syncNow();
+      if (sync.hasPendingChanges || sync.lastError != null) {
+        throw StateError('Pending account changes remain in the outbox.');
+      }
+    }
+    await _accountSettingsSync?.syncNow();
+    if (_accountSettingsSync?.lastError != null) {
+      throw StateError('Account settings are not synchronized.');
+    }
+    await _plannerSync?.syncNow();
+    if (_plannerSync?.lastError != null) {
+      throw StateError('Planner changes are not synchronized.');
+    }
+  }
+
+  Future<void> _verifyShutdownBackup() async {
+    if (_accountSession?.isSignedIn != true) {
+      return;
+    }
+    final remote = _remoteBackupScheduler;
+    if (remote == null) {
+      throw StateError('Remote backup is not available.');
+    }
+    if (!remote.isEnabled) {
+      remote.enableForSignedInAccount();
+    }
+    await remote.ensureVerifiedForExit();
+    if (remote.hasPendingBackup || remote.lastError != null) {
+      throw StateError('The final remote backup is not verified.');
+    }
+  }
+
+  /// One shutdown fence for both the account menu and blocked editor screens.
+  Future<void> _prepareAccountLogout(bool preserveOffline) async {
+    try {
+      await ShutdownCoordinator(
+        flushLocal: _flushLocallyForShutdown,
+        syncRemote: _syncRemotelyForShutdown,
+        verifyBackup: _verifyShutdownBackup,
+        stopServices: _quiesceAccountWriters,
+        timeout: const Duration(seconds: 45),
+      ).run(preserveOffline: preserveOffline);
+    } catch (_) {
+      _backupScheduler?.resumeAfterExitCancellation();
+      rethrow;
+    }
   }
 
   Future<void> _switchNamespaceIfNeeded() async {
@@ -206,7 +314,10 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
           );
         }
         if (session.isSignedIn && _incompatibleProtocolUser == session.userId) {
-          return UnsupportedAccountProtocolScreen(onLogOut: session.logout);
+          return UnsupportedAccountProtocolScreen(
+            onLogOut: session.logout,
+            onLogOutOffline: session.logoutOffline,
+          );
         }
         return AccountProtocolEditorGate(
           isSignedIn: session.isSignedIn,
@@ -219,6 +330,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
               : (_v2AccountRuntime == null ? null : _bootstrappedAccount),
           onRetry: _startAccountSync,
           onLogOut: session.logout,
+          onLogOutOffline: session.logoutOffline,
           blockingReason: session.hasPendingLocalImport(session.userId ?? '')
               ? (_localImportFailure ??
                     'Importing Local data into this account. Editing is '
@@ -290,6 +402,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     }
     _finishingExit.dispose();
     _exitFailure.dispose();
+    _exitPhase.dispose();
     _allowOfflineExit.dispose();
     super.dispose();
   }
@@ -324,6 +437,11 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     final backupService = _backupService;
     final scheduler = _backupScheduler;
     if (repository == null || backupService == null || scheduler == null) {
+      if (_hasPendingExitWork) {
+        _exitFailure.value = 'Exit stopped: local storage is not ready.';
+        _exitDrain = null;
+        return;
+      }
       _allowExit = true;
       await ServicesBinding.instance.exitApplication(ui.AppExitType.required);
       return;
@@ -332,70 +450,13 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     _exitFailure.value = null;
     _allowOfflineExit.value = false;
     _finishingExit.value = true;
+    _exitPhase.value = ShutdownPhase.idle;
     final coordinator = ShutdownCoordinator(
-      flushLocal: () async {
-        await InkActivityTracker.instance.waitForNoActiveContacts();
-        for (var attempt = 0; attempt < 3; attempt++) {
-          await AppSaveCoordinator.instance.flushPending();
-          await repository.waitForPendingSaves();
-          await waitForPendingTextStorageOperations();
-          if (!AppSaveCoordinator.instance.hasPendingWork &&
-              !repository.hasPendingSaves) {
-            break;
-          }
-        }
-        if (AppSaveCoordinator.instance.hasPendingWork ||
-            repository.hasPendingSaves) {
-          throw StateError('Pending editor saves did not settle.');
-        }
-        await scheduler.flushForExit();
-        await backupService.waitUntilIdle();
-        await waitForPendingTextStorageOperations();
-        if (_accountSession?.isSignedIn == true) {
-          if (_v2AccountRuntime == null) {
-            await _liveSync?.flushPersistedOutbox();
-          }
-        }
-      },
-      syncRemote: () async {
-        if (_accountSession?.isSignedIn != true) {
-          return;
-        }
-        final v2 = _v2AccountRuntime;
-        if (v2 != null) {
-          await v2.engine.syncNow();
-          if (v2.engine.lastError != null ||
-              (await v2.store.pending(
-                limit: 1,
-                includeDeferred: true,
-              )).isNotEmpty) {
-            throw StateError(
-              'V2 outbox is not fully acknowledged; local data is preserved.',
-            );
-          }
-          return;
-        }
-        if (_liveSync == null) {
-          throw StateError('Account synchronization is unavailable.');
-        }
-        await _liveSync!.syncNow();
-        if (_liveSync!.hasPendingChanges || _liveSync!.lastError != null) {
-          throw StateError('Pending account changes remain in the outbox.');
-        }
-      },
-      verifyBackup: () async {
-        if (_accountSession?.isSignedIn != true) {
-          return;
-        }
-        final remote = _remoteBackupScheduler;
-        if (remote == null) {
-          throw StateError('Remote backup is not available.');
-        }
-        if (!remote.isEnabled) {
-          remote.enableForSignedInAccount();
-        }
-        await remote.ensureVerifiedForExit();
-      },
+      flushLocal: _flushLocallyForShutdown,
+      syncRemote: _syncRemotelyForShutdown,
+      verifyBackup: _verifyShutdownBackup,
+      onPhase: (phase) => _exitPhase.value = phase,
+      timeout: const Duration(seconds: 45),
     );
     try {
       await coordinator.run(preserveOffline: preserveOffline);
@@ -1142,6 +1203,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
                 _activityWake?.setEnabled(true);
               },
               onBeforeAccountChange: _quiesceAccountWriters,
+              onBeforeLogout: _prepareAccountLogout,
             );
         _accountSession = accountSession;
         _diagnosticsUpload ??= DiagnosticsUploadService(
@@ -1340,6 +1402,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
                         child: _ExitGuardOverlay(
                           finishingExit: _finishingExit,
                           exitFailure: _exitFailure,
+                          exitPhase: _exitPhase,
                           allowOfflineExit: _allowOfflineExit,
                           onCancel: _cancelPendingExit,
                           onExitOffline: () {
@@ -1418,6 +1481,7 @@ class _ExitGuardOverlay extends StatelessWidget {
   const _ExitGuardOverlay({
     required this.finishingExit,
     required this.exitFailure,
+    required this.exitPhase,
     required this.allowOfflineExit,
     required this.onRetry,
     required this.onCancel,
@@ -1427,6 +1491,7 @@ class _ExitGuardOverlay extends StatelessWidget {
 
   final ValueListenable<bool> finishingExit;
   final ValueListenable<String?> exitFailure;
+  final ValueListenable<ShutdownPhase> exitPhase;
   final ValueListenable<bool> allowOfflineExit;
   final VoidCallback onRetry;
   final VoidCallback onCancel;
@@ -1445,7 +1510,13 @@ class _ExitGuardOverlay extends StatelessWidget {
               children: [
                 child,
                 if (isFinishingExit)
-                  const Positioned.fill(child: _FinishingExitOverlay())
+                  Positioned.fill(
+                    child: ValueListenableBuilder<ShutdownPhase>(
+                      valueListenable: exitPhase,
+                      builder: (context, phase, _) =>
+                          _FinishingExitOverlay(phase: phase),
+                    ),
+                  )
                 else if (failure != null)
                   Positioned(
                     left: 24,
@@ -1498,11 +1569,20 @@ class _ExitGuardOverlay extends StatelessWidget {
 }
 
 class _FinishingExitOverlay extends StatelessWidget {
-  const _FinishingExitOverlay();
+  const _FinishingExitOverlay({required this.phase});
+
+  final ShutdownPhase phase;
 
   @override
   Widget build(BuildContext context) {
-    return const AbsorbPointer(
+    final message = switch (phase) {
+      ShutdownPhase.flushLocal => 'Saving local edits and outbox...',
+      ShutdownPhase.syncRemote => 'Synchronizing account changes...',
+      ShutdownPhase.verifyBackup => 'Verifying remote backup...',
+      ShutdownPhase.stopServices => 'Stopping background services...',
+      _ => 'Finishing saves before closing...',
+    };
+    return AbsorbPointer(
       child: ColoredBox(
         color: Colors.black26,
         child: Center(
@@ -1518,7 +1598,7 @@ class _FinishingExitOverlay extends StatelessWidget {
                     child: CircularProgressIndicator(strokeWidth: 2.5),
                   ),
                   SizedBox(width: 14),
-                  Text('Finishing saves before closing...'),
+                  Text(message),
                 ],
               ),
             ),
