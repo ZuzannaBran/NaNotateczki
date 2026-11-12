@@ -131,6 +131,23 @@ void main() {
         OperationKind.documentSet,
       ],
     );
+    await repository.deleteNotebook(planner.uid);
+    expect(await repository.getNotebook(planner.uid), isNull);
+    expect(
+      (await store.pending(documentId: planner.uid)).last.kind,
+      OperationKind.documentDelete,
+    );
+    expect(
+      await store.isTombstoned(planner.uid, 'document', planner.uid),
+      isTrue,
+    );
+    final countAfterDelete = (await store.pending()).length;
+    await repository.deleteNotebook(planner.uid);
+    expect(await store.pending(), hasLength(countAfterDelete));
+    await expectLater(
+      writer.writeCreateNotebook(notebook: planner),
+      throwsStateError,
+    );
     await expectLater(
       writer.writeCreateNotebook(notebook: board),
       throwsStateError,

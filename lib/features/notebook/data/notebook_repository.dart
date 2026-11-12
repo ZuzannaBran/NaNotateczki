@@ -1544,9 +1544,6 @@ class NotebookRepository {
       if (notebook == null) {
         return;
       }
-      if (notebook.kind == NotebookKind.planner) {
-        throw UnsupportedError('Planner deletion v2 is not enabled yet.');
-      }
       final committed = await writer.writeDeleteNotebook(documentId: uid);
       if (writer.onCommitted == null) {
         reportOperationCommit(uid, committed);
