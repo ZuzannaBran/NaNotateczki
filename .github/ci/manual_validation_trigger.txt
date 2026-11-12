@@ -1,1 +1,1 @@
-Requested full package 4 validation on dev, 2026-11-12, attempt 2 after formatter and login mock fix.
+Requested final full package 4 verification on dev, 2026-11-12, attempt 3 after Local login regression fix.
