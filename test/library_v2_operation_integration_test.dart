@@ -152,109 +152,122 @@ void main() {
     );
   });
 
-  test('v2 subtree relocation rolls back all journal writes on failure',
-      () async {
-    const user = 'v2-atomic-folder-relocation';
-    ActiveStorageNamespace.activate(StorageNamespace.account(user));
-    final files = <String, String>{};
-    textStorageReadOverride = (key) async => files[key];
-    textStorageWriteOverride = (key, value) async => files[key] = value;
+  test(
+    'v2 subtree relocation rolls back all journal writes on failure',
+    () async {
+      const user = 'v2-atomic-folder-relocation';
+      ActiveStorageNamespace.activate(StorageNamespace.account(user));
+      final files = <String, String>{};
+      textStorageReadOverride = (key) async => files[key];
+      textStorageWriteOverride = (key, value) async => files[key] = value;
 
-    final database = NotesDatabase(NativeDatabase.memory());
-    addTearDown(database.close);
-    final repository = _FailSecondMetadataRepository(database);
-    final store = OperationStore(database, checkpointScope: 'account:$user');
-    final projector = EditorSqliteProjector(database);
-    final engine = SyncEngine(
-      store: store,
-      gateway: _NoNetworkGateway(),
-      actorId: 'offline-device-a',
-      checkpointScope: 'account:$user',
-      enableRealtime: false,
-      applyRemote: (operation, pending) => projector.apply(operation),
-    );
-    addTearDown(engine.stop);
-    await repository.enableAccountOperations(
-      EditorV2OperationWriter(
-        syncEngine: engine,
-        projector: projector,
-        onCommitted: repository.reportOperationCommit,
-      ),
-    );
-    final journal = LibraryV2OperationService(engine: engine, accountId: user);
-    final library = LibraryController(
-      repository,
-      CloudSyncService(repository),
-      LocalBackupService(repository),
-    );
-    addTearDown(library.dispose);
-    library.attachV2LibraryOperations(journal);
-    await library.createFolder('School');
-    await library.createFolder('Lab', parent: 'School');
-    final notebook = await library.createNotebook();
-    final planner = await library.createPlanner();
-    expect(notebook.folder, 'School/Lab');
-    expect(planner.folder, 'School/Lab');
+      final database = NotesDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      final repository = _FailSecondMetadataRepository(database);
+      final store = OperationStore(database, checkpointScope: 'account:$user');
+      final projector = EditorSqliteProjector(database);
+      final engine = SyncEngine(
+        store: store,
+        gateway: _NoNetworkGateway(),
+        actorId: 'offline-device-a',
+        checkpointScope: 'account:$user',
+        enableRealtime: false,
+        applyRemote: (operation, pending) => projector.apply(operation),
+      );
+      addTearDown(engine.stop);
+      await repository.enableAccountOperations(
+        EditorV2OperationWriter(
+          syncEngine: engine,
+          projector: projector,
+          onCommitted: repository.reportOperationCommit,
+        ),
+      );
+      final journal = LibraryV2OperationService(
+        engine: engine,
+        accountId: user,
+      );
+      final library = LibraryController(
+        repository,
+        CloudSyncService(repository),
+        LocalBackupService(repository),
+      );
+      addTearDown(library.dispose);
+      library.attachV2LibraryOperations(journal);
+      await library.createFolder('School');
+      await library.createFolder('Lab', parent: 'School');
+      final notebook = await library.createNotebook();
+      final planner = await library.createPlanner();
+      expect(notebook.folder, 'School/Lab');
+      expect(planner.folder, 'School/Lab');
 
-    final pendingBefore = (await store.pending())
-        .map((operation) => operation.operationId)
-        .toList();
-    repository.failRelocation = true;
-    await expectLater(
-      library.renameFolder('School/Lab', 'Renamed'),
-      throwsStateError,
-    );
-    expect((await journal.snapshot()).folderIdsByPath.keys,
-        contains('School/Lab'));
-    expect((await journal.snapshot()).folderIdsByPath.keys,
-        isNot(contains('School/Renamed')));
-    expect(
-      (await repository.fetchNotebooks()).map((item) => item.folder),
-      everyElement('School/Lab'),
-    );
-    expect(
-      (await store.pending()).map((operation) => operation.operationId),
-      pendingBefore,
-    );
-    expect(
-      (jsonDecode(files['library_folders.json']!) as Map)['folders'],
-      contains('School/Lab'),
-    );
+      final pendingBefore = (await store.pending())
+          .map((operation) => operation.operationId)
+          .toList();
+      repository.failRelocation = true;
+      await expectLater(
+        library.renameFolder('School/Lab', 'Renamed'),
+        throwsStateError,
+      );
+      expect(
+        (await journal.snapshot()).folderIdsByPath.keys,
+        contains('School/Lab'),
+      );
+      expect(
+        (await journal.snapshot()).folderIdsByPath.keys,
+        isNot(contains('School/Renamed')),
+      );
+      expect(
+        (await repository.fetchNotebooks()).map((item) => item.folder),
+        everyElement('School/Lab'),
+      );
+      expect(
+        (await store.pending()).map((operation) => operation.operationId),
+        pendingBefore,
+      );
+      expect(
+        (jsonDecode(files['library_folders.json']!) as Map)['folders'],
+        contains('School/Lab'),
+      );
 
-    repository.failRelocation = false;
-    expect(await library.renameFolder('School/Lab', 'Renamed'),
-        'School/Renamed');
-    await library.createFolder('Archive');
-    final afterRename = (await store.pending())
-        .map((operation) => operation.operationId)
-        .toList();
-    repository.relocationWrites = 0;
-    repository.failRelocation = true;
-    await expectLater(
-      library.moveFolderToFolder('School/Renamed', 'Archive'),
-      throwsStateError,
-    );
-    expect((await journal.snapshot()).folderIdsByPath.keys,
-        contains('School/Renamed'));
-    expect(
-      (await store.pending()).map((operation) => operation.operationId),
-      afterRename,
-    );
-    expect(
-      (await repository.fetchNotebooks()).map((item) => item.folder),
-      everyElement('School/Renamed'),
-    );
+      repository.failRelocation = false;
+      expect(
+        await library.renameFolder('School/Lab', 'Renamed'),
+        'School/Renamed',
+      );
+      await library.createFolder('Archive');
+      final afterRename = (await store.pending())
+          .map((operation) => operation.operationId)
+          .toList();
+      repository.relocationWrites = 0;
+      repository.failRelocation = true;
+      await expectLater(
+        library.moveFolderToFolder('School/Renamed', 'Archive'),
+        throwsStateError,
+      );
+      expect(
+        (await journal.snapshot()).folderIdsByPath.keys,
+        contains('School/Renamed'),
+      );
+      expect(
+        (await store.pending()).map((operation) => operation.operationId),
+        afterRename,
+      );
+      expect(
+        (await repository.fetchNotebooks()).map((item) => item.folder),
+        everyElement('School/Renamed'),
+      );
 
-    repository.failRelocation = false;
-    expect(
-      await library.moveFolderToFolder('School/Renamed', 'Archive'),
-      'Archive/Renamed',
-    );
-    expect(
-      (await repository.fetchNotebooks()).map((item) => item.folder),
-      everyElement('Archive/Renamed'),
-    );
-  });
+      repository.failRelocation = false;
+      expect(
+        await library.moveFolderToFolder('School/Renamed', 'Archive'),
+        'Archive/Renamed',
+      );
+      expect(
+        (await repository.fetchNotebooks()).map((item) => item.folder),
+        everyElement('Archive/Renamed'),
+      );
+    },
+  );
 
   test('offline devices never reuse implicit folder IDs', () async {
     const user = 'v2-implicit-folder-identity';
