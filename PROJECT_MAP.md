@@ -48,9 +48,12 @@
   transakcję nadrzędną nad operacją `@library` i zapisami dokumentów.
   Niepowodzenie dowolnego metadata writer wycofuje folder, dokumenty
   i outbox, a read-model jest odbudowywany po commit/rollback.
+  Usunięcie poddrzewa również obejmuje dokumenty, zadania i foldery
+  jedną transakcją z odtworzeniem read-modelu po commit/rollback.
   Test `library_v2_operation_integration_test.dart` wymusza awarię
-  drugiego dokumentu przy rename i move, a potem bezpieczne ponowienie.
-  Zdalne operacje nadal zachowują osobne identyfikatory i checkpointy.
+  drugiego dokumentu przy rename, move i delete, a potem bezpieczne
+  ponowienie. Zdalne operacje nadal zachowują osobne identyfikatory
+  i checkpointy.
 
 
 ## Pakiet 4 — Local → konto (2026-11-11)
