@@ -1,4 +1,64 @@
-# Etap 10 — shutdown, logout i restart (pakiet 7)
+# Etap 10 — zamykanie, wylogowanie i zachowanie lokalnych zmian
+
+Status: po pakiecie 7 z 2026-11-12 — wspólny pipeline dla logout,
+shutdown i wznowienia. Nie stanowi produkcyjnej aktywacji etapu 11.
+
+## Zmiany
+
+- Wspólny ShutdownCoordinator wykonuje kolejno: lokalne utrwalenie,
+  synchronizację, zweryfikowany backup, zatrzymanie usług i wylogowanie.
+  Obowiązuje limit 45 s dla AppScope, nie osobne nieograniczone limity na HTTP.
+- Zamknięcie aplikacji sprawdza lokalne zapisy, ink i aktualne operacje
+  zapisu; po błędzie daje Retry / Cancel. Wyjście bez sieci pojawia się
+  tylko po poprawnym utrwaleniu lokalnych zmian.
+- LiveWebSyncService.flushPersistedOutbox ponownie sprawdza wynik
+  trwałego zapisu kolejki. Błąd ukryty wcześniej przez obsługę
+  błędów w tle teraz blokuje zakończenie sesji. Regresja w
+  test/live_web_sync_service_test.dart.
+- Dialog wylogowania po błędzie zdalnym udostępnia Retry, Stay signed in
+  lub Log out offline. Offline nie wysyła notebooka jako backupu i nie
+  kasuje lokalnej kolejki; początkowy outbox pozostaje powiązany z
+  dotychczasowym kontem.
+- Przed usunięciem lokalnych poświadczeń live sync i backup muszą
+  zatrzymać aktywnych writerów. Jeżeli stop się nie kończy, wylogowanie
+  odmawia przejścia do następnego konta.
+- Zdalne odwołanie sesji podczas zwykłego wylogowania ma maksymalnie
+  5 sekund. Brak dostępnego serwera nie oznacza automatycznego
+  odwołania istniejącego tokenu na serwerze.
+- Testy: test/shutdown_coordinator_test.dart — kolejność, timeout,
+  serializacja współbieżnych prób, awarie lokalnego zapisu, brak sieci,
+  zatrzymanie writerów przed usunięciem sesji.
+
+## Granice i dalsze prace
+
+- Dla logout offline ciągłe żądania sieciowe mogą nadal działać po
+  wystąpieniu TimeoutException. Shutdown wymaga await stop(), zanim
+  oczyści poświadczenia; jeśli stop nie odpowiada, użytkownik pozostaje
+  zalogowany. Nie obiecywać gwarantowanego zamknięcia procesu przez OS.
+- Stage 11/13 nadal muszą włączyć produkcyjny cutover. Separacja Local /
+  konto A / konto B już używa namespace; sam koordynator nie zastępuje
+  testów migracji historycznych danych.
+- Nie aktywuje globalnie v2 i nie usuwa historii.
+- Wymagane testy Flutter/Dart, multi-account, sztuczny brak sieci,
+  restart podczas zapisu oraz prawdziwy serwer PostgreSQL/WebSocket.
+  Przebieg GitHub Actions uruchamia się na jawne żądanie użytkownika.
+
+Na serwerze nie ma teraz poleceń do wykonania.
+
+## Domknięcie bezpieczeństwa tokenu
+
+- Wylogowanie nie przełącza już sesji przed pomyślnym usunięciem refresh
+  tokenu z magazynu sekretów. Błąd keyringu pozostawia konto aktywne;
+  możliwa jest bezpieczna ponowna próba.
+- Niepowodzenie serwerowego revoke nie przywraca lokalnego tokenu.
+  Jeśli token został już usunięty, interfejs nie pokazuje fałszywego
+  dialogu sugerującego, że użytkownik nadal jest zalogowany.
+- Regresje w test/account_session_controller_test.dart obejmują
+  awarię usuwania poświadczeń i brak sieci podczas revoke.
+
+---
+
+## Uzupełnienie pakietu 7 — 2026-11-12
 
 ## Kontrakt
 
