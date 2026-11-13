@@ -428,6 +428,12 @@ Zestaw `test_stage12_real_stack.py` bada tę barierę na prawdziwej bazie.
 i przekazuje jego token do `stage12_live_api_test.dart`.
 Dotychczasowa rejestracja kont testowych bez markera pozostaje w trybie v1.
 
+Regresje PostgreSQL potwierdzają też, że konto v1 nie może pisać do
+planera v2, a aktywne konto może zapisać i usunąć wpis planera, zweryfikować
+backup po nowszym usunięciu dokumentu i odczytać wyłącznie własne archiwum.
+Tombstones dokumentów v1/v2 i planera zapisują SQL `NULL`, nie JSON `null`,
+żeby spełnić warunki integralności schematu.
+
 Testy nowej bariery (Python, po pobraniu zależności):
 
 ```bash
