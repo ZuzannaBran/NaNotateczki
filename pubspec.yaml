@@ -82,6 +82,7 @@ dev_dependencies:
 # desktop. Resolve the existing library instead of downloading another binary
 # from GitHub releases (whose blocked asset response fails SHA-256 verification).
 # Keep sqlite3_flutter_libs at 0.5.x until native packaging is migrated.
+# Linux aligns the plugin filename with this loader in sqlite_native_assets.cmake.
 hooks:
   user_defines:
     sqlite3:

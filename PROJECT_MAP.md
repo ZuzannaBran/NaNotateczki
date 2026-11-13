@@ -1043,6 +1043,11 @@ folderze; remis timestampów wygrywa lokalny snapshot.
 - `pubspec.yaml`: hook sqlite3 `source: system` używa istniejących
   bibliotek sqlite3_flutter_libs 0.5.x na mobile/desktop,
   unikając pobierania drugiej kopii z GitHub Releases.
+  Linux: `linux/sqlite_native_assets.cmake` dopasowuje nazwę pluginu
+  do `libsqlite3.so`, której hook szuka również w izolatach Drift.
+  `test/sqlite_native_packaging_test.dart` buduje i przenosi paczkę CMake,
+  sprawdza dlopen bez LD_LIBRARY_PATH i rozróżnia bibliotekę systemową.
+  Kontrola jest uruchamiana w CI bezpośrednio po `dart analyze`.
   Regresja: `test/sqlite_system_library_test.dart` (FTS5,
   JSON, transakcja i plikowy WAL po restarcie). Macierz desktop
   weryfikuje natywny ABI na Linux/macOS/Windows.
@@ -3226,6 +3231,9 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
 - `integration_test/document_lifecycle_test.dart`: create/rename/read/delete
   w rzeczywistej bazie danej platformy; działa wyłącznie z flagą
   `NANOTATECZKI_ISOLATED_CI=true` na izolowanym runnerze.
+  Dodatkowa regresja ładuje SQLite w procesie aplikacji i nowym izolacie
+  Drift, sprawdza JSON/FTS5 oraz zapis i ponowne otwarcie pliku. Wchodzi
+  do istniejącej macierzy Linux/Windows/macOS/Android/iOS.
 - `test/support/native_test_documents.dart`: katalog testowy i natywny
   oczekujący na zakończenie kolejki I/O przed sprzątaniem.
   adapter PathProvider; opcjonalny pamięciowy tekstowy storage zapobiega
