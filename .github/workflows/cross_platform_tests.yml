@@ -315,6 +315,16 @@ jobs:
         run: >-
           bash .github/scripts/flutter_sqlite3_download_retry.sh
           --platform chrome test/cross_platform --reporter expanded
+      - name: Verify Share guest storage and outbox after reload
+        shell: bash
+        run: |
+          # Flutter's browser test server serves static fixtures from test/.
+          cp web/sqlite3.wasm test/sqlite3.wasm
+          trap 'rm -f test/sqlite3.wasm' EXIT
+          bash .github/scripts/flutter_sqlite3_download_retry.sh \
+            --platform chrome --reporter expanded \
+            test/study_share_guest_database_test.dart \
+            test/share_operation_guest_database_test.dart
       - name: Compile complete web application
         run: flutter build web --release --no-web-resources-cdn
       - name: Validate runtime assets and package the Cloudflare upload
