@@ -6,6 +6,7 @@ import http from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+import { waitForChromePage } from './chrome_devtools.mjs';
 
 const buildRoot = path.resolve(process.env.WEB_BUILD_DIR ?? 'build/cloudflare-worker');
 const externalOrigin = process.env.WEB_ORIGIN;
@@ -105,15 +106,8 @@ pdf += offsets.slice(1).map(offset => `${String(offset).padStart(10, '0')} 00000
 pdf += `trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
 
 try {
-  let debugPort;
-  await waitFor(async () => {
-    try {
-      debugPort = (await readFile(path.join(profile, 'DevToolsActivePort'), 'utf8')).split('\n')[0];
-      return true;
-    } catch { return false; }
-  }, 'Chrome debugging port');
-  const targets = await (await fetch(`http://127.0.0.1:${debugPort}/json/list`)).json();
-  socket = new WebSocket(targets.find(target => target.type === 'page').webSocketDebuggerUrl);
+  await once(chrome, 'spawn');
+  socket = new WebSocket(await waitForChromePage(profile));
   await once(socket, 'open');
   socket.addEventListener('message', ({ data }) => {
     const message = JSON.parse(data);
@@ -210,9 +204,11 @@ try {
 } finally {
   if (socket) socket.close();
   for (const task of pending.values()) clearTimeout(task.timer);
-  const stopped = once(chrome, 'exit');
-  chrome.kill();
-  await stopped;
+  if (chrome.pid && chrome.exitCode === null && chrome.signalCode === null) {
+    const stopped = once(chrome, 'exit');
+    chrome.kill();
+    await stopped;
+  }
   if (server.listening) {
     server.closeAllConnections();
     await new Promise(resolve => server.close(resolve));

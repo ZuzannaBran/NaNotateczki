@@ -321,6 +321,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Verify Chrome DevTools startup regression
+        run: node --test .github/scripts/test_chrome_devtools.mjs
       - name: Verify built app and PDF rendering without external CDNs
         env:
           CHROME_EXECUTABLE: ${{ steps.chrome.outputs.chrome-path }}

@@ -2814,6 +2814,8 @@ przesuwa obiekt, a dwa kontakty nie zmieniają obiektu ani canvasa.
   Chrome, zablokowane CDN-y; pierwsza klatka Fluttera, render PDF przez worker,
   mapa znaków i fonty emoji/JP/Arabic/math dla `/`, `/share/UID` i `/app/`;
   `WEB_BUILD_DIR` wskazuje wypakowaną paczkę, `WEB_ORIGIN` rzeczywisty serwer.
+  `chrome_devtools.mjs` czeka na kompletny plik portu i kartę DevTools;
+  `test_chrome_devtools.mjs` pokrywa częściowy odczyt oraz wyścig startu HTTP.
 - `.github/scripts/test_cloudflare_worker.mjs`: dry-run Wrangler 4.156.1,
   walidacja dwóch reguł rewrite i nagłówków, lokalny Workers oraz Chrome;
   niezależny od konta Cloudflare, wykonywany w jobie web CI.

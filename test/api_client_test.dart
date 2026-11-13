@@ -180,11 +180,7 @@ void main() {
         visited.add(request.url.path);
         expect(request.headers['authorization'], 'Bearer access');
         return http.Response(
-          jsonEncode({
-            'protocol': 'v2',
-            'writeEnabled': true,
-            'version': 1,
-          }),
+          jsonEncode({'protocol': 'v2', 'writeEnabled': true, 'version': 1}),
           200,
         );
       }),
