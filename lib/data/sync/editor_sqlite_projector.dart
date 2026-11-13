@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:collection/collection.dart';
 import 'package:crypto/crypto.dart' as crypto;
@@ -1936,8 +1935,7 @@ class EditorSqliteProjector {
           Variable<String>(owner),
           Variable<String>(assetId),
           Variable<String>(
-            'sqlite-asset:' +
-                (await _assetChecksum(op.documentId, owner, assetId)),
+            'sqlite-asset:${await _assetChecksum(op.documentId, owner, assetId)}',
           ),
         ],
       );

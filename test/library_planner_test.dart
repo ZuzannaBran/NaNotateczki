@@ -121,9 +121,9 @@ void main() {
     final decoded = repository.decodePortableBackup(portable);
     expect(decoded.plannerTasks.containsKey(planner.uid), isTrue);
     expect((decoded.plannerTasks[planner.uid] as List), hasLength(1));
-    final payload = jsonDecode(
-      (await readStoredText('library_folders.json'))!,
-    ) as Map<String, dynamic>;
+    final payload =
+        jsonDecode((await readStoredText('library_folders.json'))!)
+            as Map<String, dynamic>;
     expect((payload['plannerTasks'] as Map)[planner.uid], hasLength(1));
 
     final restored = newLibrary();
@@ -140,9 +140,9 @@ void main() {
       result.id,
     ]);
     await restored.flushPlannerTasks();
-    final saved = jsonDecode(
-      (await readStoredText('library_folders.json'))!,
-    ) as Map<String, dynamic>;
+    final saved =
+        jsonDecode((await readStoredText('library_folders.json'))!)
+            as Map<String, dynamic>;
     saved['plannerCompletedLast'] = {planner.uid: false};
     await writeStoredText('library_folders.json', jsonEncode(saved));
 

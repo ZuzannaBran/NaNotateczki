@@ -107,7 +107,7 @@ class StorageNamespaceManager {
       _active = true;
       _generation++;
     });
-    _tail = result.then<void>((_) {}, onError: (Object _, StackTrace __) {});
+    _tail = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
     return result;
   }
 }

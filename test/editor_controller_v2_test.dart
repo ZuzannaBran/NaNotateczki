@@ -827,7 +827,7 @@ void main() {
       actorId: 'remote-layer-test',
       checkpointScope: 'remote-layer-test',
       enableRealtime: false,
-      applyRemote: (_, __) async {},
+      applyRemote: (_, _) async {},
     );
     addTearDown(engine.stop);
     final controller = EditorController(
@@ -1006,7 +1006,7 @@ void main() {
         final writer = EditorV2OperationWriter(
           syncEngine: engine,
           projector: projector,
-          onCommitted: (_, __) {
+          onCommitted: (_, _) {
             final waiter = typedCommitted;
             if (waiter != null && !waiter.isCompleted) {
               waiter.complete();
@@ -1096,7 +1096,7 @@ void main() {
         final writer = EditorV2OperationWriter(
           syncEngine: engine,
           projector: projector,
-          onCommitted: (_, __) {
+          onCommitted: (_, _) {
             if (committed != null && !committed!.isCompleted) {
               committed!.complete();
             }
@@ -1226,7 +1226,7 @@ void main() {
         actorId: 'wrong-database',
         checkpointScope: 'wrong-namespace',
         enableRealtime: false,
-        applyRemote: (_, __) async {},
+        applyRemote: (_, _) async {},
       );
       addTearDown(engine.stop);
       final writer = EditorV2OperationWriter(

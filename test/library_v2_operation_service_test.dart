@@ -11,8 +11,7 @@ OperationEnvelope operation(
 }) {
   final serial = clock.toString().padLeft(12, '0');
   final uuid =
-      '11111111-2222-4333-8444-' +
-      (actor == 'device-z' ? '999999999999' : serial);
+      '11111111-2222-4333-8444-${actor == 'device-z' ? '999999999999' : serial}';
   return OperationEnvelope(
     operationId: uuid,
     actorId: actor,

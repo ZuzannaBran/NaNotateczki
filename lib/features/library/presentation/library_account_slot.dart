@@ -362,8 +362,9 @@ class _AccountDialogState extends State<_AccountDialog> {
                     'You can switch modes later in account settings.',
           key: const ValueKey('account-welcome-description'),
           textAlign: TextAlign.center,
-          style: _accountSecondaryTextStyle(context)
-              .copyWith(fontSize: AppTypography.document),
+          style: _accountSecondaryTextStyle(
+            context,
+          ).copyWith(fontSize: AppTypography.document),
         ),
         const SizedBox(height: 28),
         FilledButton(
@@ -926,11 +927,11 @@ class _AccountDialogState extends State<_AccountDialog> {
     }
     final runtime = context.read<EditorV2AccountRuntime?>();
     final backup = context.read<RemoteBackupScheduler>();
+    final repository = context.read<NotebookRepository?>();
     final coordinator = ShutdownCoordinator(
       flushLocal: () async {
         await InkActivityTracker.instance.waitForNoActiveContacts();
         await AppSaveCoordinator.instance.flushPending();
-        final repository = context.read<NotebookRepository?>();
         await repository?.waitForPendingSaves();
         await waitForPendingTextStorageOperations();
         if (AppSaveCoordinator.instance.hasPendingWork ||
@@ -998,10 +999,8 @@ class _AccountDialogState extends State<_AccountDialog> {
             title: const Text('Account sync not complete'),
             content: Text(
               'Local changes are saved. Remote sync or backup stopped '
-                      'at ' +
-                  failure.phase.name +
-                  '. Your unsent changes will remain '
-                      'on this device.',
+              'at ${failure.phase.name}. Your unsent changes will remain '
+              'on this device.',
             ),
             actions: [
               TextButton(

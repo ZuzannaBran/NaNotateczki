@@ -127,7 +127,7 @@ void main() {
         old.execute('PRAGMA user_version=5');
         old.execute('COMMIT');
       } finally {
-        old.dispose();
+        old.close();
       }
 
       database = NotesDatabase(NativeDatabase(file));

@@ -249,7 +249,8 @@ class LibraryController extends ChangeNotifier {
         'Corrupt documents were detected, but no recoverable local backup '
         'copies were found.',
         null,
-        source: 'LibraryController.restoreCorruptDocumentsFromBackup(no_candidates)',
+        source:
+            'LibraryController.restoreCorruptDocumentsFromBackup(no_candidates)',
       );
       notifyListeners();
       return 0;

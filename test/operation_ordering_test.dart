@@ -768,7 +768,7 @@ void main() {
           payload: const {
             'properties': {'x': 1},
           },
-          dependencies: [if (parent != null) parent],
+          dependencies: [?parent],
           logicalClock: i + 1,
         ),
       );

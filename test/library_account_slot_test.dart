@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -5,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
 
+import 'package:program/core/storage/app_save_coordinator.dart';
 import 'package:program/core/storage/text_storage.dart';
 import 'package:program/core/theme/app_theme.dart';
 import 'package:program/core/theme/app_typography.dart';
@@ -130,6 +133,86 @@ void main() {
     );
 
     expect(find.byKey(const ValueKey('account-menu-button')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('logout drains local saves after the dialog is unmounted', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final apiClient = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient((_) async => http.Response('', 500)),
+    );
+    final database = NotesDatabase(NativeDatabase.memory());
+    final repository = _PendingSaveRepository(database);
+    final session =
+        AccountSessionController(
+            apiClient,
+            credentialStore: _MemoryAccountCredentialStore(),
+          )
+          ..mode = AccountDataMode.account
+          ..userId = 'test-user'
+          ..username = 'test_user'
+          ..profileLoaded = true
+          ..onboardingComplete = true;
+    final backup = RemoteBackupScheduler(session: session);
+    final editorFlush = Completer<void>();
+    var editorFlushStarted = false;
+    final owner = Object();
+    AppSaveCoordinator.instance.register(
+      owner,
+      hasPendingWork: () => !editorFlush.isCompleted,
+      flush: () {
+        editorFlushStarted = true;
+        return editorFlush.future;
+      },
+    );
+    addTearDown(() async {
+      if (!editorFlush.isCompleted) {
+        editorFlush.complete();
+      }
+      if (!repository.savesCompleted.isCompleted) {
+        repository.savesCompleted.complete();
+      }
+      AppSaveCoordinator.instance.unregister(owner);
+      backup.dispose();
+      session.dispose();
+      apiClient.close();
+      await database.close();
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MultiProvider(
+          providers: [
+            Provider<NotebookRepository>.value(value: repository),
+            ChangeNotifierProvider<AccountSessionController>.value(
+              value: session,
+            ),
+            ChangeNotifierProvider<RemoteBackupScheduler>.value(value: backup),
+          ],
+          child: const Scaffold(body: LibraryAccountSlot()),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('account-settings-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('account-logout')));
+    await tester.pump();
+    expect(editorFlushStarted, isTrue);
+    expect(repository.waitStarted.isCompleted, isFalse);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    editorFlush.complete();
+    await tester.pump();
+    expect(repository.waitStarted.isCompleted, isTrue);
+    expect(session.isSignedIn, isTrue);
+
+    repository.savesCompleted.complete();
+    await tester.pump();
+    expect(session.isSignedIn, isTrue);
     expect(tester.takeException(), isNull);
   });
 
@@ -322,6 +405,22 @@ void main() {
     apiClient.close();
     await database.close();
   });
+}
+
+class _PendingSaveRepository extends NotebookRepository {
+  _PendingSaveRepository(super.database);
+
+  final waitStarted = Completer<void>();
+  final savesCompleted = Completer<void>();
+
+  @override
+  bool get hasPendingSaves => !savesCompleted.isCompleted;
+
+  @override
+  Future<void> waitForPendingSaves() async {
+    waitStarted.complete();
+    await savesCompleted.future;
+  }
 }
 
 class _MemoryAccountCredentialStore implements AccountCredentialStore {

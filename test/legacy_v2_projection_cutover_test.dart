@@ -183,113 +183,116 @@ void main() {
     },
   );
 
-  test('archives original rows atomically and resumes without replacing v2', () async {
-    available = false;
-    await expectLater(cutover.prepare(receipt), throwsA(isA<ApiException>()));
-    expect((await repository.fetchNotebooks()).single.title, 'Saved v1');
-    final absent = await database
-        .customSelect(
-          "SELECT name FROM sqlite_master WHERE name = 'legacy_v1_notebook_rows'",
-        )
-        .get();
-    expect(absent, isEmpty);
+  test(
+    'archives original rows atomically and resumes without replacing v2',
+    () async {
+      available = false;
+      await expectLater(cutover.prepare(receipt), throwsA(isA<ApiException>()));
+      expect((await repository.fetchNotebooks()).single.title, 'Saved v1');
+      final absent = await database
+          .customSelect(
+            "SELECT name FROM sqlite_master WHERE name = 'legacy_v1_notebook_rows'",
+          )
+          .get();
+      expect(absent, isEmpty);
 
-    available = true;
-    await cutover.prepare(receipt);
-    expect(await repository.fetchNotebooks(), isEmpty);
-    final archived = await database
-        .customSelect('SELECT uid, title FROM legacy_v1_notebook_rows')
-        .getSingle();
-    expect(archived.data, {'uid': local['uid'], 'title': 'Saved v1'});
-    final projector = EditorSqliteProjector(database);
-    final store = OperationStore(
-      database,
-      checkpointScope: 'account:account-1',
-    );
-    String? previous;
-    var seq = 0;
-    Future<void> replay(
-      OperationKind kind, {
-      String? obj,
-      String? page,
-      Map<String, dynamic> payload = const {},
-      String? document,
-    }) async {
-      seq++;
-      final op = OperationEnvelope.fromJson({
-        'schemaVersion': 1,
-        'operationId': const Uuid().v4(),
-        'actorId': 'v1-cutover:test-device',
-        'actorSeq': seq,
-        'documentId': document ?? local['uid'],
-        'type': kind.wireName,
-        'payload': payload,
-        'dependencies': [?previous],
-        'logicalClock': seq,
-        'objectId': ?obj,
-        'pageId': ?page,
-      });
-      previous = op.operationId;
-      await store.applyRemote(
-        op,
+      available = true;
+      await cutover.prepare(receipt);
+      expect(await repository.fetchNotebooks(), isEmpty);
+      final archived = await database
+          .customSelect('SELECT uid, title FROM legacy_v1_notebook_rows')
+          .getSingle();
+      expect(archived.data, {'uid': local['uid'], 'title': 'Saved v1'});
+      final projector = EditorSqliteProjector(database);
+      final store = OperationStore(
+        database,
         checkpointScope: 'account:account-1',
-        serverSequence: 90 - 4 + seq,
-        apply: () => projector.apply(op),
       );
-    }
+      String? previous;
+      var seq = 0;
+      Future<void> replay(
+        OperationKind kind, {
+        String? obj,
+        String? page,
+        Map<String, dynamic> payload = const {},
+        String? document,
+      }) async {
+        seq++;
+        final op = OperationEnvelope.fromJson({
+          'schemaVersion': 1,
+          'operationId': const Uuid().v4(),
+          'actorId': 'v1-cutover:test-device',
+          'actorSeq': seq,
+          'documentId': document ?? local['uid'],
+          'type': kind.wireName,
+          'payload': payload,
+          'dependencies': [?previous],
+          'logicalClock': seq,
+          'objectId': ?obj,
+          'pageId': ?page,
+        });
+        previous = op.operationId;
+        await store.applyRemote(
+          op,
+          checkpointScope: 'account:account-1',
+          serverSequence: 90 - 4 + seq,
+          apply: () => projector.apply(op),
+        );
+      }
 
-    await replay(
-      OperationKind.documentCreate,
-      payload: {
-        'value': {
-          'title': 'Migrated v2',
-          'folder': 'Notes',
-          'kindIndex': 0,
-          'createdAt': local['createdAt'],
-          'updatedAt': local['updatedAt'],
+      await replay(
+        OperationKind.documentCreate,
+        payload: {
+          'value': {
+            'title': 'Migrated v2',
+            'folder': 'Notes',
+            'kindIndex': 0,
+            'createdAt': local['createdAt'],
+            'updatedAt': local['updatedAt'],
+          },
         },
-      },
-    );
-    await replay(
-      OperationKind.pageCreate,
-      obj: 'live-page',
-      payload: {
-        'value': {'title': 'Live', 'isBookmarked': true},
-      },
-    );
-    await replay(
-      OperationKind.objectDelete,
-      obj: 'deleted-ink',
-      page: 'old-page',
-    );
-    await replay(OperationKind.pageDelete, obj: 'old-page');
-    expect(await store.checkpoint('account:account-1'), 90);
-    expect(
-      await store.isTombstoned(local['uid'] as String, 'page', 'old-page'),
-      isTrue,
-    );
-    expect(
-      await store.wasObjectDeleted(
-        documentId: local['uid'] as String,
-        objectId: 'deleted-ink',
-      ),
-      isTrue,
-    );
-    // The same durable receipt is harmless after startup/replay, even offline.
-    available = false;
-    await cutover.prepare(receipt);
-    expect(requests, 2);
-    final migrated = (await repository.fetchNotebooks()).single;
-    expect(migrated.title, 'Migrated v2');
-    expect(
-      migrated.updatedAt.toUtc(),
-      DateTime.parse(local['updatedAt'] as String),
-    );
-    await expectLater(
-      cutover.prepare(const LegacyCutoverReceipt(6, 90)),
-      throwsStateError,
-    );
-  });
+      );
+      await replay(
+        OperationKind.pageCreate,
+        obj: 'live-page',
+        payload: {
+          'value': {'title': 'Live', 'isBookmarked': true},
+        },
+      );
+      await replay(
+        OperationKind.objectDelete,
+        obj: 'deleted-ink',
+        page: 'old-page',
+      );
+      await replay(OperationKind.pageDelete, obj: 'old-page');
+      expect(await store.checkpoint('account:account-1'), 90);
+      expect(
+        await store.isTombstoned(local['uid'] as String, 'page', 'old-page'),
+        isTrue,
+      );
+      expect(
+        await store.wasObjectDeleted(
+          documentId: local['uid'] as String,
+          objectId: 'deleted-ink',
+        ),
+        isTrue,
+      );
+      // The same durable receipt is harmless after startup/replay, even offline.
+      available = false;
+      await cutover.prepare(receipt);
+      expect(requests, 2);
+      final migrated = (await repository.fetchNotebooks()).single;
+      expect(migrated.title, 'Migrated v2');
+      expect(
+        migrated.updatedAt.toUtc(),
+        DateTime.parse(local['updatedAt'] as String),
+      );
+      await expectLater(
+        cutover.prepare(const LegacyCutoverReceipt(6, 90)),
+        throwsStateError,
+      );
+    },
+  );
 
   test(
     'converts an offline edit exactly once without overwriting remote fields',

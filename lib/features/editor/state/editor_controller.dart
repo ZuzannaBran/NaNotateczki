@@ -1391,8 +1391,9 @@ class EditorController extends ChangeNotifier {
       lassoMaxX = math.max(lassoMaxX, point.dx);
       lassoMaxY = math.max(lassoMaxY, point.dy);
     }
-    final inkCandidates = inkSpatialIndexFor(page.inkStrokes)
-        .query(Rect.fromLTRB(lassoMinX, lassoMinY, lassoMaxX, lassoMaxY));
+    final inkCandidates = inkSpatialIndexFor(
+      page.inkStrokes,
+    ).query(Rect.fromLTRB(lassoMinX, lassoMinY, lassoMaxX, lassoMaxY));
     for (final s in inkCandidates) {
       final isSelectedInk =
           !s.tool.isEraser &&
@@ -3125,10 +3126,7 @@ class EditorController extends ChangeNotifier {
                 if (clearDecorations)
                   for (final key in ['bold', 'italic', 'underline', 'strike'])
                     key: null,
-                if (clearFontFamily)
-                  'font': null
-                else if (fontFamily != null)
-                  'font': fontFamily,
+                if (clearFontFamily) 'font': null else 'font': ?fontFamily,
                 if (fontSize != null) 'size': nextFontSize.round().toString(),
                 if (color != null) 'color': _colorToHex(nextColor),
                 if (bold != null) 'bold': bold ? true : null,

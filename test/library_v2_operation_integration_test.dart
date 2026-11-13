@@ -393,7 +393,7 @@ void main() {
         actorId: actor,
         checkpointScope: 'account:$user',
         enableRealtime: false,
-        applyRemote: (_, __) async {},
+        applyRemote: (_, _) async {},
       );
       addTearDown(engine.stop);
       final journal = LibraryV2OperationService(
@@ -421,7 +421,7 @@ void main() {
       actorId: 'device-x',
       checkpointScope: 'account:$user',
       enableRealtime: false,
-      applyRemote: (_, __) async {},
+      applyRemote: (_, _) async {},
     );
     addTearDown(engine.stop);
     final journal = LibraryV2OperationService(engine: engine, accountId: user);

@@ -108,7 +108,7 @@ class _StudyShareV2GuestEditorState extends State<StudyShareV2GuestEditor> {
       _repository = repository;
       final store = OperationStore(
         database,
-        checkpointScope: 'share:' + widget.shareId,
+        checkpointScope: 'share:${widget.shareId}',
       );
       final actorId = await loadPersistentShareActor(
         store,
@@ -138,7 +138,7 @@ class _StudyShareV2GuestEditorState extends State<StudyShareV2GuestEditor> {
           guestTicket: widget.ticket,
         ),
         actorId: actorId,
-        checkpointScope: 'share:' + widget.shareId,
+        checkpointScope: 'share:${widget.shareId}',
         apiClient: api,
         shareId: widget.shareId,
         guestTicket: widget.ticket,
@@ -327,8 +327,9 @@ class _StudyShareV2GuestEditorState extends State<StudyShareV2GuestEditor> {
     }
     final request = ++_appearanceRequest;
     try {
-      final appearance = await StudyShareGuestClient(apiClient: api)
-          .appearance(widget.shareId, widget.ticket);
+      final appearance = await StudyShareGuestClient(
+        apiClient: api,
+      ).appearance(widget.shareId, widget.ticket);
       if (!mounted ||
           _closed ||
           request != _appearanceRequest ||

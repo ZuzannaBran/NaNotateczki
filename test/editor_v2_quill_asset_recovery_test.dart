@@ -104,10 +104,10 @@ void main() {
         deltaJson: jsonEncode([
           {'insert': 'A'},
           {
-            'insert': {'image': 'asset:' + image.assetId},
+            'insert': {'image': 'asset:${image.assetId}'},
           },
           {
-            'insert': {'pdf': 'asset:' + pdf.assetId},
+            'insert': {'pdf': 'asset:${pdf.assetId}'},
           },
           {'insert': '\n'},
         ]),
@@ -130,7 +130,7 @@ void main() {
             deltaJson: jsonEncode([
               {'insert': 'A'},
               {
-                'insert': {'pdf': 'asset:' + pdf.assetId},
+                'insert': {'pdf': 'asset:${pdf.assetId}'},
               },
               {'insert': '\n'},
             ]),

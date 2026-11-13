@@ -504,7 +504,7 @@ void main() {
         actorId: 'actor-local',
         checkpointScope: 'user-A-v2',
         enableRealtime: false,
-        applyRemote: (_, __) async {},
+        applyRemote: (_, _) async {},
         prepareLocalOperations: (_) async {
           preparing.complete();
           await release.future;
@@ -1095,7 +1095,7 @@ void main() {
       actorId: 'actor-local',
       checkpointScope: 'user-A-v2',
       enableRealtime: false,
-      applyRemote: (_, __) async {},
+      applyRemote: (_, _) async {},
     );
     final valid = await engine.writeLocal(
       documentId: 'document-one',
@@ -1222,7 +1222,7 @@ void main() {
       actorId: 'actor-local',
       checkpointScope: 'user-A-v2',
       enableRealtime: false,
-      applyRemote: (_, __) async {},
+      applyRemote: (_, _) async {},
     );
     Future<void> addFor(String documentId) async {
       await engine.writeLocal(
@@ -1604,7 +1604,7 @@ void main() {
       guestTicket: ticket,
       onShareEnded: () => ended++,
       enableRealtime: false,
-      applyRemote: (_, __) async {},
+      applyRemote: (_, _) async {},
     );
     final pending = await engine.writeLocal(
       documentId: 'document-one',

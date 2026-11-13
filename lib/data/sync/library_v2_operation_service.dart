@@ -258,7 +258,7 @@ class LibraryV2OperationReducer {
         final label = names[id]!;
         final path = parent == null
             ? label
-            : resolve(parent as String) + '/' + label;
+            : '${resolve(parent as String)}/$label';
         return path;
       } finally {
         visiting.remove(id);
@@ -361,7 +361,7 @@ class LibraryV2OperationService {
     });
     _refreshTail = refresh.then<void>(
       (_) {},
-      onError: (Object _, StackTrace __) {},
+      onError: (Object _, StackTrace _) {},
     );
     return refresh;
   }
@@ -682,7 +682,7 @@ class LibraryV2OperationService {
     if (id == null ||
         parent == null ||
         targetParent == path ||
-        targetParent.startsWith(path + '/')) {
+        targetParent.startsWith('$path/')) {
       throw StateError('Folder move would create a cycle.');
     }
     await _commitRelocation(OperationKind.folderMove, id, {
@@ -710,7 +710,7 @@ class LibraryV2OperationService {
     final state = await snapshot();
     final children =
         state.folderIdsByPath.keys
-            .where((path) => path == root || path.startsWith(root + '/'))
+            .where((path) => path == root || path.startsWith('$root/'))
             .toList()
           ..sort((a, b) => b.length.compareTo(a.length));
     if (children.isEmpty) {

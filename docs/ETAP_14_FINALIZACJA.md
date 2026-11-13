@@ -1,5 +1,13 @@
 # Etap 14 — porządki po migracji
 
+## Audyt i czyszczenie lokalne — 2026-11-13
+
+Bieżący wynik i pozostałe bramki opisuje
+[AUDYT_V2_2026_11_13.md](AUDYT_V2_2026_11_13.md). Wpisy historyczne poniżej
+nie są aktualnym statusem integracji. Po dodatkowym audycie zapis API
+domyślnie pozostaje wyłączony; skrypt wdrożenia zachowuje konfigurację
+`disabled`/`canary`/`all`. Nie rozszerza samodzielnie canary na wszystkie konta.
+
 ## Pakiet 11 — tylko v2
 
 Klient konta uruchamia v2 bez dodatkowej flagi. Stare synchronizatory

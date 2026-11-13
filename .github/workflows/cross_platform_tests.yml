@@ -133,8 +133,8 @@ jobs:
           cd server
           python -m pytest -q api/tests
 
-      - name: Verify offline canary activation guards
-        run: python3 -m unittest discover -s server/scripts/tests -p 'test_stage13_canary_activation.py'
+      - name: Verify deployment, backup, restore and activation guards
+        run: python3 -m unittest discover -s server/scripts/tests
 
       - name: Verify legacy SQLite migration staging
         run: python3 -m unittest discover -s tool -p 'test_stage11_migrate.py'
@@ -144,6 +144,9 @@ jobs:
     name: PostgreSQL HTTP smoke (account, sync, sharing, backup)
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    env:
+      # This job creates and destroys its own database and has no real users.
+      OPERATIONS_V2_WRITE_MODE: all
     defaults:
       run:
         working-directory: server

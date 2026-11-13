@@ -142,7 +142,7 @@ void main() {
 
   test('concurrent color and movement converge through the v2 reducer', () {
     String uuid(int number) =>
-        '00000000-0000-4000-8000-' + number.toString().padLeft(12, '0');
+        '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}';
     OperationEnvelope op(
       int number,
       OperationKind kind,

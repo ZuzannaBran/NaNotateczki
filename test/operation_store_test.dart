@@ -996,7 +996,7 @@ void main() {
       raw.execute('DROP TABLE operation_outbox_v5');
       raw.execute('PRAGMA user_version = 4');
     } finally {
-      raw.dispose();
+      raw.close();
     }
 
     final upgraded = NotesDatabase(NativeDatabase(file));
@@ -1060,7 +1060,7 @@ void main() {
       );
       raw.execute('PRAGMA user_version = 3');
     } finally {
-      raw.dispose();
+      raw.close();
     }
 
     final upgraded = NotesDatabase(NativeDatabase(file));
@@ -1122,7 +1122,7 @@ void main() {
       }
       raw.execute('PRAGMA user_version = 2');
     } finally {
-      raw.dispose();
+      raw.close();
     }
 
     final upgraded = NotesDatabase(NativeDatabase(file));
@@ -1472,7 +1472,7 @@ void main() {
           payload: const {
             'value': {'x': 1},
           },
-          dependencies: [if (parent != null) parent],
+          dependencies: [?parent],
         );
         await store.applyRemote(
           remote,

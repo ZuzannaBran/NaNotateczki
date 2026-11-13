@@ -47,7 +47,7 @@ void main() {
   test('WAL journal survives reopen without overwriting IDs', () async {
     final directory = await Directory.systemTemp.createTemp('nn-sqlite-');
     addTearDown(() => directory.delete(recursive: true));
-    final file = File(directory.path + '/operations.sqlite');
+    final file = File('${directory.path}/operations.sqlite');
     final first = sqlite3.open(file.path);
     try {
       first.execute('PRAGMA journal_mode = WAL');

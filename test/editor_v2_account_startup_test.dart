@@ -1180,7 +1180,7 @@ void main() {
   test('SQLite restart keeps offline ink and remote title', () async {
     final directory = await Directory.systemTemp.createTemp('nn-v2-offline-');
     addTearDown(() => directory.delete(recursive: true));
-    final file = File(directory.path + '/notes.sqlite');
+    final file = File('${directory.path}/notes.sqlite');
     final first = _Fixture(NativeDatabase(file));
     late String documentId;
     late String localOperationId;
@@ -1753,7 +1753,7 @@ void main() {
   test('remote page remains unique after SQLite restart', () async {
     final dir = await Directory.systemTemp.createTemp('nn-page-restart-');
     addTearDown(() => dir.delete(recursive: true));
-    final file = File(dir.path + '/notes.sqlite');
+    final file = File('${dir.path}/notes.sqlite');
     final first = _Fixture(NativeDatabase(file));
     late String documentId;
     late String localOperationId;

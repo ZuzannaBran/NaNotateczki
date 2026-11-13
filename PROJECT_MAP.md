@@ -9,6 +9,11 @@
   jest oddzielny od operacji, a zapisu całej notatki nie ma.
 - `RemoteBackupService` przechowuje znacznik obecności bazy.
   `V2BackupRecoveryService` zapisuje i odtwarza archiwum operacyjne.
+- `server/api/app/operation_rollout.py` współdzieli bramkę canary z operacjami,
+  ustawieniami, backupem i mutacjami Share. Domyślny zapis jest wyłączony;
+  odwołanie Share pozostaje dostępne. Regresje HTTP:
+  `server/api/tests/test_v2_rollout_boundaries.py`; wdrożenie:
+  `server/scripts/tests/test_deploy_v2.py`.
 - Kanoniczny serwer i jego lustro: `0016_retire_legacy_sync.sql`,
   `api/app/owner_lock.py`, `scripts/deploy-v2.sh`.
   Nowe i puste konta są v2 bez flagi klienta. Zarchiwizowane
@@ -1466,13 +1471,13 @@ oznaczania notebooków jako dirty. Sprzątanie osieroconych obrazów działa
 tylko przy normalnym starcie istniejącej, zdrowej bazy.
 
 - 21: `FolderCoverShape`; 23: `FolderCoverStyle`; 54: `LibraryController`.
-- 146: `initialize`; 161: `loadItems`.
-- 328: `folderNames`; 354: `childFoldersOf`; 363: `updateFolderCover`.
-- 382: `createFolder`; 405: `renameFolder`;
-  473: `canMoveFolderToFolder`; 491: `moveFolderToFolder`;
-  551: `deleteFolder` (poddrzewo).
-- 749: `moveItemToFolder`; 796: `selectFolder`; 924: `_loadFolders`;
-  986: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
+- 147: `initialize`; 167: `loadItems`.
+- 316: `folderNames`; 342: `childFoldersOf`; 351: `updateFolderCover`.
+- 373: `createFolder`; 400: `renameFolder`;
+  491: `canMoveFolderToFolder`; 509: `moveFolderToFolder`;
+  594: `deleteFolder` (poddrzewo).
+- 832: `moveItemToFolder`; 879: `selectFolder`; 998: `_loadFolders`;
+  1060: `_saveFolders` — zapis folderów zgłasza pusty zestaw zmian.
 
 ### `lib/features/library/presentation/library_screen.dart` (aktualizowany)
 `_PersistentWorkspaceEditor` utrzymuje lokalny `EditorController` przez
@@ -1590,19 +1595,19 @@ edycję okładki; etykiety mają rozmiar 14 px, a opcje dodawania nie mają ikon
   `NotebookKind.planner`, aby nie zgłaszać `UnsupportedError`.
 - 35: `LibraryScreen`; 44: `_LibraryScreenState`;
   437: `_maybeShowAccountOnboarding`;
-  586: `_keepCatalogOnMovedFolder`; 688: `_openCatalogSettings`;
-  1052: `_CreateMenuButton`;
-  1097: `_LibraryTreePane` (`_LibraryTreePaneState` 1124);
-  1339: `_buildFolder`; 1526: `_FolderTreeRow`;
-  1629: `_LibraryTreeItemRow` (bez ikon typów);
-  1730: `_sidebarMenuShape`;
-  1744: `_SidebarMenuShadowPainter`;
-  1780: `_showSidebarMenu`;
-  1893: `_TreeRowActions`;
-  1973: `_LibraryWorkspace`;
-  2111: `_LeftZoneToggleTab` (również przycisk timera).
+  585: `_keepCatalogOnMovedFolder`; 687: `_openCatalogSettings`;
+  1065: `_CreateMenuButton`;
+  1110: `_LibraryTreePane` (`_LibraryTreePaneState` 1137);
+  1352: `_buildFolder`; 1539: `_FolderTreeRow`;
+  1642: `_LibraryTreeItemRow` (bez ikon typów);
+  1743: `_sidebarMenuShape`;
+  1757: `_SidebarMenuShadowPainter`;
+  1793: `_showSidebarMenu`;
+  1906: `_TreeRowActions`;
+  1986: `_LibraryWorkspace`;
+  2263: `_LeftZoneToggleTab` (również przycisk timera).
 
-### `lib/features/library/presentation/library_account_slot.dart` (1104 linie)
+### `lib/features/library/presentation/library_account_slot.dart` (1217 linii)
 
 Onboarding `Create account`/`Sign in`/`Try local` z jednym
 nagłówkiem NaNotateczki i tekstem Welcome poniżej, bez podwójnego tytułu,
@@ -1630,11 +1635,13 @@ a po zmianie hasła zatrzymuje usługi przed wyczyszczeniem sesji.
   Automatyczne inicjowanie synchronizacji należy do `AppScope`, także na
   platformach natywnych; ręczne polityki pozostają awaryjnym wyborem.
 
-- 19: `showLibraryAccountDialog`; 48: `LibraryAccountSlot`;
-  153: `_AccountAvatar`; 185: `_AccountDialog`;
-  198: `_AccountDialogState`; 695: `_usernameField`;
-  716: `_accountLabeledField`; 908: `_backupNow`;
-  945: `_changePassword`.
+- 28: `showLibraryAccountDialog`; 60: `LibraryAccountSlot`;
+  165: `_AccountAvatar`; 199: `_AccountDialog`;
+  212: `_AccountDialogState`; 713: `_usernameField`;
+  734: `_accountLabeledField`; 1087: `_backupNow`;
+  1105: `_changePassword`.
+- 915: `_finishSignedInSession` pobiera serwisy przed oczekiwaniem na
+  lokalny flush; odmontowanie dialogu nie przerywa drenażu repozytorium.
 
 ### `lib/features/library/presentation/library_catalog.dart` (1288 linii)
 
@@ -2006,17 +2013,17 @@ tekstowe z `OperationStore` i pomija puste zmiany. Metody:
 `writeAction`, `writePageChange`, `writeCreatePage`, `writeDeletePage`,
 `writeCreateNotebook`, `writeDeleteNotebook` oraz `writeNotebookChange`
 — atomowy wsad wielostronicowy lub bootstrap/del dokumentu bez v1.
-390: `writeNotebookChange(onCommittedInTransaction:)`, 864: `_commit`:
+395: `writeNotebookChange(onCommittedInTransaction:)`, 869: `_commit`:
 checkpoint lokalny przed callbackiem UI/backupu, rollback całego gestu
 przy jego błędzie, metadata-only dla już zapisanego autosave.
 `stageQuillAsset` przygotowuje nowy inline import bez HTTP/outboxu,
 sprawdza sygnaturę, typ embedu i limit 64 MiB, kopiuje bajty do bufora
 i rejestruje potwierdzenie per dokument/asset ID. Commit attach zwalnia
 zarówno klucz zwykłego obrazu, jak i klucz embedu; rollback je zachowuje.
-116: `verifyQuillAssetReference` sprawdza kopię wewnętrzną w tym samym
+115: `verifyQuillAssetReference` sprawdza kopię wewnętrzną w tym samym
 dokumencie: staging przed autosave lub trwały receipt i checksumowane bajty,
 zgodny typ embedu oraz pozostały budżet. Nie pobiera plików ani nie zapisuje
-operacji. 92: `quillAssetBytes` odczytuje podgląd ze zweryfikowanego
+operacji. 91: `quillAssetBytes` odczytuje podgląd ze zweryfikowanego
 stagingu tego samego dokumentu, a po commicie ze scoped BLOB. Zapobiega
 zapamiętaniu błędu nieistniejącej jeszcze referencji przed autosave.
 Regresje: `test/editor_v2_rich_paste_test.dart`.
@@ -2236,7 +2243,7 @@ ponawianie ink oraz stron bez ponownego użycia tombstones. Błąd zapisu
 wyłącza Undo/Redo; `historyRevision` powiadamia toolbar po błędzie
 oraz po wyczyszczeniu dirty flags przy udanym retry.
 Natywne importy obrazów i renderów PDF zamrażają bajty przed mutacją
-kontrolera; checkpoint nie odczytuje plików. 3909: `restoreImageCache`
+kontrolera; checkpoint nie odczytuje plików. 3978: `restoreImageCache`
 zachowuje te bajty i nie zapisuje operacji ani kroku historii.
 `test/editor_v2_native_image_history_test.dart`: sześć regresji SQLite,
 import PNG/PDF przez publiczne API z pliku, usunięcie pliku przed commitem,
@@ -2300,25 +2307,25 @@ tło bez powiadamiania całego edytora; odczyt i domyślne wzory
 synchronizują ten notifier. Obrazy trafiają do prywatnego katalogu danych
 aplikacji. Rozpoznane po przytrzymaniu kształty nie włączają Move.
 
-- 95: `LassoSelection`; 134: `EditorController`;
-  1611: `setCurrentBackgroundSettings`; 1625: `applyInkColorPreset`.
-- 829: `updatePageLayout`; 844: `beginObjectTransform`;
-  869: `setViewTransform`; 998–1129: operacje `*OnPage`.
-- 1132: `setTool`; 1157: `startShapeEdit`; 1170: `finishShapeEdit`;
-  1198: `inkStrokesForDisplay`; 1209: `previewShapeStrokeOnPage`;
-  1221: `cancelShapeStrokePreview`; 1248: `commitShapeStrokeOnPage`;
-  1282: `commitActiveTextEdit`; 1492: `setImageTransformPreview`;
-  1499: `clearImageTransformPreview`. Transformacja ink zachowuje ID
+- 96: `LassoSelection`; 135: `EditorController`;
+  1633: `setCurrentBackgroundSettings`; 1647: `applyInkColorPreset`.
+- 813: `updatePageLayout`; 828: `beginObjectTransform`;
+  853: `setViewTransform`; 977–1113: operacje `*OnPage`.
+- 1114: `setTool`; 1139: `startShapeEdit`; 1152: `finishShapeEdit`;
+  1212: `inkStrokesForDisplay`; 1231: `previewShapeStrokeOnPage`;
+  1243: `cancelShapeStrokePreview`; 1270: `commitShapeStrokeOnPage`;
+  1304: `commitActiveTextEdit`; 1514: `setImageTransformPreview`;
+  1521: `clearImageTransformPreview`. Transformacja ink zachowuje ID
   przez `UpdateInkStrokeAction` i rewizję strony, z pojedynczym Undo/Redo.
   Regresje: `test/shape_edit_test.dart` (anulowanie i odmontowanie podczas
   przeciągania), `test/editor_v2_crash_recovery_test.dart` (SQLite, outbox,
   rollback, retry i Undo po restarcie dla notatnika i tablicy).
 - Historia pamięta UID strony; regresje nawigacji i usuwania stron:
   `test/editor_controller_layering_test.dart`.
-- 2003: `_mergedBackgroundDefaults`; 2086: `undo`; 2126: `redo`;
-  2663: `toggleBookmark`; 3023: `updateActiveTextStyle`.
-- 4139: `_imagesDir`; 4297: `_applyAction`; 4330: `_applyInkAction`;
-  4542: `_scheduleSave`; 4758: `_saveDirtyPages`; 4800: `_save`.
+- 2025: `_mergedBackgroundDefaults`; 2108: `undo`; 2148: `redo`;
+  2685: `toggleBookmark`; 3045: `updateActiveTextStyle`.
+- 4158: `_imagesDir`; 4316: `_applyAction`; 4349: `_applyInkAction`;
+  4561: `_scheduleSave`; 4777: `_saveDirtyPages`; 4819: `_save`.
 
 - `lib/features/editor/state/ink_color_presets.dart`:
   `InkColorPreset` pobiera globalne zestawy Blue/Pink/Green z `AppColors`
@@ -2554,7 +2561,7 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   uchwytu i odrzuca podgląd przy anulowaniu lub odmontowaniu.
   10: `ShapeEditGeometry`; 255: `ShapeEditOverlay`.
 
-- `lib/features/editor/presentation/widgets/text_hud_block.dart` (742):
+- `lib/features/editor/presentation/widgets/text_hud_block.dart` (741):
   podgląd używa tych samych zamienników Georgii co UI, ale nie narzuca
   ich blokom z indywidualnie wybranym fontem;
   aktywny `TextBlock` renderowany przez Flutter `EditableText`;
@@ -2563,7 +2570,7 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   tekst do natywnego EditableText. PNG/JPEG mają ograniczony strumień,
   bez otwierania URI schowka jako plików. 94: `_bindController`;
   105: `_pasteRichClipboard`; 170: `_readClipboardImage`; 199: `build`;
-  394: `_onTextChanged`; 654: `textBlockAppearance`.
+  393: `_onTextChanged`; 653: `textBlockAppearance`.
   Delete usuwa obiekt tylko przy pustym tekście, w przeciwnym razie
   pozostaje natywną edycją tekstu (znak po prawej stronie kursora). ramka,
   move/resize/scale są delegowane do wspólnego `ObjectTransformHud`; obrót
@@ -2572,7 +2579,7 @@ na współrzędne dokumentu i wyznacza docelowy scroll/pan zachowujący zoom.
   Start transformacji zapisuje najnowszą treść, włącza blokadę viewportu
   i używa tej treści jako snapshotu resize, więc zmiana rozmiaru ani anulowanie
   gestu nie przywracają starszego tekstu.
-  427: `_previewTransform`; 467: `_commitTransform`. Podczas move/resize HUD
+  426: `_previewTransform`; 466: `_commitTransform`. Podczas move/resize HUD
   renderuje lokalny podgląd bez zmiany modelu. Puszczenie uchwytu zapisuje
   jedną akcję historii; anulowanie i odmontowanie porzucają podgląd.
   Kolor aktywnego tekstu jest
@@ -2908,7 +2915,8 @@ indeks ink, benchmark renderowania, gesty tekstu, resize oraz start aplikacji:
   brak przenoszenia outboxu i rewizji między kontami, natychmiastowe
   wysłanie kopii konfliktowej po odpowiedzi HTTP 409.
 - `test/library_account_slot_test.dart`: centrowanie nazwy, podgląd i limit
-  hasła, brak awatara w pasku konta (pozostaje w dialogu), wyrównanie
+  hasła, drenaż lokalnego zapisu po odmontowaniu dialogu podczas logout,
+  brak awatara w pasku konta (pozostaje w dialogu), wyrównanie
   statusu z nazwą, rozmiar ikony ustawień i odstępy przycisków;
   dostęp do konta w szerokim sidebarze
   i mobilnym drawerze, onboarding/rejestracja z powtórzeniem hasła, lokalna

@@ -12,6 +12,13 @@ Stare dokumenty są dostępne tylko dla importera. Ich zachowanie nie
 oznacza możliwości uruchomienia starego synchronizatora. Dalsze
 opisy produkcyjnego v1 są historyczne.
 
+Przypisanie protokołu v2 nie włącza globalnego zapisu. Domyślny tryb API
+i Compose to `OPERATIONS_V2_WRITE_MODE=disabled`; canary wymaga jawnej
+listy UUID. `deploy-v2.sh` zachowuje konfigurację i nie wymusza `all`.
+Rozszerzenie zapisu na wszystkie konta wymaga zakończenia akceptacji.
+Bramka obejmuje także mutacje ustawień, backupu i Share, w tym wydanie
+biletu gościa. Odczyt oraz odwołanie Share pozostają dostępne przy pauzie.
+
 
 ## Pakiet 7: zamykanie, wylogowanie i restart (2026-11-12)
 

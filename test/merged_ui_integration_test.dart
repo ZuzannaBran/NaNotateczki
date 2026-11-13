@@ -580,8 +580,9 @@ Future<void> _snapshot(WidgetTester tester, String name) async {
       'MERGE_REVIEW_PREFIX',
       defaultValue: 'review',
     );
-    await File('/tmp/nanotateczki-$prefix-$name.png')
-        .writeAsBytes(bytes!.buffer.asUint8List());
+    await File(
+      '/tmp/nanotateczki-$prefix-$name.png',
+    ).writeAsBytes(bytes!.buffer.asUint8List());
     image.dispose();
   });
 }

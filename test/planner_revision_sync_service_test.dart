@@ -85,8 +85,9 @@ void main() {
       expect(writes, 1);
       await sync.syncNow();
       expect(writes, 1);
-      final key = StorageNamespace.account('account-1')
-          .fileKey('planner_revisions.json');
+      final key = StorageNamespace.account(
+        'account-1',
+      ).fileKey('planner_revisions.json');
       expect(storage[key], contains('"revision":1'));
 
       planner.edit(

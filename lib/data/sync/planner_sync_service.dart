@@ -163,18 +163,16 @@ class PlannerSyncService {
           final expected = server?['revision'] as int? ?? 0;
           final signature = PlannerRevisionLedger.signature(source);
           final operationId = const Uuid().v5(
-            Uuid.NAMESPACE_URL,
+            Namespace.url.value,
             'planner:$user:$id:$expected:$signature',
           );
-          final answer = await apiClient.putJson(
-            '/v2/planner/entries/${Uri.encodeComponent(id)}',
-            {
-              'operationId': operationId,
-              'expectedRevision': expected,
-              'deleted': source['deleted'],
-              'entry': source['entry'],
-            },
-          );
+          final answer = await apiClient
+              .putJson('/v2/planner/entries/${Uri.encodeComponent(id)}', {
+                'operationId': operationId,
+                'expectedRevision': expected,
+                'deleted': source['deleted'],
+                'entry': source['entry'],
+              });
           if (_stopped || session.userId != user) {
             return;
           }

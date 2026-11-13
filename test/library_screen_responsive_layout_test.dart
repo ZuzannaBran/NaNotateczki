@@ -521,9 +521,9 @@ void main() {
     expect(
       sidebarColor,
       isNot(
-        Theme.of(tester.element(find.text('Projects')))
-            .appBarTheme
-            .backgroundColor,
+        Theme.of(
+          tester.element(find.text('Projects')),
+        ).appBarTheme.backgroundColor,
       ),
     );
     final toggles = [

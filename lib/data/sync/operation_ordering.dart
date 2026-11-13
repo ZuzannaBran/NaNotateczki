@@ -82,10 +82,10 @@ class OperationActorClock {
     };
     final causalIds = <String>{
       ...dependencies,
-      if (revertsOperationId != null) revertsOperationId,
+      ?revertsOperationId,
       for (final id in observedIds)
         if (!coveredIds.contains(id)) id,
-      if (previousOperationId != null) previousOperationId!,
+      ?previousOperationId,
     }.toList()..sort();
     if (causalIds.length * 39 > OperationEnvelope.maxDependencyBytes ||
         actorSeq >= OperationEnvelope.maxSafeInteger ||

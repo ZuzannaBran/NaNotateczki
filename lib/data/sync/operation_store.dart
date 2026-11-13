@@ -294,8 +294,8 @@ class OperationStore {
     }
     final requiredIds = <String>{
       ...dependencies,
-      if (revertsOperationId != null) revertsOperationId,
-      if (previousId != null) previousId,
+      ?revertsOperationId,
+      ?previousId,
     };
     final available = <String, OperationEnvelope>{};
     var nextClock = state?['last_clock'] as int? ?? 0;
