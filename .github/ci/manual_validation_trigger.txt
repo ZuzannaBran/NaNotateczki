@@ -1,1 +1,3 @@
-full-ci-2026-11-13-offline-cutover-conflicts-restore-9b09cd2d
+Full verification 2026-11-13
+Revision 7e65403600a5f9183bedab921746c4b2f22c022e
+Offline legacy folders and tasks, deleted move destination and independent Flutter peers.
