@@ -1000,8 +1000,11 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Prevents absolute image paths from leaking between devices and from
   /// producing false conflicts when native imports relocate image files.
-  Map<String, dynamic> _encodeSyncNotebook(Notebook notebook) =>
+  static Map<String, dynamic> encodeCutoverNotebook(Notebook notebook) =>
       _normalizeSyncNotebook(NotebookRepository.encodeNotebook(notebook));
+
+  Map<String, dynamic> _encodeSyncNotebook(Notebook notebook) =>
+      encodeCutoverNotebook(notebook);
 
   static Map<String, dynamic> _normalizeSyncNotebook(
     Map<String, dynamic> encoded,
@@ -1109,9 +1112,15 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
   /// A legacy delete may exist only in the v1 outbox, without a SQLite row.
   /// Do not switch writers while a device still holds unsent legacy intent.
   static Future<void> requireEmptyLegacyOutbox(String userId) async {
+    await readCutoverState(userId);
+  }
+
+  static Future<({int cursor, Map<String, int> revisions})> readCutoverState(
+    String userId,
+  ) async {
     final raw = await readStoredText(_stateKey(userId));
     if (raw == null) {
-      return;
+      return (cursor: 0, revisions: const <String, int>{});
     }
     final state = jsonDecode(raw);
     if (state is! Map<String, dynamic> || state['version'] != 1) {
@@ -1125,6 +1134,15 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     if (pending.isNotEmpty) {
       throw StateError('V2 activation blocked by unsent legacy edits.');
     }
+    final cursor = state['cursor'] ?? 0;
+    final revisions = state['revisions'] ?? const <String, dynamic>{};
+    if (cursor is! int ||
+        cursor < 0 ||
+        revisions is! Map<String, dynamic> ||
+        revisions.values.any((value) => value is! int || value < 1)) {
+      throw const FormatException('Invalid saved legacy revision receipts.');
+    }
+    return (cursor: cursor, revisions: Map<String, int>.from(revisions));
   }
 
   Future<void> _loadState(String userId) async {

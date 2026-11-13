@@ -1094,6 +1094,60 @@ void main() {
     expect(poisoned.accepted.single.operation.operationId, valid.operationId);
   });
 
+  test(
+    'image creation and attachment stay together across the batch limit',
+    () async {
+      await engine.stop();
+      final drafts = <LocalOperationDraft>[
+        for (var i = 0; i < SyncEngine.maxBatchSize - 1; i++)
+          LocalOperationDraft(
+            kind: OperationKind.objectCreate,
+            pageId: 'page-one',
+            objectId: 'prefix-$i',
+            payload: const {
+              'value': {'objectType': 'test'},
+            },
+          ),
+        LocalOperationDraft(
+          kind: OperationKind.objectCreate,
+          pageId: 'page-one',
+          objectId: 'image',
+          payload: const {
+            'value': {'objectType': 'image', 'assetId': 'asset-one'},
+          },
+        ),
+        LocalOperationDraft(
+          kind: OperationKind.assetAttach,
+          pageId: 'page-one',
+          objectId: 'image',
+          payload: {
+            'assetId': 'asset-one',
+            'sha256': 'a' * 64,
+            'sizeBytes': 20,
+            'mediaType': 'image/png',
+          },
+        ),
+      ];
+      final committed = await store.writeLocalBatch(
+        actorId: 'image-pair',
+        documentId: 'document-one',
+        operations: drafts,
+        apply: (_) async {},
+      );
+      await engine.start();
+      expect(gateway.batches.map((item) => item.length), [49, 2]);
+      expect(
+        gateway.batches.last,
+        committed.reversed
+            .take(2)
+            .toList()
+            .reversed
+            .map((op) => op.operationId),
+      );
+      expect(await store.pending(), isEmpty);
+    },
+  );
+
   test('a broken pull does not block the outbox of another document', () async {
     gateway.seed(_remote('actor-bad', 'bad'));
     await engine.stop();

@@ -3624,7 +3624,7 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   kolejność stop, awaria keyringu i offline revoke.
 - `docs/ETAP_10_SHUTDOWN.md`: ograniczenia platformowe i weryfikacja.
 
-## Etap 11 — weryfikowany staging danych legacy (bez cutover)
+## Etap 11 — staging i kontrolowany cutover konta historycznego
 
 - `tool/stage11_migrate.py`: offline, Linux/native; SHA-256,
   zgodność powiązania konta, zachowanie oryginalnej SQLite i WAL
@@ -3632,9 +3632,14 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   pełne sprawdzenie listy plików, manifest staged-not-activated.
 - `tool/test_stage11_migrate.py`: 19 regresji m.in. staging konta,
   profile, nowe źródła, osierocone assety, symlinki, resume i WAL.
-- `docs/ETAP_11_MIGRATION.md`: **produkcja v1→v2 nadal nieaktywna**.
-  AppScope i Web nie wykonują cutover; wymagane etapy 7/12/13 i migracja
-  serwerowego protokołu z trwałą blokadą starszych writerów.
+- `server/api/app/legacy_cutover.py`, `legacy_operation_plan.py` i migracja
+  0015: dry-run, deterministyczny dziennik v2, trwały receipt i blokada v1.
+- `lib/data/sync/legacy_v2_projection_cutover.dart`: potwierdzenie rewizji
+  i pustego outboxu, transakcyjne archiwum SQLite, odbudowa przez SyncEngine
+  pod bramką AppScope. Regresje w `test/legacy_v2_projection_cutover_test.dart`
+  i `server/api/tests/test_stage12_real_stack.py`.
+- `docs/ETAP_11_MIGRATION.md`: procedura testowa i granice weryfikacji.
+  Nie uruchomiono produkcyjnego cutover.
 
 ## Etap 12 — nowe testy, akceptacja nadal otwarta (2026-11-03)
 

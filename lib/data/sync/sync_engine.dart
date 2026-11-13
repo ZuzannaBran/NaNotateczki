@@ -570,28 +570,55 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     final groups = <String, List<OperationEnvelope>>{};
     final bytesByActor = <String, int>{};
     final full = <String>{};
-    for (final operation in ready) {
+    for (var offset = 0; offset < ready.length; offset++) {
+      final operation = ready[offset];
       final actor = operation.actorId;
       if (full.contains(actor)) {
         continue;
       }
       final group = groups.putIfAbsent(actor, () => []);
-      final size = utf8.encode(jsonEncode(operation.toJson())).length;
+      final unit = [operation];
+      if (_isImageCreation(operation)) {
+        var following = offset + 1 < ready.length ? ready[offset + 1] : null;
+        final nextIsInPage = following != null;
+        if (!nextIsInPage) {
+          final remainder = await store.pending(limit: 1, offset: offset + 1);
+          following = remainder.firstOrNull;
+        }
+        if (following == null ||
+            !_isInitialImageAttachment(operation, following)) {
+          await store.markBlocked(
+            operation.operationId,
+            'Image creation has no ready matching asset attachment.',
+          );
+          full.add(actor);
+          continue;
+        }
+        unit.add(following);
+        if (nextIsInPage) {
+          offset++;
+        }
+      }
+      final size = unit.fold<int>(
+        0,
+        (total, item) => total + utf8.encode(jsonEncode(item.toJson())).length,
+      );
       final total = bytesByActor[actor] ?? 0;
-      if (group.length >= maxBatchSize ||
+      if (group.length + unit.length > maxBatchSize ||
           (group.isNotEmpty && total + size > maxBatchPayloadBytes)) {
         full.add(actor);
         continue;
       }
-      group.add(operation);
+      group.addAll(unit);
       bytesByActor[actor] = total + size;
       if (total + size > maxBatchPayloadBytes) {
-        // An oversized individual operation is retained and rejected by
-        // the transport, never silently bypassed by later actor edits.
         full.add(actor);
       }
     }
-    final selected = groups.entries.take(maxConcurrentActors).toList();
+    final selected = groups.entries
+        .where((group) => group.value.isNotEmpty)
+        .take(maxConcurrentActors)
+        .toList();
     await Future.wait([
       for (final group in selected)
         _sendActor(generation, group.key, group.value),
@@ -600,10 +627,32 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
       0,
       (total, group) => total + group.value.length,
     );
-    if (ready.length > attempted) {
+    if (attempted > 0 && ready.length > attempted) {
       _requested = true;
     }
   }
+
+  static bool _isImageCreation(OperationEnvelope operation) {
+    final value = operation.payload['value'];
+    return operation.kind == OperationKind.objectCreate &&
+        value is Map &&
+        value['objectType'] == 'image' &&
+        value['assetId'] is String;
+  }
+
+  static bool _isInitialImageAttachment(
+    OperationEnvelope create,
+    OperationEnvelope attachment,
+  ) =>
+      attachment.kind == OperationKind.assetAttach &&
+      attachment.documentId == create.documentId &&
+      attachment.pageId == create.pageId &&
+      attachment.objectId == create.objectId &&
+      attachment.actorId == create.actorId &&
+      attachment.actorSeq == create.actorSeq + 1 &&
+      attachment.dependencies.contains(create.operationId) &&
+      attachment.payload['assetId'] ==
+          (create.payload['value'] as Map)['assetId'];
 
   Future<void> _acceptReceipts(
     int generation,
@@ -675,13 +724,14 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
       // The server commits an entire batch or none of it. If one later
       // intent fails, commit the safe prefix instead of penalizing its first
       // operation. Never jump over an invalid actor sequence.
+      final minimumPrefix = _isImageCreation(batch.first) ? 2 : 1;
       if (error is ApiException &&
-          batch.length > 1 &&
+          batch.length > minimumPrefix &&
           (error.statusCode == 409 ||
               error.statusCode == 413 ||
               error.statusCode == 422)) {
         try {
-          final first = [batch.first];
+          final first = batch.take(minimumPrefix).toList();
           final receipts = await _authorized(() async {
             await prepareLocalOperations?.call(first);
             if (!_isActive(generation)) {

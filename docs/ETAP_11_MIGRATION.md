@@ -1,8 +1,10 @@
 # Etap 11 — bezpieczna migracja dotychczasowych danych
 
-Status: **dla pustych, wyczyszczonych instalacji podłączono oddzielne
-magazyny Local/Account na Native/Web**. Migracja istniejących danych oraz
-protokół SyncEngine v2/Share nie zostały jeszcze uruchomione. Nie uruchamiać obu protokołów zapisujących do jednego UID.
+Status: oddzielne magazyny Local/Account i protokół v2 są w kodzie.
+Konto historyczne można przekonwertować na środowisku testowym po
+opróżnieniu kolejek v1 wszystkich urządzeń. Produkcyjny rollout nie
+jest częścią tej procedury testowej. Nie uruchamiać obu writerów na
+tym samym UID.
 
 ## Zweryfikowany proces przygotowawczy na Linux / native
 
@@ -53,41 +55,21 @@ nowy plik źródłowy i nieoczekiwany plik w stagingu. Nie uruchomiono Flutter/D
 PostgreSQL ani GitHub Actions. Testy używają uproszczonych schematów
 SQLite; historyczne zrzuty rzeczywistych instalacji wciąż są konieczne.
 
-## Otwarte blokady (nie wolno ich ukrywać)
+## Granice weryfikacji przed produkcją
 
-1. **Aktywacja namespace (etap 7/11):** AppScope wciąż otwiera
-   notes.sqlite, a inne pliki mają globalne klucze; wymagane jest
-   atomowe przełączanie kontrolerów/providerów, Web IndexedDB, ustawień
-   i tokenów bez mieszania kont. Dopiero potem można odblokować login B.
-2. **Przejście Local → account:** jawna decyzja i idempotentne UID mapping
-   dokumentów, stron, planera i folderów (wraz z assetami), bez
-   nadpisywania preferencji konta.
-3. **Zamiana v1 → v2:** każdy serwerowy dokument i SQLite potrzebują
-   snapshotu początkowego v2, punktu startowego dziennika i potwierdzenia
-   checkpointu. Wymagane przeniesienie tombstones, outbox i poprawnych
-   CRDT tekstu. Nie wolno po prostu skopiować JSON v1 do document_states.
-4. **Serwer:** transakcyjne zamknięcie zapisów v1 per UID, migracja,
-   trwały marker trybu, bezpieczny retry i blokada starych klientów.
-   Dotychczasowy serwer chroni przed dwoma writerami, ale nie oferuje
-   jeszcze ukończonego endpointu cutover.
-5. **Rekordy historyczne:** testy na SQLite v1–v5, brak WAL,
-   obecny WAL, uszkodzone strony, brak miejsca, wymuszony restart,
-   prawdziwe dokumenty z PDF i Quill.
-6. **Etapy 5/6/8/9/10:** włączenie produkcyjnego SyncEngine i Share,
-   folderów/zadań i planera v2, odtwarzanie snapshot+replay, poprawne
-   wyjście z zachowaniem outboxu wymagają migracji i testów E2E.
-7. **Etapy 12–13:** test środowiska PostgreSQL/WebSocket, dwóch urządzeń,
-   backup produkcyjnej bazy przed migracjami, wdrożenie canary.
-   Dopiero po nim usuwać legacy (etap 14).
+- Przejść procedurę na kopii rzeczywistej bazy i na dwóch instalacjach
+  z historią. Osobno zweryfikować stare schematy, brak miejsca, restart
+  procesu i restore PostgreSQL oraz magazynu assetów.
+- Nie przełączać konta, jeżeli jakiekolwiek urządzenie lub gość ma
+  niezapisane dane albo nie można potwierdzić jego stanu.
+- Nie modyfikować katalogu stagingu w miejscu i nie usuwać danych v1.
 
 ## Serwer
 
-Na tym etapie **nie wykonywać poleceń na serwerze**: nowej migracji SQL ani
-przełączenia API nie wdrożono. Polecenia z etapu 13 są warunkowe i wymagają
-najpierw zweryfikowanego pełnego backupu PostgreSQL i assetów.
-
-Dotychczasowa aplikacja nadal używa legacy storage i sync; ten etap
-zmniejsza ryzyko przygotowania kopii, ale nie zamyka migracji v2.
+Staging plików nie wymaga żadnych poleceń na serwerze. Test konwersji
+serwerowej opisano niżej. Uruchomienie produkcyjne należy do osobnej
+procedury etapu 13 i wymaga wcześniej zweryfikowanej kopii PostgreSQL
+oraz assetów.
 
 ## Zasady zgodności po korekcie
 
@@ -110,9 +92,8 @@ Test regresyjny sprawdza staging bazy v6 bez zmiany źródła.
 
 Klient najpierw potwierdza protokół konta, a przed uruchomieniem
 writera wywołuje `GET /v2/activation/readiness`. Serwer kontroluje
-trwały marker v2, tryb canary i allowlist kont, po czym odmawia
-przy pozostałościach dokumentów, events, idempotency, backupów,
-ustawień biblioteki i linków Share w protokole v1. Brak endpointu
+trwały marker v2 i allowlistę kont. Jeżeli istnieją dane v1,
+wymagany jest dodatkowo administracyjny receipt konwersji. Brak endpointu
 albo przerwanie HTTP pozostawia edytor zablokowany.
 
 Na urządzeniu nawet obecność `document.set` nie oznacza wykonanej
@@ -122,21 +103,35 @@ gdy lokalny notebook został już usunięty. Aktywacja pustego konta
 testowego odrzuca błąd
 sprawdzenia procesu API, nieznane tabele i zweryfikowane assety.
 
-**Konta historyczne:** staging etapu 11 nie przenosi jeszcze danych
-przez protokół v2. Bez utrwalenia Quill, mediów, folderów, zadań,
-tombstones, checkpointów i niewysłanego outboxu nie wolno aktywować
-istniejącego konta ani zastępować migracji resetem serwera.
+**Konta historyczne:** migracja SQL 0015 dodaje administracyjny receipt.
+`python -m app.legacy_cutover UUID` na testowym backendzie wykonuje
+dry-run. Proces ma używać konta DB uprawnionego do zapisu markera i
+receipt oraz tego samego prywatnego magazynu assetów co API. Zatrzymać
+stare klienty po potwierdzeniu wysłania ich dokumentów, folderów,
+ustawień, planera i zmian gości. Zamknąć aktywne Share. Na zweryfikowanej
+kopii danych uruchomić apply z `--expect-v1-cursor` z dry-runu oraz
+`--all-v1-devices-flushed`. Wymagana jest jawna allowlista zapisu v2.
+Nie ustawiaj `all` na produkcji w celu obejścia tej bramki.
 
-## Uzupełnienie przy etapie 13 — trwała bariera protokołów
+Serwer zachowuje wiersze v1 i atomowo publikuje operacje, receipt i
+marker v2. Ponowne uruchomienie odczytuje istniejący receipt. Dokumenty,
+strony, elementy i zadania zachowują identyfikatory. Foldery bez UID
+dostają deterministyczne identyfikatory. Formatowany tekst jest
+przenoszony do atomów Quill. Inline PNG/JPEG/WebP/PDF i inline
+osadzenia Quill z danymi są weryfikowane przez SHA-256. Brak bytes,
+nieobsługiwany embed lub brak zgodności danych blokuje konwersję.
+Ustawienia konta i planer pozostają w ich istniejących rejestrach CAS.
 
-Backend po migracji `0013_account_protocol_fence.sql` zachowuje dla
-każdego konta tryb v1, dopóki administrator nie utworzy trwałego
-markera `account_sync_protocol`. Mutacje v1 PUT/DELETE oraz v2 batch
-sprawdzają go w tej samej blokadzie transakcyjnej właściciela.
-Aktywacja istniejącego konta nadal jest **niedostępna**: najpierw wymaga
-bezstratnej konwersji jego dokumentów, assetów, operacji offline,
-tombstones i checkpointów. Narzędzie
-`scripts/stage13-activate-empty-canary.sh` dopuszcza wyłącznie nowy,
-pusty identyfikator testowy (przy zatrzymanym API). Ten mechanizm
-**nie zamyka etapu 11** ani nie zmienia aktywnej aplikacji.
+Klient pobiera zarchiwizowaną rewizję każdego lokalnego dokumentu,
+porównuje treść i blokuje przełączenie przy niepotwierdzonych zmianach
+albo outboxie v1. Następnie archiwizuje oryginalne tabele SQLite,
+zapisuje receipt lokalny i opróżnia projekcję w jednej transakcji.
+Standardowy feed v2 wznawia odbudowę od trwałego kursora. Edytor
+pozostaje zamknięty do osiągnięcia checkpointu i zakończenia bootstrapu.
+Nie jest to konwerter niewysłanych snapshotów v1. Należy je wysłać
+przed aktywacją. Błędne potwierdzenie nie powoduje skasowania ich na
+urządzeniu, ale wymaga odzyskania ze starej kopii.
 
+Świeży, pusty identyfikator testowy nadal obsługuje
+`scripts/stage13-activate-empty-canary.sh`. Nie wykonano cutover
+żadnego rzeczywistego konta.

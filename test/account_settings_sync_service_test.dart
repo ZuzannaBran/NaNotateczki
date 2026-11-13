@@ -58,6 +58,73 @@ void main() {
     expect(files, isEmpty);
   });
 
+  test(
+    'first v2 settings pass keeps an offline edit using the v1 CAS base',
+    () async {
+      const user = 'historical-settings';
+      ActiveStorageNamespace.activate(StorageNamespace.account(user));
+      final suffix = sha256
+          .convert(utf8.encode(user))
+          .toString()
+          .substring(0, 16);
+      final files = <String, String>{
+        'app_prefs.json': '{"darkMode":true}',
+        'account_settings_cursor_$suffix.json': jsonEncode({
+          'version': 1,
+          'settings': {
+            'appPreferences': {
+              'revision': 4,
+              'value': {'darkMode': false},
+            },
+          },
+        }),
+      };
+      textStorageReadOverride = (key) async => files[key];
+      textStorageWriteOverride = (key, value) async => files[key] = value;
+      final api = ApiClient(
+        baseUri: Uri.parse('https://api.example.test'),
+        httpClient: MockClient((request) async {
+          if (request.method == 'GET') {
+            return http.Response(
+              jsonEncode({
+                'settings': {
+                  'appPreferences': {
+                    'revision': 4,
+                    'value': {'darkMode': false},
+                  },
+                },
+              }),
+              200,
+            );
+          }
+          expect(request.method, 'PUT');
+          expect(request.url.path, '/v2/account-settings/appPreferences');
+          expect(jsonDecode(request.body), {
+            'expectedRevision': 4,
+            'value': {'darkMode': true},
+          });
+          return http.Response('{"revision":5,"value":{"darkMode":true}}', 200);
+        }),
+      )..setAccessToken('test-token');
+      addTearDown(api.close);
+      final session = AccountSessionController(api)
+        ..mode = AccountDataMode.account
+        ..userId = user;
+      addTearDown(session.dispose);
+      final service = AccountSettingsSyncService(
+        apiClient: api,
+        session: session,
+        useV2: true,
+      );
+      await service.syncNow();
+      expect(files['app_prefs.json'], '{"darkMode":true}');
+      expect(
+        files['account_settings_v2_cursor_$suffix.json'],
+        contains('"revision":5'),
+      );
+    },
+  );
+
   test('v2 settings use guarded CAS without library JSON writes', () async {
     ActiveStorageNamespace.activate(StorageNamespace.account('account-v2'));
     final files = <String, String>{

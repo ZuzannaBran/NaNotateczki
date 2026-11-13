@@ -65,11 +65,15 @@ class LibraryV2OperationReducer {
     return 0;
   }
 
-  static LibraryV2Snapshot replay(Iterable<OperationEnvelope> history) {
+  static LibraryV2Snapshot replay(
+    Iterable<OperationEnvelope> history, {
+    Iterable<int> migratedRecentCoverColors = const [],
+  }) {
     final folders = <String, _LibraryNode>{};
     final tasks = <String, _LibraryNode>{};
     final deletedFolders = <String>{};
     final deletedTasks = <String>{};
+    final newCoverColors = <(List<Object>, int)>[];
 
     for (final operation in history) {
       if (operation.documentId != OperationEnvelope.libraryDocumentId) {
@@ -123,6 +127,14 @@ class LibraryV2OperationReducer {
       node.merge(raw, operation);
       if (isFolder) {
         _validateFolders(folders);
+        final cover = raw['cover'];
+        final color = cover is Map ? cover['iconColor'] : null;
+        final rank = node.versions['cover'];
+        if (!operation.actorId.startsWith('v1-cutover:') &&
+            color is int &&
+            rank?.last == operation.operationId) {
+          newCoverColors.add((rank!, color));
+        }
       } else if (node.fields['plannerUid'] is! String ||
           (node.fields['plannerUid'] as String).isEmpty) {
         throw const FormatException('Task has no planner identity.');
@@ -174,12 +186,18 @@ class LibraryV2OperationReducer {
         task.remove('sortIndex');
       }
     }
+    newCoverColors.sort((a, b) => compareRank(b.$1, a.$1));
+    final recentColors = <int>{
+      ...newCoverColors.map((entry) => entry.$2),
+      ...migratedRecentCoverColors,
+      ...colors,
+    }.take(12).toList();
     final folderNames = paths.keys.toList()..sort();
     return LibraryV2Snapshot(Map.unmodifiable(paths), {
       'folders': folderNames,
       'covers': covers,
       'plannerTasks': tasksByPlanner,
-      'recentCoverColors': colors.take(12).toList(),
+      'recentCoverColors': recentColors,
     });
   }
 
@@ -298,7 +316,34 @@ class LibraryV2OperationService {
 
   Future<LibraryV2Snapshot> snapshot() async {
     _requireNamespace();
-    return LibraryV2OperationReducer.replay(await _history());
+    final marker = await _database
+        .customSelect(
+          "SELECT name FROM sqlite_master WHERE name = 'legacy_v1_projection_cutover'",
+        )
+        .getSingleOrNull();
+    var colors = const <int>[];
+    if (marker != null) {
+      final archived = await _database
+          .customSelect(
+            'SELECT library_json FROM legacy_v1_projection_cutover '
+            'WHERE account_id = ?',
+            variables: [Variable<String>(accountId)],
+          )
+          .getSingleOrNull();
+      final raw = archived?.readNullable<String>('library_json');
+      if (raw != null) {
+        final library = jsonDecode(raw);
+        if (library is Map && library['recentCoverColors'] is List) {
+          colors = (library['recentCoverColors'] as List)
+              .whereType<int>()
+              .toList();
+        }
+      }
+    }
+    return LibraryV2OperationReducer.replay(
+      await _history(),
+      migratedRecentCoverColors: colors,
+    );
   }
 
   /// Invoked inside the journal transaction before an envelope is appended.

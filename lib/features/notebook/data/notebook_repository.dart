@@ -283,7 +283,15 @@ class NotebookRepository {
     }
   }
 
-  Future<List<Notebook>> fetchNotebooks() async {
+  Future<List<Notebook>> fetchNotebooks() => _fetchNotebooks();
+
+  /// Compare a v1 source without persisting any normalization side effects.
+  Future<List<Notebook>> fetchNotebooksForCutover() =>
+      _fetchNotebooks(persistLegacyEraserNormalization: false);
+
+  Future<List<Notebook>> _fetchNotebooks({
+    bool persistLegacyEraserNormalization = true,
+  }) async {
     try {
       final rows =
           await (database.select(database.notebookRows)..orderBy([
@@ -327,7 +335,8 @@ class NotebookRepository {
       } else {
         _isNotebookCacheComplete = false;
       }
-      if (legacyPagesByNotebook.isNotEmpty) {
+      if (persistLegacyEraserNormalization &&
+          legacyPagesByNotebook.isNotEmpty) {
         try {
           await _persistLegacyEraserPages(legacyPagesByNotebook);
         } catch (error, stackTrace) {

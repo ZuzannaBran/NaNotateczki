@@ -41,6 +41,10 @@ class EditorSqliteProjector {
       Variable<String>(operation.documentId),
     ]);
     if (document == null) {
+      // A first-seen delete still records a durable document tombstone.
+      if (operation.kind == OperationKind.documentDelete) {
+        return;
+      }
       throw StateError('The target notebook must be imported first.');
     }
     final projected = await _resolveConcurrentMove(operation);
@@ -92,7 +96,9 @@ class EditorSqliteProjector {
           'No verified SQLite editor reducer for ${projected.kind.wireName}.',
         );
     }
-    await _touchNotebook(operation.documentId);
+    if (!operation.actorId.startsWith('v1-cutover:')) {
+      await _touchNotebook(operation.documentId);
+    }
   }
 
   /// Resolve an older pageId only when a different actor has already moved
@@ -183,7 +189,9 @@ class EditorSqliteProjector {
       throw StateError('V2 document creation cannot import a legacy row.');
     }
     final value = Map<String, dynamic>.from(op.payload['value'] as Map);
-    if (value.length != 4 ||
+    final migrated = op.actorId.startsWith('v1-cutover:');
+    if (value.length != (migrated ? 5 : 4) ||
+        (migrated && value['updatedAt'] is! String) ||
         value['title'] is! String ||
         (value['title'] as String).isEmpty ||
         value['folder'] is! String ||
@@ -194,7 +202,10 @@ class EditorSqliteProjector {
       throw const FormatException('Invalid v2 notebook creation.');
     }
     final createdAt = DateTime.tryParse(value['createdAt'] as String);
-    if (createdAt == null) {
+    final updatedAt = migrated
+        ? DateTime.tryParse(value['updatedAt'] as String)
+        : createdAt;
+    if (createdAt == null || updatedAt == null) {
       throw const FormatException('Invalid v2 notebook creation time.');
     }
     await database
@@ -206,7 +217,7 @@ class EditorSqliteProjector {
             kindIndex: value['kindIndex'] as int,
             folder: value['folder'] as String,
             createdAt: createdAt,
-            updatedAt: createdAt,
+            updatedAt: updatedAt,
           ),
         );
   }
@@ -466,7 +477,16 @@ class EditorSqliteProjector {
 
   Future<void> _deletePage(OperationEnvelope op) async {
     final pageId = op.objectId!;
-    await _pageExists(op, pageId);
+    final page = await _row(
+      'SELECT notebook_uid FROM page_rows WHERE uid = ?',
+      [Variable<String>(pageId)],
+    );
+    if (page == null) {
+      return; // First-seen historical tombstone.
+    }
+    if (page['notebook_uid'] != op.documentId) {
+      throw StateError('Deleted page belongs to another notebook.');
+    }
     final count = await _row(
       'SELECT COUNT(*) AS total FROM page_rows WHERE notebook_uid = ?',
       [Variable<String>(op.documentId)],
@@ -878,25 +898,22 @@ class EditorSqliteProjector {
   }
 
   Future<void> _deleteObject(OperationEnvelope op) async {
-    // A page deleted earlier may already have destroyed this object.
-    // Still record the signed object.delete as a document-wide tombstone,
-    // provided no owner on another page remains unaccounted for.
-    if (await _store.isTombstoned(op.documentId, 'page', op.pageId!)) {
-      final liveOwners = await database
-          .customSelect(
-            'SELECT page_uid FROM ink_stroke_rows WHERE uid = ? '
-            'UNION ALL SELECT page_uid FROM image_block_rows WHERE uid = ? '
-            'UNION ALL SELECT page_uid FROM text_block_rows WHERE uid = ?',
-            variables: [
-              Variable<String>(op.objectId!),
-              Variable<String>(op.objectId!),
-              Variable<String>(op.objectId!),
-            ],
-          )
-          .get();
-      if (liveOwners.isEmpty) {
-        return;
-      }
+    // An object that is absent on every page still needs a durable
+    // tombstone. Never let this path suppress a live object on another page.
+    final liveOwners = await database
+        .customSelect(
+          'SELECT page_uid FROM ink_stroke_rows WHERE uid = ? '
+          'UNION ALL SELECT page_uid FROM image_block_rows WHERE uid = ? '
+          'UNION ALL SELECT page_uid FROM text_block_rows WHERE uid = ?',
+          variables: [
+            Variable<String>(op.objectId!),
+            Variable<String>(op.objectId!),
+            Variable<String>(op.objectId!),
+          ],
+        )
+        .get();
+    if (liveOwners.isEmpty) {
+      return;
     }
     await _pageExists(op, op.pageId!);
     final ink = await _row(

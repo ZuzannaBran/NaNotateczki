@@ -34,6 +34,13 @@ class AccountProtocolNotSupported extends StateError {
     : super('This version cannot edit accounts using sync v2.');
 }
 
+class LegacyCutoverReceipt {
+  const LegacyCutoverReceipt(this.legacyCursor, this.operationCursor);
+
+  final int legacyCursor;
+  final int operationCursor;
+}
+
 class ApiClient {
   ApiClient({
     Uri? baseUri,
@@ -119,7 +126,7 @@ class ApiClient {
 
   /// Verifies the canary marker and server readiness before starting v2.
   /// Missing endpoints never allow a fallback to a legacy writer.
-  Future<void> ensureV2AccountReady() async {
+  Future<LegacyCutoverReceipt?> ensureV2AccountReady() async {
     final response = await get('/v2/activation/readiness');
     final payload = response.decodeJson();
     if (payload is! Map<String, dynamic> ||
@@ -130,7 +137,23 @@ class ApiClient {
         'V2 account activation is not verified by this server.',
       );
     }
+    final cutover = payload['legacyCutover'];
+    if (cutover == null) {
+      return null;
+    }
+    if (cutover is! Map<String, dynamic> ||
+        !_safeCursor(cutover['legacyCursor']) ||
+        !_safeCursor(cutover['operationCursor'])) {
+      throw const FormatException('Invalid historical cutover receipt.');
+    }
+    return LegacyCutoverReceipt(
+      cutover['legacyCursor'] as int,
+      cutover['operationCursor'] as int,
+    );
   }
+
+  static bool _safeCursor(Object? value) =>
+      value is int && value >= 0 && value <= 9007199254740991;
 
   Uri realtimeUri() {
     final uri = resolve('/v1/realtime');

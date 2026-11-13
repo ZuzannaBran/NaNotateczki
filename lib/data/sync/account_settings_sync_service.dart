@@ -88,7 +88,12 @@ class AccountSettingsSyncService {
     final key = useV2
         ? 'account_settings_v2_cursor_${_hash(userId)}.json'
         : _checkpointKey(userId);
-    final saved = await readStoredText(key);
+    // CAS revisions for non-library settings are shared by both protocols.
+    // Carry forward the v1 base so an offline device edit is not overwritten
+    // during its first v2 pass.
+    final saved =
+        await readStoredText(key) ??
+        (useV2 ? await readStoredText(_checkpointKey(userId)) : null);
     final checkpoint = saved == null
         ? <String, dynamic>{}
         : _object(jsonDecode(saved));
