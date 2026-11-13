@@ -2217,90 +2217,114 @@ void main() {
     );
   });
 
-  test('pending ink move allows independent remote page title', () async {
-    final f = _Fixture(NativeDatabase.memory());
-    addTearDown(f.close);
-    expect(
-      await f.runtime.startForCurrentAccount(isCurrent: () => true),
-      isTrue,
-    );
-    final notebook = await f.repository.createNotebook();
-    final source = notebook.pages.single.id;
-    final actor = f.runtime.engine.actorIdForDocument(notebook.uid);
-    await f.runtime.engine.syncNow();
-    await f.runtime.store.writeLocal(
-      actorId: actor,
-      documentId: notebook.uid,
-      objectId: 'local-move-target',
-      kind: OperationKind.pageCreate,
-      payload: const {
-        'value': {'title': 'Move target', 'isBookmarked': false},
+  for (final deleteTarget in [false, true]) {
+    test(
+      'pending ink move rebases remote page patch ($deleteTarget)',
+      () async {
+        final f = _Fixture(NativeDatabase.memory());
+        addTearDown(f.close);
+        expect(
+          await f.runtime.startForCurrentAccount(isCurrent: () => true),
+          isTrue,
+        );
+        final notebook = await f.repository.createNotebook();
+        final source = notebook.pages.single.id;
+        final actor = f.runtime.engine.actorIdForDocument(notebook.uid);
+        await f.runtime.engine.syncNow();
+        await f.runtime.store.writeLocal(
+          actorId: actor,
+          documentId: notebook.uid,
+          objectId: 'local-move-target',
+          kind: OperationKind.pageCreate,
+          payload: const {
+            'value': {'title': 'Move target', 'isBookmarked': false},
+          },
+          apply: f.runtime.projector.apply,
+        );
+        await f.runtime.store.writeLocal(
+          actorId: actor,
+          documentId: notebook.uid,
+          pageId: source,
+          objectId: 'local-move-stroke',
+          kind: OperationKind.strokeCreate,
+          payload: const {
+            'value': {
+              'objectType': 'stroke',
+              'colorValue': 0xFF224466,
+              'width': 2.0,
+              'toolIndex': 0,
+              'sortIndex': 0,
+              'points': [
+                [1.0, 2.0, 0.5],
+              ],
+            },
+          },
+          apply: f.runtime.projector.apply,
+        );
+        await f.runtime.engine.syncNow();
+        final local = await f.runtime.store.writeLocal(
+          actorId: actor,
+          documentId: notebook.uid,
+          pageId: source,
+          objectId: 'local-move-stroke',
+          kind: OperationKind.objectMove,
+          payload: const {'toPageId': 'local-move-target', 'sortIndex': 0},
+          apply: f.runtime.projector.apply,
+        );
+        f.rejectPosts = true;
+        final expectedCursor = f.accepted.length + 1;
+        final title = OperationEnvelope(
+          operationId: '00000000-0000-4000-8000-00000000c002',
+          actorId: 'metadata-peer',
+          actorSeq: 1,
+          logicalClock: local.logicalClock + 1,
+          dependencies: [f.accepted.last['operationId'] as String],
+          documentId: notebook.uid,
+          objectId: deleteTarget ? 'local-move-target' : source,
+          kind: deleteTarget ? OperationKind.pageDelete : OperationKind.pageSet,
+          payload: deleteTarget
+              ? const {}
+              : const {
+                  'properties': {'title': 'Remote title'},
+                },
+        );
+        f.accepted.add(title.toJson());
+        await f.runtime.engine.syncNow();
+        final saved = (await f.repository.getNotebook(notebook.uid))!;
+        expect(saved.pages.first.inkStrokes, isEmpty);
+        if (deleteTarget) {
+          expect(saved.pages.single.id, source);
+          expect(
+            await f.runtime.store.wasObjectDeleted(
+              documentId: notebook.uid,
+              objectId: local.objectId!,
+            ),
+            isTrue,
+          );
+          final archive =
+              jsonDecode((await f.runtime.recoveryReport())!) as Map;
+          final preserved =
+              (archive['concurrentDeletes'] as List).single as Map;
+          expect(preserved['notebook_json'], contains('local-move-stroke'));
+          expect(preserved['local_json'], contains(local.operationId));
+        } else {
+          expect(saved.pages, hasLength(2));
+          expect(saved.pages.first.title, 'Remote title');
+          expect(saved.pages.last.inkStrokes.single.id, 'local-move-stroke');
+        }
+        expect(
+          await f.runtime.store.checkpoint('account:startup-account'),
+          expectedCursor,
+        );
+        expect(
+          (await f.runtime.store.pending(
+            includeDeferred: true,
+          )).map((op) => op.operationId),
+          [local.operationId],
+        );
       },
-      apply: f.runtime.projector.apply,
     );
-    await f.runtime.store.writeLocal(
-      actorId: actor,
-      documentId: notebook.uid,
-      pageId: source,
-      objectId: 'local-move-stroke',
-      kind: OperationKind.strokeCreate,
-      payload: const {
-        'value': {
-          'objectType': 'stroke',
-          'colorValue': 0xFF224466,
-          'width': 2.0,
-          'toolIndex': 0,
-          'sortIndex': 0,
-          'points': [
-            [1.0, 2.0, 0.5],
-          ],
-        },
-      },
-      apply: f.runtime.projector.apply,
-    );
-    await f.runtime.engine.syncNow();
-    final local = await f.runtime.store.writeLocal(
-      actorId: actor,
-      documentId: notebook.uid,
-      pageId: source,
-      objectId: 'local-move-stroke',
-      kind: OperationKind.objectMove,
-      payload: const {'toPageId': 'local-move-target', 'sortIndex': 0},
-      apply: f.runtime.projector.apply,
-    );
-    f.rejectPosts = true;
-    final expectedCursor = f.accepted.length + 1;
-    final title = OperationEnvelope(
-      operationId: '00000000-0000-4000-8000-00000000c002',
-      actorId: 'metadata-peer',
-      actorSeq: 1,
-      logicalClock: local.logicalClock + 1,
-      dependencies: [f.accepted.last['operationId'] as String],
-      documentId: notebook.uid,
-      objectId: source,
-      kind: OperationKind.pageSet,
-      payload: const {
-        'properties': {'title': 'Remote title'},
-      },
-    );
-    f.accepted.add(title.toJson());
-    await f.runtime.engine.syncNow();
-    final saved = (await f.repository.getNotebook(notebook.uid))!;
-    expect(saved.pages, hasLength(2));
-    expect(saved.pages.first.title, 'Remote title');
-    expect(saved.pages.first.inkStrokes, isEmpty);
-    expect(saved.pages.last.inkStrokes.single.id, 'local-move-stroke');
-    expect(
-      await f.runtime.store.checkpoint('account:startup-account'),
-      expectedCursor,
-    );
-    expect(
-      (await f.runtime.store.pending(
-        includeDeferred: true,
-      )).map((op) => op.operationId),
-      [local.operationId],
-    );
-  });
+  }
 
   test('offline notebook title survives older remote rank', () async {
     final f = _Fixture(NativeDatabase.memory());

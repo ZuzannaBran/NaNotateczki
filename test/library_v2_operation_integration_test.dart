@@ -19,6 +19,8 @@ import 'package:program/features/library/presentation/library_controller.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:program/features/notebook/domain/notebook.dart';
 
+import 'support/native_test_documents.dart';
+
 class _NoNetworkGateway implements OperationGateway {
   @override
   Future<List<OperationReceipt>> send(
@@ -60,6 +62,7 @@ class _FailSecondMetadataRepository extends NotebookRepository {
 }
 
 void main() {
+  useIsolatedNativeTestDocuments();
   TestWidgetsFlutterBinding.ensureInitialized();
 
   tearDown(() {
@@ -67,6 +70,79 @@ void main() {
     textStorageWriteOverride = null;
     ActiveStorageNamespace.activate(StorageNamespace.local());
   });
+
+  test(
+    'legacy library deltas keep newer fields and archived deletions',
+    () async {
+      const user = 'historical-library';
+      ActiveStorageNamespace.activate(StorageNamespace.account(user));
+      final db = NotesDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final store = OperationStore(db);
+      final engine = SyncEngine(
+        store: store,
+        gateway: _NoNetworkGateway(),
+        actorId: 'offline',
+        checkpointScope: 'account:$user',
+        enableRealtime: false,
+        applyRemote: (operation, pending) async {},
+      );
+      addTearDown(engine.dispose);
+      final library = LibraryV2OperationService(
+        engine: engine,
+        accountId: user,
+      );
+      await library.createFolder('Shared');
+      await library.createFolder('RemoteOnly');
+      await library.createTask('planner', {
+        'id': 'task-live',
+        'title': 'Remote title',
+      }, 0);
+      await library.createTask('planner', {
+        'id': 'task-deleted',
+        'title': 'Old',
+      }, 1);
+      await library.deleteTask('task-deleted');
+      final base = {
+        'folders': ['Shared'],
+        'plannerTasks': {
+          'planner': [
+            {'id': 'task-live', 'title': 'Base title'},
+            {'id': 'task-deleted', 'title': 'Old'},
+          ],
+        },
+      };
+      final local = {
+        'folders': ['Shared', 'Shared/Offline'],
+        'plannerTasks': {
+          'planner': [
+            {'id': 'task-live', 'title': 'Base title', 'completed': true},
+            {'id': 'task-deleted', 'title': 'Offline edit'},
+          ],
+        },
+      };
+      final snapshot = await library.snapshot();
+      List<String>? conflicts;
+      await library.replayLegacyMetadata(
+        base: base,
+        local: local,
+        cutover: snapshot.value,
+        protectedFolders: {},
+        onCommitted: (items) async => conflicts = items,
+      );
+      final after = await library.snapshot();
+      expect(
+        after.folderIdsByPath.keys,
+        containsAll(['Shared/Offline', 'RemoteOnly']),
+      );
+      final task =
+          (after.value['plannerTasks']['planner'] as List).single as Map;
+      expect(task['title'], 'Remote title');
+      expect(task['completed'], isTrue);
+      expect(conflicts!.single, contains('task-deleted'));
+      expect(await library.wasTaskDeleted('task-deleted'), isTrue);
+    },
+  );
 
   test('planner, folder subtree and task changes use the v2 journal', () async {
     const user = 'v2-integration-account';

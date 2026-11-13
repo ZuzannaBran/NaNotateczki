@@ -89,9 +89,12 @@ nie zależą przyczynowo od siebie i mają poprawne `toPageId`/`sortIndex`.
 Rozstrzyga trwały ranking `(logicalClock, actorId, actorSeq, operationId)`;
 przegrana operacja zachowuje kopertę, nie przenosi obiektu z powrotem.
 Test regresyjny odtwarza dwa lokalne plikowe SQLite i restart.
-Ruch versus `page.delete` źródła/docelowej strony nadal nie jest
-automatycznie scalany, bo usunięcie kontenera nie jest przemienne;
-jego błąd pozostaje jawny i nie może usunąć outboxu.
+Gdy `page.delete` usuwa stronę docelową, jej usunięcie wygrywa w obu
+kolejnościach dostarczenia. Przeniesiony obiekt dostaje tombstone UID,
+a lokalny ruch zachowuje swoją kopertę i odzyskiwalną kopię treści.
+SQLite, API i otwarty edytor nie odtwarzają obiektu na stronie źródłowej.
+Usunięcie strony źródłowej i niejednoznaczne kolizje nadal nie są
+automatycznie scalane i nie mogą usuwać outboxu.
 
 Weryfikacja na Ubuntu wymaga podpisanych pakietów: skrypt CI
 `install_linux_prerequisites.sh` próbuje najpierw niezależne HTTPS

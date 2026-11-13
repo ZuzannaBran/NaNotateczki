@@ -705,10 +705,6 @@ class EditorSqliteProjector {
     }
 
     await _pageExists(op, sourceId);
-    await _pageExists(op, destinationId);
-    if (await _store.isTombstoned(op.documentId, 'page', destinationId)) {
-      throw StateError('Destination page has been tombstoned.');
-    }
     final ink = await _row(
       'SELECT page_uid, sort_index FROM ink_stroke_rows WHERE uid = ?',
       [Variable<String>(op.objectId!)],
@@ -738,6 +734,18 @@ class EditorSqliteProjector {
       }
     }
     await _pageExists(op, actualSourceId);
+    if (await _store.isTombstoned(op.documentId, 'page', destinationId)) {
+      await _deleteObject(
+        OperationEnvelope.fromJson({
+          ...op.toJson(),
+          'type': OperationKind.objectDelete.wireName,
+          'pageId': actualSourceId,
+          'payload': <String, dynamic>{},
+        }),
+      );
+      return;
+    }
+    await _pageExists(op, destinationId);
     final sourceAssetKey = 'page:${jsonEncode([actualSourceId, op.objectId])}';
     final destinationAssetKey =
         'page:${jsonEncode([destinationId, op.objectId])}';

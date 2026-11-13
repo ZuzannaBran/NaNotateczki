@@ -5,10 +5,12 @@ import 'package:drift/drift.dart';
 
 import '../../core/storage/text_storage.dart';
 import '../../features/editor/state/editor_v2_operation_writer.dart';
+import '../../features/notebook/data/notebook_repository.dart';
 import '../../features/notebook/domain/note_page.dart';
 import '../../features/notebook/domain/notebook.dart';
-import '../../features/notebook/data/notebook_repository.dart';
+import 'account_settings_sync_service.dart';
 import 'api_client.dart';
+import 'library_v2_operation_service.dart';
 import 'live_web_sync_service.dart';
 import 'notebook_merge.dart';
 import 'operation_protocol.dart';
@@ -146,14 +148,16 @@ class LegacyV2ProjectionCutover {
       if (library != null &&
           library.isNotEmpty &&
           !_equivalentLibrary(jsonDecode(library), remoteLibrary)) {
+        final base = await AccountSettingsSyncService.readLegacyLibraryBase(
+          accountId,
+        );
         await database.customStatement(
           'INSERT INTO legacy_v1_cutover_intents '
-          "(uid, base_json, local_json, state, reason) VALUES (?, ?, ?, 'conflict', ?)",
+          "(uid, base_json, local_json, state) VALUES (?, ?, ?, 'pending')",
           [
             OperationEnvelope.libraryDocumentId,
-            remoteLibrary == null ? null : jsonEncode(remoteLibrary),
+            base == null ? null : jsonEncode(base),
             library,
-            'Legacy folder or task edits need review.',
           ],
         );
       }
@@ -208,18 +212,25 @@ class LegacyV2ProjectionCutover {
   Future<void> replayPending({
     required EditorV2OperationWriter writer,
     required OperationStore store,
+    LibraryV2OperationService? library,
   }) async {
     await _createQueue();
     final db = repository.database;
     final rows = await db
         .customSelect(
           'SELECT uid, base_json, local_json FROM legacy_v1_cutover_intents '
-          "WHERE state = 'pending' ORDER BY uid",
+          "WHERE state = 'pending' ORDER BY uid = '@library', uid",
         )
         .get();
     for (final row in rows) {
       _assertCurrent();
       final uid = row.read<String>('uid');
+      if (uid == OperationEnvelope.libraryDocumentId) {
+        if (library != null) {
+          await _replayLibrary(library, row);
+        }
+        continue;
+      }
       final rawBase = row.readNullable<String>('base_json');
       final rawLocal = row.readNullable<String>('local_json');
       final base = rawBase == null
@@ -338,6 +349,56 @@ class LegacyV2ProjectionCutover {
           );
         });
       }
+    }
+  }
+
+  Future<void> _replayLibrary(
+    LibraryV2OperationService library,
+    QueryRow row,
+  ) async {
+    final rawBase = row.readNullable<String>('base_json');
+    final rawLocal = row.read<String>('local_json');
+    final database = repository.database;
+    final receipt = await database
+        .customSelect(
+          'SELECT library_json FROM legacy_v1_projection_cutover WHERE account_id = ?',
+          variables: [Variable<String>(accountId)],
+        )
+        .getSingle();
+    final rawServer = receipt.readNullable<String>('library_json');
+    final archived = rawServer == null ? null : jsonDecode(rawServer);
+    Future<void> mark(List<String> conflicts) async {
+      _assertCurrent();
+      await database.customStatement(
+        'UPDATE legacy_v1_cutover_intents SET state = ?, reason = ? WHERE uid = ?',
+        [
+          conflicts.isEmpty ? 'converted' : 'conflict',
+          conflicts.isEmpty ? null : conflicts.join('\n'),
+          OperationEnvelope.libraryDocumentId,
+        ],
+      );
+    }
+
+    final notebooks = await repository.fetchNotebooks();
+    if (repository.lastFetchSkippedCorruptRows) {
+      throw StateError('Cannot protect folders with unreadable v2 notebooks.');
+    }
+    try {
+      await library.replayLegacyMetadata(
+        base: rawBase == null ? null : jsonDecode(rawBase),
+        local: jsonDecode(rawLocal),
+        cutover: archived,
+        protectedFolders: notebooks.map((note) => note.folder).toSet(),
+        onCommitted: mark,
+      );
+    } on FormatException {
+      await mark([
+        'Invalid legacy folder or task data. The original values were kept.',
+      ]);
+    } on TypeError {
+      await mark([
+        'Invalid legacy folder or task shape. The original values were kept.',
+      ]);
     }
   }
 

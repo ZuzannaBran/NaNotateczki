@@ -135,9 +135,12 @@ ma tombstone. Lokalna edycja może być scalona z niezależnym polem
 serwera. Przy kolizji lub nowszej wersji zdalnej nie wykonuje się
 nieodwracalnego usunięcia ani nie wskrzesza dokumentu. Użytkownik
 może skopiować dane odzyskiwania i jawnie odtworzyć zachowaną treść
-jako nową notatkę. Konflikty biblioteki i brak niektórych starszych
-formatów nie są automatycznie konwertowane. Pozostają w archiwum
-do przejrzenia. Nadal należy zsynchronizować wszystkie znane klienty
+jako nową notatkę. Foldery i zadania są scalane względem ostatniej
+potwierdzonej wartości v1 po odtworzeniu notatek. Zapis zgodnych zmian
+i oznaczenie wyniku są atomowe. Nowsze pola serwera i tombstones
+pozostają nietknięte. Kolizje, brak wiarygodnego punktu odniesienia
+i nieobsługiwane formaty zostają w archiwum do przejrzenia.
+Nadal należy zsynchronizować wszystkie znane klienty
 przed produkcyjną aktywacją, szczególnie outboxy gości Share.
 
 Świeży, pusty identyfikator testowy nadal obsługuje

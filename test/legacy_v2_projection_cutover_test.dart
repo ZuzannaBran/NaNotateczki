@@ -5,6 +5,8 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:program/core/storage/active_storage_namespace.dart';
+import 'package:program/core/storage/storage_namespace_manager.dart';
 import 'package:program/core/storage/text_storage.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/data/sync/api_client.dart';
@@ -25,6 +27,9 @@ void main() {
   late Map<String, dynamic> local;
   late Map<String, dynamic> remote;
   late Map<String, dynamic> state;
+  Map<String, dynamic>? localLibrary;
+  Map<String, dynamic>? baseLibrary;
+  Map<String, dynamic>? remoteLibrary;
   late ApiClient api;
   late LegacyV2ProjectionCutover cutover;
   var available = true;
@@ -45,15 +50,28 @@ void main() {
       'revisions': {notebook.uid: 2},
       'pending': <String>[],
     };
-    textStorageReadOverride = (key) async =>
-        key.startsWith('server_sync_state_') ? jsonEncode(state) : null;
+    localLibrary = baseLibrary = remoteLibrary = null;
+    textStorageReadOverride = (key) async {
+      if (key.startsWith('server_sync_state_')) return jsonEncode(state);
+      if (key.startsWith('account_settings_cursor_') && baseLibrary != null) {
+        return jsonEncode({
+          'settings': {
+            'libraryState': {'revision': 1, 'value': baseLibrary},
+          },
+        });
+      }
+      if (key == 'library_folders.json' && localLibrary != null) {
+        return jsonEncode(localLibrary);
+      }
+      return null;
+    };
     current = available = true;
     requests = 0;
     api = ApiClient(
       baseUri: Uri.parse('https://api.example.test'),
       httpClient: MockClient((request) async {
         if (request.url.path == '/v2/activation/legacy-library') {
-          return http.Response(jsonEncode({'library': null}), 200);
+          return http.Response(jsonEncode({'library': remoteLibrary}), 200);
         }
         expect(request.url.path, '/v2/activation/legacy-source');
         expect(request.url.queryParameters, {
@@ -80,9 +98,72 @@ void main() {
 
   tearDown(() async {
     textStorageReadOverride = null;
+    ActiveStorageNamespace.activate(StorageNamespace.local());
     api.close();
     await database.close();
   });
+
+  test(
+    'legacy library receipt queues and replays offline changes once',
+    () async {
+      ActiveStorageNamespace.activate(StorageNamespace.account('account-1'));
+      baseLibrary = {'folders': <String>[]};
+      localLibrary = {
+        'folders': ['Offline folder'],
+      };
+      remoteLibrary = {
+        'folders': ['Remote folder'],
+      };
+      await cutover.prepare(receipt);
+      final runtime = EditorV2AccountRuntime(
+        repository: repository,
+        apiClient: api,
+        accountId: 'account-1',
+        actorId: 'migration-test',
+        enableRealtime: false,
+      );
+      addTearDown(runtime.dispose);
+      final converted = OperationEnvelope.fromJson({
+        'schemaVersion': 1,
+        'operationId': const Uuid().v4(),
+        'actorId': 'v1-cutover:library',
+        'actorSeq': 1,
+        'logicalClock': 1,
+        'documentId': OperationEnvelope.libraryDocumentId,
+        'objectId': const Uuid().v4(),
+        'type': 'folder.create',
+        'dependencies': <String>[],
+        'payload': {
+          'value': {'name': 'Remote folder', 'parentId': null},
+        },
+      });
+      await runtime.store.applyRemote(
+        converted,
+        serverSequence: 90,
+        checkpointScope: 'account:account-1',
+        apply: () => runtime.libraryOperations.apply(converted),
+      );
+      Future<void> replay() => cutover.replayPending(
+        writer: runtime.writer,
+        store: runtime.store,
+        library: runtime.libraryOperations,
+      );
+      await replay();
+      final queued = (await runtime.store.pending()).single;
+      expect(queued.kind, OperationKind.folderCreate);
+      expect(
+        (await runtime.libraryOperations.snapshot()).folderIdsByPath.keys,
+        unorderedEquals(['Remote folder', 'Offline folder']),
+      );
+      await cutover.prepare(receipt);
+      await replay();
+      expect(
+        (await runtime.store.pending()).single.operationId,
+        queued.operationId,
+      );
+      expect(await cutover.conflicts(), isEmpty);
+    },
+  );
 
   test(
     'archives original rows atomically and resumes without replacing v2',

@@ -468,6 +468,22 @@ class OperationStore {
     }
     // The server may accept an old concurrent edit as an ignored no-op.
     // Record its actor sequence and cursor without resurrecting the target.
+    final pageMoveTombstones =
+        !deleted && entry.kind == OperationKind.pageDelete
+        ? await _movedObjectsOnPage(entry.documentId, entry.objectId!)
+        : const <String>[];
+    final deletedMoveDestination =
+        !deleted &&
+        entry.kind == OperationKind.objectMove &&
+        entry.payload['toPageId'] is String &&
+        await isTombstoned(
+          entry.documentId,
+          'page',
+          entry.payload['toPageId'] as String,
+        );
+    if (deletedMoveDestination && source == 'local') {
+      throw StateError('Cannot move into a deleted page.');
+    }
     if (!deleted) {
       await apply();
     }
@@ -510,9 +526,60 @@ class OperationStore {
     }
     if (!deleted) {
       await _writeTombstone(entry);
+      for (final uid in pageMoveTombstones) {
+        await _writeMoveTombstone(entry, entry.objectId!, uid);
+      }
+      if (deletedMoveDestination &&
+          !await _hasLiveObject(entry.documentId, entry.objectId!)) {
+        await _writeMoveTombstone(
+          entry,
+          entry.payload['toPageId'] as String,
+          entry.objectId!,
+        );
+      }
     }
     return true;
   }
+
+  Future<bool> _hasLiveObject(String document, String uid) async {
+    return await _row(
+          'SELECT 1 FROM (SELECT uid, page_uid FROM ink_stroke_rows UNION ALL '
+          'SELECT uid, page_uid FROM image_block_rows UNION ALL '
+          'SELECT uid, page_uid FROM text_block_rows) live '
+          'JOIN page_rows p ON p.uid = live.page_uid '
+          'WHERE p.notebook_uid = ? AND live.uid = ? LIMIT 1',
+          [document, uid],
+        ) !=
+        null;
+  }
+
+  Future<List<String>> _movedObjectsOnPage(String document, String page) async {
+    final result = await database
+        .customSelect(
+          'SELECT live.uid FROM ('
+          'SELECT uid, page_uid FROM ink_stroke_rows UNION ALL '
+          'SELECT uid, page_uid FROM image_block_rows UNION ALL '
+          'SELECT uid, page_uid FROM text_block_rows'
+          ') live JOIN page_rows p ON p.uid = live.page_uid '
+          'WHERE p.notebook_uid = ? AND p.uid = ? AND EXISTS ('
+          "SELECT 1 FROM operations o WHERE o.document_id = p.notebook_uid "
+          "AND o.object_id = live.uid AND o.kind = 'object.move')",
+          variables: [Variable<String>(document), Variable<String>(page)],
+        )
+        .get();
+    return [for (final row in result) row.read<String>('uid')];
+  }
+
+  Future<void> _writeMoveTombstone(
+    OperationEnvelope entry,
+    String page,
+    String uid,
+  ) => database.customStatement(
+    'INSERT INTO object_tombstones '
+    '(document_id, target_kind, page_id, object_id, operation_id) '
+    "VALUES (?, 'object', ?, ?, ?) ON CONFLICT DO NOTHING",
+    [entry.documentId, page, uid, entry.operationId],
+  );
 
   Future<bool> _isDeletedTarget(OperationEnvelope entry) async {
     final document = entry.documentId;

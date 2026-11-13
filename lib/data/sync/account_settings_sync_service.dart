@@ -421,6 +421,26 @@ class AccountSettingsSyncService {
   static String _hash(String userId) =>
       sha256.convert(utf8.encode(userId)).toString().substring(0, 16);
 
+  /// The last server-acknowledged library value on this legacy device.
+  static Future<Map<String, dynamic>?> readLegacyLibraryBase(
+    String userId,
+  ) async {
+    final raw = await readStoredText(_checkpointKey(userId));
+    if (raw == null) {
+      return null;
+    }
+    final state = _object(jsonDecode(raw));
+    final settings = state['settings'];
+    final entry = settings is Map ? settings['libraryState'] : null;
+    if (entry == null) {
+      return null;
+    }
+    if (entry is! Map || entry['revision'] is! int || entry['value'] is! Map) {
+      throw const FormatException('Invalid legacy library revision receipt.');
+    }
+    return Map<String, dynamic>.from(entry['value'] as Map);
+  }
+
   static String _checkpointKey(String userId) =>
       'account_settings_cursor_${_hash(userId)}.json';
 

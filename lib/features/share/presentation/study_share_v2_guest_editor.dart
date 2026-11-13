@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../data/drift/notes_database.dart';
@@ -13,6 +15,7 @@ import '../../../data/sync/operation_store.dart';
 import '../../../data/sync/share_ink_preview_codec.dart';
 import '../../../data/sync/persistent_share_actor.dart';
 import '../../../data/sync/sync_engine.dart';
+import '../../../data/sync/v2_delete_conflict_archive.dart';
 import '../../../data/sync/v2_outbox_conflict_policy.dart';
 import '../../../data/sync/verified_editor_asset_buffer.dart';
 import '../../board/presentation/board_screen.dart';
@@ -68,6 +71,7 @@ class _StudyShareV2GuestEditorState extends State<StudyShareV2GuestEditor> {
   bool _starting = false;
   String? _error;
   bool _needsRejoin = false;
+  bool _hasRecovery = false;
 
   @override
   void initState() {
@@ -134,9 +138,22 @@ class _StudyShareV2GuestEditorState extends State<StudyShareV2GuestEditor> {
         shareId: widget.shareId,
         guestTicket: widget.ticket,
         applyRemote: (operation, pendingLocal) async {
-          if (operation.documentId != widget.documentUid ||
-              !V2OutboxConflictPolicy.canApply(operation, pendingLocal)) {
-            throw StateError('Shared edit awaits an operational rebase.');
+          if (operation.documentId != widget.documentUid) {
+            throw StateError('Guest operation escaped the invitation scope.');
+          }
+          if (!V2OutboxConflictPolicy.canApply(operation, pendingLocal)) {
+            if (!V2OutboxConflictPolicy.canArchiveMoveDestinationDelete(
+              operation,
+              pendingLocal,
+            )) {
+              throw StateError('Shared edit awaits an operational rebase.');
+            }
+            await V2DeleteConflictArchive.archive(
+              operation,
+              pendingLocal,
+              repository: repository,
+              projector: projector,
+            );
           }
           await projector.apply(operation);
         },
@@ -196,12 +213,14 @@ class _StudyShareV2GuestEditorState extends State<StudyShareV2GuestEditor> {
         );
       };
       await editor.historyReady;
+      final archived = await V2DeleteConflictArchive.read(repository);
       if (_closed || !mounted) {
         return;
       }
       setState(() {
         _error = null;
         _needsRejoin = false;
+        _hasRecovery = archived.isNotEmpty;
       });
       engine.requestSync();
     } catch (error) {
@@ -231,6 +250,24 @@ class _StudyShareV2GuestEditorState extends State<StudyShareV2GuestEditor> {
         repository: repository,
       ).onRemoteCommitted(operation);
     }
+    if (operation.kind == OperationKind.pageDelete && !_hasRecovery) {
+      final archived = await V2DeleteConflictArchive.read(repository);
+      if (archived.isNotEmpty && mounted && !_closed) {
+        setState(() => _hasRecovery = true);
+      }
+    }
+  }
+
+  Future<void> _copyRecovery() async {
+    final repository = _repository;
+    if (repository == null) return;
+    final archived = await V2DeleteConflictArchive.read(repository);
+    if (archived.isEmpty || _closed || !mounted) return;
+    await Clipboard.setData(
+      ClipboardData(
+        text: jsonEncode({'version': 1, 'concurrentDeletes': archived}),
+      ),
+    );
   }
 
   void _onSharePreview(Map<String, dynamic> message) {
@@ -351,6 +388,19 @@ class _StudyShareV2GuestEditorState extends State<StudyShareV2GuestEditor> {
     final editor = _editor;
     return Column(
       children: [
+        if (_hasRecovery)
+          TextButton(
+            onPressed: () async {
+              try {
+                await _copyRecovery();
+              } catch (_) {
+                if (mounted && !_closed) {
+                  setState(() => _error = 'Cannot copy the saved edits.');
+                }
+              }
+            },
+            child: const Text('Copy saved edits from a deleted page'),
+          ),
         if (_error != null)
           Padding(
             padding: const EdgeInsets.all(12),

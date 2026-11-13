@@ -956,7 +956,11 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       if (!isCurrent()) {
         return;
       }
-      await cutover.replayPending(writer: runtime.writer, store: runtime.store);
+      await cutover.replayPending(
+        writer: runtime.writer,
+        store: runtime.store,
+        library: runtime.libraryOperations,
+      );
       if (!await runtime.startForCurrentAccount(isCurrent: isCurrent)) {
         return;
       }

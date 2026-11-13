@@ -7,7 +7,6 @@ import '../../features/editor/state/editor_v2_operation_writer.dart';
 import '../../features/editor/state/editor_v2_remote_patch_dispatcher.dart';
 import '../../features/notebook/data/notebook_repository.dart';
 import '../../features/notebook/domain/note_page.dart';
-import '../../features/notebook/domain/notebook.dart';
 import 'api_client.dart';
 import 'editor_sqlite_projector.dart';
 import 'operation_asset_gateway.dart';
@@ -18,6 +17,7 @@ import 'operation_store.dart';
 import 'share_ink_preview_codec.dart';
 import 'sync_engine.dart';
 import 'verified_editor_asset_buffer.dart';
+import 'v2_delete_conflict_archive.dart';
 import 'v2_outbox_conflict_policy.dart';
 
 /// Owns the operational editor journal for one confirmed v2 account.
@@ -80,11 +80,20 @@ class EditorV2AccountRuntime {
                   V2OutboxConflictPolicy.canArchiveObjectDelete(
                     operation,
                     pendingLocal,
-                  ));
+                  )) ||
+              V2OutboxConflictPolicy.canArchiveMoveDestinationDelete(
+                operation,
+                pendingLocal,
+              );
           if (!canArchiveDeletion) {
             throw StateError('Remote v2 operation awaits local outbox ACK.');
           }
-          await runtime._archiveDeleteConflict(operation, pendingLocal);
+          await V2DeleteConflictArchive.archive(
+            operation,
+            pendingLocal,
+            repository: repository,
+            projector: projector,
+          );
         }
         await projector.apply(operation);
       },
@@ -232,77 +241,6 @@ class EditorV2AccountRuntime {
   Future<void> retryBlockedOperation(String operationId) =>
       engine.retryBlockedOperation(operationId);
 
-  Future<void> _archiveDeleteConflict(
-    OperationEnvelope operation,
-    List<OperationEnvelope> pending,
-  ) async {
-    final notebook = await repository.getNotebook(operation.documentId);
-    if (notebook == null ||
-        repository.lastCorruptNotebookIds.contains(operation.documentId)) {
-      throw StateError(
-        'Cannot archive a delete conflict with an unreadable notebook.',
-      );
-    }
-    final database = repository.database;
-    await database.customStatement(
-      'CREATE TABLE IF NOT EXISTS v2_delete_conflicts ('
-      'operation_id TEXT PRIMARY KEY, document_id TEXT NOT NULL, '
-      'remote_json TEXT NOT NULL, local_json TEXT NOT NULL, notebook_json TEXT)',
-    );
-    await database.customStatement(
-      'INSERT INTO v2_delete_conflicts '
-      '(operation_id, document_id, remote_json, local_json, notebook_json) '
-      'VALUES (?, ?, ?, ?, ?)',
-      [
-        operation.operationId,
-        operation.documentId,
-        jsonEncode(operation.toJson()),
-        jsonEncode([for (final item in pending) item.toJson()]),
-        jsonEncode(await _recoveryNotebookSnapshot(notebook)),
-      ],
-    );
-  }
-
-  Future<Map<String, dynamic>> _recoveryNotebookSnapshot(
-    Notebook source,
-  ) async {
-    final pages = <NotePage>[];
-    for (final page in source.pages) {
-      final blocks = [...page.textBlocks];
-      for (var i = 0; i < blocks.length; i++) {
-        final text = blocks[i];
-        if (text.deltaJson == null) {
-          continue;
-        }
-        final delta = jsonDecode(text.deltaJson!) as List<dynamic>;
-        for (final entry in delta) {
-          final insert = (entry as Map)['insert'];
-          if (insert is! Map) {
-            continue;
-          }
-          final assetId = OperationEnvelope.embedAssetId(insert);
-          final receipt = await projector.localAssetReceipt(
-            documentId: source.uid,
-            assetId: assetId,
-          );
-          if (receipt == null) {
-            throw StateError('Cannot archive an unverified Quill attachment.');
-          }
-          final bytes = await projector.verifiedUploadBytes(receipt);
-          final mediaType = receipt['mediaType'];
-          entry['insert'] = {
-            insert.keys.single: 'data:$mediaType;base64,${base64Encode(bytes)}',
-          };
-        }
-        blocks[i] = text.copyWith(deltaJson: jsonEncode(delta));
-      }
-      pages.add(page.copyWith(textBlocks: blocks));
-    }
-    return repository.encodeSelfContainedBackup([
-      source.copyWith(pages: pages),
-    ]).single;
-  }
-
   /// Keeps an archived edit as a new document only on explicit user action.
   /// Original document IDs and tombstones never change.
   Future<void> restoreRecoveryCopies({
@@ -448,18 +386,7 @@ class EditorV2AccountRuntime {
           "WHERE x.status = 'blocked' ORDER BY o.actor_id, o.actor_seq",
         )
         .get();
-    final archive = await database
-        .customSelect(
-          "SELECT name FROM sqlite_master WHERE name = 'v2_delete_conflicts'",
-        )
-        .getSingleOrNull();
-    final deleted = archive == null
-        ? []
-        : await database
-              .customSelect(
-                'SELECT * FROM v2_delete_conflicts ORDER BY operation_id',
-              )
-              .get();
+    final deleted = await V2DeleteConflictArchive.read(repository);
     if (legacy.isEmpty && blocked.isEmpty && deleted.isEmpty) {
       return null;
     }
@@ -467,7 +394,7 @@ class EditorV2AccountRuntime {
       'version': 1,
       'legacyConflicts': [for (final row in legacy) row.data],
       'blockedOperations': [for (final row in blocked) row.data],
-      'concurrentDeletes': [for (final row in deleted) row.data],
+      'concurrentDeletes': deleted,
     });
   }
 

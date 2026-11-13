@@ -3232,6 +3232,76 @@ void main() {
     );
   });
 
+  for (final moveFirst in [false, true]) {
+    test(
+      'destination deletion converges without reusing moved UID ($moveFirst)',
+      () async {
+        const destination = 'deleted-move-target';
+        const uid = 'move-vs-page-delete';
+        final setup = await write([
+          const LocalOperationDraft(
+            kind: OperationKind.pageCreate,
+            objectId: destination,
+            payload: {
+              'value': {'title': 'Destination', 'isBookmarked': false},
+            },
+          ),
+          LocalOperationDraft(
+            kind: OperationKind.strokeCreate,
+            pageId: pageId,
+            objectId: uid,
+            payload: {'value': _stroke()},
+          ),
+        ]);
+        final move = OperationEnvelope(
+          operationId: const Uuid().v4(),
+          actorId: 'moving-peer',
+          actorSeq: 1,
+          documentId: documentId,
+          pageId: pageId,
+          objectId: uid,
+          logicalClock: 60,
+          dependencies: [setup.last.operationId],
+          kind: OperationKind.objectMove,
+          payload: const {'toPageId': destination, 'sortIndex': 1},
+        );
+        final deletion = OperationEnvelope(
+          operationId: const Uuid().v4(),
+          actorId: 'deleting-peer',
+          actorSeq: 1,
+          documentId: documentId,
+          objectId: destination,
+          logicalClock: 61,
+          dependencies: [setup.first.operationId],
+          kind: OperationKind.pageDelete,
+          payload: const {},
+        );
+        final events = moveFirst ? [move, deletion] : [deletion, move];
+        for (var i = 0; i < events.length; i++) {
+          final op = events[i];
+          await store.applyRemote(
+            op,
+            serverSequence: i + 1,
+            checkpointScope: 'move-delete',
+            apply: () => projector.apply(op),
+          );
+        }
+        final note = (await notebooks.getNotebook(documentId))!;
+        expect(note.pages.single.id, pageId);
+        expect(note.pages.single.inkStrokes, isEmpty);
+        expect(
+          await store.wasObjectDeleted(documentId: documentId, objectId: uid),
+          isTrue,
+        );
+        expect(
+          (await store.operation(move.operationId))?.toJson(),
+          move.toJson(),
+        );
+        expect(await store.checkpoint('move-delete'), 2);
+      },
+    );
+  }
+
   test(
     'late object.delete after page.delete records a safe tombstone',
     () async {

@@ -88,6 +88,37 @@ class V2OutboxConflictPolicy {
                 }.contains(local.kind)),
       );
 
+  /// The target page deletion wins over an optimistic incoming move.
+  /// Preserve the moved content before applying the page tombstone.
+  static bool canArchiveMoveDestinationDelete(
+    OperationEnvelope deletion,
+    List<OperationEnvelope> pending,
+  ) {
+    if (deletion.kind != OperationKind.pageDelete ||
+        deletion.payload.isNotEmpty) {
+      return false;
+    }
+    final page = deletion.objectId;
+    final moved = {
+      for (final op in pending)
+        if (op.kind == OperationKind.objectMove &&
+            op.documentId == deletion.documentId &&
+            op.payload['toPageId'] == page)
+          op.objectId,
+    };
+    return moved.isNotEmpty &&
+        pending.every(
+          (op) =>
+              canApply(deletion, [op]) ||
+              (op.documentId == deletion.documentId &&
+                  moved.contains(op.objectId) &&
+                  (op.kind == OperationKind.objectMove
+                      ? op.payload['toPageId'] == page
+                      : op.kind.target == OperationTarget.object &&
+                            op.pageId == page)),
+        );
+  }
+
   /// Reusing a verified immutable asset across two owners is safe.
   ///
   /// A create, embed or replacement carries no complete receipt and still

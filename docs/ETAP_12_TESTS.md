@@ -1,5 +1,22 @@
 # Etap 12 — weryfikacja zapisu i synchronizacji
 
+## Przeniesienie na usuniętą stronę i offline v1
+
+- SQLite i rzeczywiste PostgreSQL sprawdzają obie kolejności
+  `object.move` i `page.delete` strony docelowej, brak wskrzeszenia UID
+  oraz zachowanie oryginalnej koperty. Ponowienie żądania dostaje ACK
+  duplicate bez ponownego zapisu.
+- Test otwartego edytora sprawdza usunięcie obiektu z widocznej strony
+  bez zmiany aktywnej strony ani viewportu. Test klienta konta sprawdza
+  postęp checkpointu i archiwum przy niewysłanym ruchu.
+- Test biblioteki weryfikuje scalenie folderów i zadań v1 z nowszą
+  projekcją v2 bez nadpisania pól serwera i bez wskrzeszenia tombstone.
+- Runner uruchamia osobno dwa procesy Flutter z niezależnymi SQLite.
+  Oba zapisują offline zmianę tego samego UID, przesyłają oryginalne
+  koperty, zamykają i ponownie otwierają SQLite. Oba muszą odtworzyć
+  dokładnie jedną kreskę na stronie docelowej z szerokością drugiego
+  klienta. To nie zastępuje próby na fizycznych urządzeniach.
+
 ## Pakiet 1 — kontrakty operacji i PostgreSQL (2026-11-09)
 
 - Dart i Python: kompletne 300 UUID w dependencies po roundtripie

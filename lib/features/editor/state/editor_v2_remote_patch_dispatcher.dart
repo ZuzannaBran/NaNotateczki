@@ -120,32 +120,36 @@ class EditorV2RemotePatchDispatcher {
         for (final page in notebook.pages)
           if (_ownsObject(page, movedId)) page,
       ];
-      if (owners.isEmpty) {
-        final store = OperationStore(repository.database);
-        final deleted =
-            await store.wasObjectDeleted(
-              documentId: operation.documentId,
-              objectId: movedId,
-            ) ||
-            await store.isTombstoned(operation.documentId, 'page', sourceId);
-        if (deleted) {
-          // The operation store accepted a stale move as a no-op. Do not
-          // advance the UI cursor if an earlier deletion was not rendered.
-          if (editor.pages.any((page) => _ownsObject(page, movedId))) {
-            throw StateError('The editor still displays a deleted object.');
-          }
-          return;
-        }
-      }
-      if (owners.length != 1) {
-        throw StateError('Committed move has no unique SQLite target.');
-      }
       final visibleOwners = [
         for (final page in editor.pages)
           if (_ownsObject(page, movedId)) page.id,
       ];
       if (visibleOwners.length > 1) {
         throw StateError('Committed move has no unique visible source.');
+      }
+      if (owners.isEmpty) {
+        final store = OperationStore(repository.database);
+        if (await store.wasObjectDeleted(
+          documentId: operation.documentId,
+          objectId: movedId,
+        )) {
+          // A move into a deleted destination can itself delete the object.
+          if (visibleOwners.isNotEmpty) {
+            final page = _page(notebook.pages, visibleOwners.single);
+            if (page == null) {
+              throw StateError('Committed deletion awaits a page patch.');
+            }
+            _applyObject(page, movedId);
+          }
+          return;
+        }
+        if (visibleOwners.isEmpty &&
+            await store.isTombstoned(operation.documentId, 'page', sourceId)) {
+          return;
+        }
+      }
+      if (owners.length != 1) {
+        throw StateError('Committed move has no unique SQLite target.');
       }
       // Concurrent moves may share the original envelope page. Remove the
       // object from its last rendered location, including an intermediate

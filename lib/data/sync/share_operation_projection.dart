@@ -22,6 +22,7 @@ class ShareOperationProjection {
       Map<String, dynamic>.from(value);
 
   static String _pageKey(String id) => 'page:$id';
+  static String _movedObjectKey(String id) => 'moved-object:$id';
   static String _objectKey(String pageId, String objectId) =>
       'object:$pageId:$objectId';
 
@@ -82,7 +83,13 @@ class ShareOperationProjection {
         : op.pageId!;
     final pageKey = _pageKey(pageId);
     if (kind == OperationKind.pageDelete) {
-      pages.remove(pageId);
+      final removed = pages.remove(pageId) as Map?;
+      final objects = removed?['objects'] as Map?;
+      for (final entry in objects?.entries ?? const <MapEntry>[]) {
+        if ((entry.value as Map)['movedIntoPage'] == true) {
+          deleted.add(_movedObjectKey(entry.key as String));
+        }
+      }
       deleted.add(pageKey);
       return ShareOperationProjection._(next, deleted);
     }
@@ -131,7 +138,8 @@ class ShareOperationProjection {
       deleted.add(objectKey);
       return ShareOperationProjection._(next, deleted);
     }
-    if (deleted.contains(objectKey)) {
+    if (deleted.contains(objectKey) ||
+        deleted.contains(_movedObjectKey(objectId))) {
       if (kind == OperationKind.objectCreate ||
           kind == OperationKind.strokeCreate) {
         throw StateError('Deleted object cannot be recreated.');
@@ -141,10 +149,16 @@ class ShareOperationProjection {
     if (kind == OperationKind.objectMove) {
       final destinationId = op.payload['toPageId'] as String;
       final sortIndex = op.payload['sortIndex'] as int;
+      if (deleted.contains(_pageKey(destinationId))) {
+        if (!objects.containsKey(objectId)) {
+          throw StateError('Source object is not available.');
+        }
+        objects.remove(objectId);
+        deleted.add(_movedObjectKey(objectId));
+        return ShareOperationProjection._(next, deleted);
+      }
       final destination = pages[destinationId];
-      if (destination is! Map ||
-          deleted.contains(_pageKey(destinationId)) ||
-          destinationId == pageId) {
+      if (destination is! Map || destinationId == pageId) {
         throw StateError('Destination page is not available.');
       }
       final moved = objects[objectId];
@@ -159,7 +173,8 @@ class ShareOperationProjection {
           deleted.contains(_objectKey(destinationId, objectId))) {
         throw StateError('Destination identity is occupied.');
       }
-      final nextObject = Map<String, dynamic>.from(moved);
+      final nextObject = Map<String, dynamic>.from(moved)
+        ..['movedIntoPage'] = true;
       _merge(nextObject, {'sortIndex': sortIndex}, op, force: optimistic);
       objects.remove(objectId);
       destinationObjects[objectId] = nextObject;

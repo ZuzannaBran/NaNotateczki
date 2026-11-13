@@ -460,6 +460,27 @@ void main() {
     );
     expect(await store.checkpoint('remote-patch-test'), 6);
     expect(await store.pending(), isEmpty);
+
+    final visibleStroke = await remote(
+      kind: OperationKind.strokeCreate,
+      pageId: notebook.pages.first.id,
+      objectId: 'move-into-deleted-page',
+      payload: created.payload,
+    );
+    await dispatcher.onRemoteCommitted(visibleStroke);
+    expect(editor.currentPage.inkStrokes.single.id, visibleStroke.objectId);
+    editor.viewPan = const Offset(12, 34);
+    final moveToDeletedPage = await remote(
+      kind: OperationKind.objectMove,
+      pageId: notebook.pages.first.id,
+      objectId: visibleStroke.objectId!,
+      payload: const {'toPageId': 'remote-page', 'sortIndex': 0},
+    );
+    await dispatcher.onRemoteCommitted(moveToDeletedPage);
+    expect(editor.pages.expand((page) => page.inkStrokes), isEmpty);
+    expect(editor.currentPage.id, notebook.pages.first.id);
+    expect(editor.viewPan, const Offset(12, 34));
+    expect(await store.checkpoint('remote-patch-test'), clock);
   });
   test('remote document set/delete cannot block v2 UI delivery', () async {
     final database = NotesDatabase(NativeDatabase.memory());

@@ -168,8 +168,10 @@ testy: `test/v2_outbox_conflict_policy_test.dart` oraz
 
 Regresja rebase (2026-11-11):
 `V2OutboxConflictPolicy` dopuszcza `object.move` przy tworzeniu/usuwaniu
-niepowiązanej strony, lecz blokuje operacje dotyczące strony źródłowej
-lub docelowej. Test: `test/v2_outbox_conflict_policy_test.dart`.
+niepowiązanej strony. Usunięcie strony docelowej wygrywa po zapisaniu
+archiwum, a usunięcie strony źródłowej pozostaje przypadkiem zachowawczym.
+Testy: `test/editor_v2_account_startup_test.dart` i
+`test/editor_v2_remote_patch_dispatcher_test.dart`.
 
 Regresja kompaktacji (2026-11-10):
 `test/operation_store_test.dart` weryfikuje, że brak trwałego kursora
@@ -3636,10 +3638,13 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   0015: dry-run, deterministyczny dziennik v2, trwały receipt i blokada v1.
 - `lib/data/sync/legacy_v2_projection_cutover.dart`: potwierdzenie rewizji,
   transakcyjne archiwum SQLite i kolejka intencji offline, odbudowa przez
-  SyncEngine, bezkolizyjne operacje v2 po osiągnięciu checkpointu.
-  `EditorV2AccountRuntime` archiwizuje także konflikt z potwierdzonym
-  zdalnym usunięciem oraz udostępnia raport i jawne odtworzenie kopii. Regresje w `test/legacy_v2_projection_cutover_test.dart`
+  SyncEngine i scalenie offline notatek, folderów oraz zadań na bazie
+  ostatniej potwierdzonej wersji po osiągnięciu checkpointu. Regresje w
+  `test/legacy_v2_projection_cutover_test.dart`
   i `server/api/tests/test_stage12_real_stack.py`.
+- `lib/data/sync/v2_delete_conflict_archive.dart`: konto i gość Share
+  zachowują oryginalne koperty oraz kopię treści z mediami przed
+  potwierdzonym usunięciem. Konto umożliwia też odtworzenie nowej kopii.
 - `docs/ETAP_11_MIGRATION.md`: procedura testowa i granice weryfikacji.
   Nie uruchomiono produkcyjnego cutover.
 
@@ -3668,6 +3673,9 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   bez testu gestów UI na dwóch fizycznych urządzeniach. Job
   `v2-controller-e2e` uruchamia runner w Xvfb, także po markerach
   `[ci:failed-only] [ci:v2-e2e]`; nowy wynik wymaga potwierdzenia.
+- `test/stage12_two_process_live_test.dart`: runner uruchamia osobne
+  procesy Flutter z trwałymi SQLite. Sprawdza niezależny ruch i edycję
+  kreski offline, ACK oryginalnych kopert i konwergencję po restarcie.
 - Etap 13: `server/migrations/0013_account_protocol_fence.sql`,
   `server/api/app/account_protocol.py`, `server/scripts/stage13-activate-empty-canary.sh`
   — trwałe, domyślnie v1, nieodwracalne przełączenie WYŁĄCZNIE pustego
