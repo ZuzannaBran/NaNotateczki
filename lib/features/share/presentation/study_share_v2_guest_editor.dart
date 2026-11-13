@@ -17,7 +17,6 @@ import '../../../data/sync/share_ink_preview_codec.dart';
 import '../../../data/sync/study_share_service.dart';
 import '../../../data/sync/sync_engine.dart';
 import '../../../data/sync/v2_delete_conflict_archive.dart';
-import '../../../data/sync/v2_outbox_conflict_policy.dart';
 import '../../../data/sync/verified_editor_asset_buffer.dart';
 import '../../board/presentation/board_screen.dart';
 import '../../editor/state/editor_controller.dart';
@@ -142,25 +141,17 @@ class _StudyShareV2GuestEditorState extends State<StudyShareV2GuestEditor> {
         apiClient: api,
         shareId: widget.shareId,
         guestTicket: widget.ticket,
-        applyRemote: (operation, pendingLocal) async {
+        applyRemoteAtCursor: (operation, pendingLocal, cursor) async {
           if (operation.documentId != widget.documentUid) {
             throw StateError('Guest operation escaped the invitation scope.');
           }
-          if (!V2OutboxConflictPolicy.canApply(operation, pendingLocal)) {
-            if (!V2OutboxConflictPolicy.canArchiveMoveDestinationDelete(
-              operation,
-              pendingLocal,
-            )) {
-              throw StateError('Shared edit awaits an operational rebase.');
-            }
-            await V2DeleteConflictArchive.archive(
-              operation,
-              pendingLocal,
-              repository: repository,
-              projector: projector,
-            );
-          }
-          await projector.apply(operation);
+          await V2DeleteConflictArchive.applyRemote(
+            operation,
+            pendingLocal,
+            cursor,
+            repository: repository,
+            projector: projector,
+          );
         },
         prepareRemoteOperation: (operation) =>
             projector.prepareRemoteMedia(operation, assets),

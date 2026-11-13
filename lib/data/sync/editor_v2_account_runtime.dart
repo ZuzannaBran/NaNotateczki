@@ -18,7 +18,6 @@ import 'share_ink_preview_codec.dart';
 import 'sync_engine.dart';
 import 'verified_editor_asset_buffer.dart';
 import 'v2_delete_conflict_archive.dart';
-import 'v2_outbox_conflict_policy.dart';
 
 /// Owns the operational editor journal for one confirmed v2 account.
 ///
@@ -67,35 +66,18 @@ class EditorV2AccountRuntime {
       checkpointScope: 'account:$accountId',
       apiClient: apiClient,
       enableRealtime: enableRealtime,
-      applyRemote: (operation, pendingLocal) async {
+      applyRemoteAtCursor: (operation, pendingLocal, cursor) async {
         if (operation.documentId == OperationEnvelope.libraryDocumentId) {
           await libraryOperations.apply(operation);
           return;
         }
-        // Editor mutations never use the library projection.
-        if (!V2OutboxConflictPolicy.canApply(operation, pendingLocal)) {
-          final canArchiveDeletion =
-              operation.kind == OperationKind.documentDelete ||
-              (operation.kind == OperationKind.objectDelete &&
-                  V2OutboxConflictPolicy.canArchiveObjectDelete(
-                    operation,
-                    pendingLocal,
-                  )) ||
-              V2OutboxConflictPolicy.canArchiveMoveDestinationDelete(
-                operation,
-                pendingLocal,
-              );
-          if (!canArchiveDeletion) {
-            throw StateError('Remote v2 operation awaits local outbox ACK.');
-          }
-          await V2DeleteConflictArchive.archive(
-            operation,
-            pendingLocal,
-            repository: repository,
-            projector: projector,
-          );
-        }
-        await projector.apply(operation);
+        await V2DeleteConflictArchive.applyRemote(
+          operation,
+          pendingLocal,
+          cursor,
+          repository: repository,
+          projector: projector,
+        );
       },
       prepareRemoteOperation: (operation) =>
           projector.prepareRemoteMedia(operation, assetGateway),

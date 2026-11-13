@@ -24,6 +24,13 @@ typedef RemoteOperationReducer =
       List<OperationEnvelope> pendingLocal,
     );
 
+typedef SequencedRemoteOperationReducer =
+    Future<void> Function(
+      OperationEnvelope remote,
+      List<OperationEnvelope> pendingLocal,
+      int serverSequence,
+    );
+
 /// Notifies the editor only after a remote operation is durable in SQLite.
 /// This callback must be idempotent: a failed notification is retried on replay.
 typedef RemoteOperationCommitted =
@@ -45,7 +52,8 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     required this.gateway,
     required this.actorId,
     required this.checkpointScope,
-    required this.applyRemote,
+    this.applyRemote,
+    this.applyRemoteAtCursor,
     this.prepareRemoteOperation,
     this.prepareLocalOperations,
     this.onRemoteCommitted,
@@ -58,6 +66,9 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     this.pollInterval = const Duration(seconds: 45),
     WebSocketChannel Function(Uri)? connectRealtime,
   }) : _connectRealtime = connectRealtime ?? WebSocketChannel.connect {
+    if ((applyRemote == null) == (applyRemoteAtCursor == null)) {
+      throw ArgumentError('Exactly one remote reducer is required.');
+    }
     if (actorId.isEmpty || checkpointScope.isEmpty) {
       throw ArgumentError('An actor and isolated checkpoint are required.');
     }
@@ -84,7 +95,8 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
   final OperationGateway gateway;
   final String actorId;
   final String checkpointScope;
-  final RemoteOperationReducer applyRemote;
+  final RemoteOperationReducer? applyRemote;
+  final SequencedRemoteOperationReducer? applyRemoteAtCursor;
   final RemoteOperationPreparer? prepareRemoteOperation;
   final Future<void> Function(List<OperationEnvelope>)? prepareLocalOperations;
   final RemoteOperationCommitted? onRemoteCommitted;
@@ -477,7 +489,12 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
                   break;
                 }
               }
-              await applyRemote(item.operation, pending);
+              final sequenced = applyRemoteAtCursor;
+              if (sequenced != null) {
+                await sequenced(item.operation, pending, item.cursor);
+              } else {
+                await applyRemote!(item.operation, pending);
+              }
             },
           );
           if (!_isActive(generation)) {

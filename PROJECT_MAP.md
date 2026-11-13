@@ -1,3 +1,28 @@
+## Audyt i regresje v2 — 2026-11-13
+
+- `lib/data/sync/sync_engine.dart:49`: `SyncEngine` przyjmuje dokładnie
+  jeden reducer; `applyRemoteAtCursor` przekazuje zatwierdzoną pozycję
+  zdarzenia do wspólnej polityki usunięć konta i Share.
+- `lib/data/sync/operation_store.dart:570`: `movesAfterSourceDeletion`
+  rozróżnia ACK przed/po usunięciu strony i zachowuje pierwotny outbox.
+  Wielokrotne zatwierdzone ruchy pozostają jawnie blokowane do pełnego rebase.
+- `lib/data/sync/editor_sqlite_projector.dart:35`:
+  `removeMovesAfterSourceDeletion` usuwa tylko zweryfikowaną kopię
+  optymistyczną po zapisaniu archiwum w tej samej transakcji.
+- `lib/data/sync/v2_delete_conflict_archive.dart:14`: `applyRemote`
+  współdzieli bezstratną politykę z `editor_v2_account_runtime.dart:69`
+  i `study_share_v2_guest_editor.dart:144`.
+- `lib/features/editor/state/editor_v2_remote_patch_dispatcher.dart:107`:
+  usunięcie strony odświeża też cel unieważnionego ruchu, bez remountu.
+- `test/v2_projection_corpus_test.dart`,
+  `test/fixtures/v2_projection_corpus.json` i
+  `tool/verify_projection_corpus.py`: 37 wspólnych wyników Python/SQLite,
+  w tym Quill, PNG/PDF, tombstones, LWW, Undo i restart.
+  `test/editor_v2_account_startup_test.dart` pokrywa ACK przed/po usunięciu,
+  zachowanie kopert, odzyskiwanie i viewport.
+- `tool/check_server_mirror.py` obejmuje również pełny reset, jego regresje
+  i audit retirement. Kanoniczny serwer pozostaje źródłem prawdy.
+
 ## Stan bieżący: pakiet 11, zapis konta tylko v2
 
 - `lib/app/app_scope.dart` montuje konto dopiero po gotowości jego

@@ -103,6 +103,28 @@ class EditorV2RemotePatchDispatcher {
       if (!applied) {
         throw StateError('Committed page patch was deferred.');
       }
+      if (operation.kind == OperationKind.pageDelete) {
+        // A source deletion may also invalidate an optimistic relocation on
+        // another page. Patch those concrete pages without remounting editor.
+        for (final durable in notebook.pages) {
+          final visible = _page(editor.pages, durable.id);
+          if (visible == null) {
+            continue;
+          }
+          final ids = [
+            ...visible.inkStrokes.map((object) => object.id),
+            ...visible.textBlocks.map((object) => object.id),
+            ...visible.imageBlocks.map((object) => object.id),
+          ];
+          if (ids.any((id) => !_ownsObject(durable, id)) &&
+              !editor.applyConfirmedV2PagePatch(
+                pageId: durable.id,
+                page: durable,
+              )) {
+            throw StateError('Committed source deletion patch was deferred.');
+          }
+        }
+      }
       return;
     }
 

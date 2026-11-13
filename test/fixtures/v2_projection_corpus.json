@@ -1,0 +1,7413 @@
+[
+  {
+    "name": "scalar LWW across operation kinds/1",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000005",
+        "actorId": "actor-5",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "stroke.create",
+        "payload": {
+          "value": {
+            "objectType": "stroke",
+            "colorValue": 4279383126,
+            "width": 2.0,
+            "toolIndex": 0,
+            "sortIndex": 0,
+            "points": [
+              [
+                10.0,
+                12.0,
+                0.5
+              ]
+            ]
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 5,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000014",
+        "actorId": "alice",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.set",
+        "payload": {
+          "properties": {
+            "width": 3.5,
+            "colorValue": 4289379276
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 30,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000015",
+        "actorId": "bob",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.transform",
+        "payload": {
+          "properties": {
+            "points": [
+              [
+                20,
+                30,
+                0.7
+              ]
+            ]
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 30,
+        "pageId": "p",
+        "objectId": "ink"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {
+              "ink": {
+                "colorValue": 4289379276,
+                "width": 3.5,
+                "toolIndex": 0,
+                "sortIndex": 0,
+                "points": [
+                  [
+                    20,
+                    30,
+                    0.7
+                  ]
+                ],
+                "objectType": "stroke"
+              }
+            },
+            "order": [
+              "ink"
+            ]
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": []
+    }
+  },
+  {
+    "name": "scalar LWW across operation kinds/2",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000005",
+        "actorId": "actor-5",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "stroke.create",
+        "payload": {
+          "value": {
+            "objectType": "stroke",
+            "colorValue": 4279383126,
+            "width": 2.0,
+            "toolIndex": 0,
+            "sortIndex": 0,
+            "points": [
+              [
+                10.0,
+                12.0,
+                0.5
+              ]
+            ]
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 5,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000015",
+        "actorId": "bob",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.transform",
+        "payload": {
+          "properties": {
+            "points": [
+              [
+                20,
+                30,
+                0.7
+              ]
+            ]
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 30,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000014",
+        "actorId": "alice",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.set",
+        "payload": {
+          "properties": {
+            "width": 3.5,
+            "colorValue": 4289379276
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 30,
+        "pageId": "p",
+        "objectId": "ink"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {
+              "ink": {
+                "colorValue": 4289379276,
+                "width": 3.5,
+                "toolIndex": 0,
+                "sortIndex": 0,
+                "points": [
+                  [
+                    20,
+                    30,
+                    0.7
+                  ]
+                ],
+                "objectType": "stroke"
+              }
+            },
+            "order": [
+              "ink"
+            ]
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": []
+    }
+  },
+  {
+    "name": "same-field LWW tie/1",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000005",
+        "actorId": "actor-5",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "stroke.create",
+        "payload": {
+          "value": {
+            "objectType": "stroke",
+            "colorValue": 4279383126,
+            "width": 2.0,
+            "toolIndex": 0,
+            "sortIndex": 0,
+            "points": [
+              [
+                10.0,
+                12.0,
+                0.5
+              ]
+            ]
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 5,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000016",
+        "actorId": "alice",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.set",
+        "payload": {
+          "properties": {
+            "width": 4
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 30,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000017",
+        "actorId": "zed",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.set",
+        "payload": {
+          "properties": {
+            "width": 5
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 30,
+        "pageId": "p",
+        "objectId": "ink"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {
+              "ink": {
+                "colorValue": 4279383126,
+                "width": 5,
+                "toolIndex": 0,
+                "sortIndex": 0,
+                "points": [
+                  [
+                    10.0,
+                    12.0,
+                    0.5
+                  ]
+                ],
+                "objectType": "stroke"
+              }
+            },
+            "order": [
+              "ink"
+            ]
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": []
+    }
+  },
+  {
+    "name": "same-field LWW tie/2",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000005",
+        "actorId": "actor-5",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "stroke.create",
+        "payload": {
+          "value": {
+            "objectType": "stroke",
+            "colorValue": 4279383126,
+            "width": 2.0,
+            "toolIndex": 0,
+            "sortIndex": 0,
+            "points": [
+              [
+                10.0,
+                12.0,
+                0.5
+              ]
+            ]
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 5,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000017",
+        "actorId": "zed",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.set",
+        "payload": {
+          "properties": {
+            "width": 5
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 30,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000016",
+        "actorId": "alice",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.set",
+        "payload": {
+          "properties": {
+            "width": 4
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 30,
+        "pageId": "p",
+        "objectId": "ink"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {
+              "ink": {
+                "colorValue": 4279383126,
+                "width": 5,
+                "toolIndex": 0,
+                "sortIndex": 0,
+                "points": [
+                  [
+                    10.0,
+                    12.0,
+                    0.5
+                  ]
+                ],
+                "objectType": "stroke"
+              }
+            },
+            "order": [
+              "ink"
+            ]
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": []
+    }
+  },
+  {
+    "name": "move and style preserve one UID/1",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000005",
+        "actorId": "actor-5",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "stroke.create",
+        "payload": {
+          "value": {
+            "objectType": "stroke",
+            "colorValue": 4279383126,
+            "width": 2.0,
+            "toolIndex": 0,
+            "sortIndex": 0,
+            "points": [
+              [
+                10.0,
+                12.0,
+                0.5
+              ]
+            ]
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 5,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000018",
+        "actorId": "actor-24",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.move",
+        "payload": {
+          "toPageId": "q",
+          "sortIndex": 5
+        },
+        "dependencies": [],
+        "logicalClock": 24,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000019",
+        "actorId": "actor-25",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.set",
+        "payload": {
+          "properties": {
+            "width": 3.5,
+            "colorValue": 4289379276
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 25,
+        "pageId": "p",
+        "objectId": "ink"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {
+              "ink": {
+                "colorValue": 4289379276,
+                "width": 3.5,
+                "toolIndex": 0,
+                "sortIndex": 5,
+                "points": [
+                  [
+                    10.0,
+                    12.0,
+                    0.5
+                  ]
+                ],
+                "objectType": "stroke"
+              }
+            },
+            "order": [
+              "ink"
+            ]
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": []
+    }
+  },
+  {
+    "name": "move and style preserve one UID/2",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000005",
+        "actorId": "actor-5",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "stroke.create",
+        "payload": {
+          "value": {
+            "objectType": "stroke",
+            "colorValue": 4279383126,
+            "width": 2.0,
+            "toolIndex": 0,
+            "sortIndex": 0,
+            "points": [
+              [
+                10.0,
+                12.0,
+                0.5
+              ]
+            ]
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 5,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000019",
+        "actorId": "actor-25",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.set",
+        "payload": {
+          "properties": {
+            "width": 3.5,
+            "colorValue": 4289379276
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 25,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000018",
+        "actorId": "actor-24",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.move",
+        "payload": {
+          "toPageId": "q",
+          "sortIndex": 5
+        },
+        "dependencies": [],
+        "logicalClock": 24,
+        "pageId": "p",
+        "objectId": "ink"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {
+              "ink": {
+                "colorValue": 4289379276,
+                "width": 3.5,
+                "toolIndex": 0,
+                "sortIndex": 5,
+                "points": [
+                  [
+                    10.0,
+                    12.0,
+                    0.5
+                  ]
+                ],
+                "objectType": "stroke"
+              }
+            },
+            "order": [
+              "ink"
+            ]
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": []
+    }
+  },
+  {
+    "name": "concurrent moves/1",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000005",
+        "actorId": "actor-5",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "stroke.create",
+        "payload": {
+          "value": {
+            "objectType": "stroke",
+            "colorValue": 4279383126,
+            "width": 2.0,
+            "toolIndex": 0,
+            "sortIndex": 0,
+            "points": [
+              [
+                10.0,
+                12.0,
+                0.5
+              ]
+            ]
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 5,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000001a",
+        "actorId": "alice",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.move",
+        "payload": {
+          "toPageId": "q",
+          "sortIndex": 5
+        },
+        "dependencies": [],
+        "logicalClock": 30,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000001b",
+        "actorId": "zed",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.move",
+        "payload": {
+          "toPageId": "r",
+          "sortIndex": 6
+        },
+        "dependencies": [],
+        "logicalClock": 30,
+        "pageId": "p",
+        "objectId": "ink"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {
+              "ink": {
+                "colorValue": 4279383126,
+                "width": 2.0,
+                "toolIndex": 0,
+                "sortIndex": 6,
+                "points": [
+                  [
+                    10.0,
+                    12.0,
+                    0.5
+                  ]
+                ],
+                "objectType": "stroke"
+              }
+            },
+            "order": [
+              "ink"
+            ]
+          }
+        }
+      },
+      "tombstones": []
+    }
+  },
+  {
+    "name": "concurrent moves/2",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000005",
+        "actorId": "actor-5",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "stroke.create",
+        "payload": {
+          "value": {
+            "objectType": "stroke",
+            "colorValue": 4279383126,
+            "width": 2.0,
+            "toolIndex": 0,
+            "sortIndex": 0,
+            "points": [
+              [
+                10.0,
+                12.0,
+                0.5
+              ]
+            ]
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 5,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000001b",
+        "actorId": "zed",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.move",
+        "payload": {
+          "toPageId": "r",
+          "sortIndex": 6
+        },
+        "dependencies": [],
+        "logicalClock": 30,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000001a",
+        "actorId": "alice",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.move",
+        "payload": {
+          "toPageId": "q",
+          "sortIndex": 5
+        },
+        "dependencies": [],
+        "logicalClock": 30,
+        "pageId": "p",
+        "objectId": "ink"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {
+              "ink": {
+                "colorValue": 4279383126,
+                "width": 2.0,
+                "toolIndex": 0,
+                "sortIndex": 6,
+                "points": [
+                  [
+                    10.0,
+                    12.0,
+                    0.5
+                  ]
+                ],
+                "objectType": "stroke"
+              }
+            },
+            "order": [
+              "ink"
+            ]
+          }
+        }
+      },
+      "tombstones": []
+    }
+  },
+  {
+    "name": "move and delete/1",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000005",
+        "actorId": "actor-5",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "stroke.create",
+        "payload": {
+          "value": {
+            "objectType": "stroke",
+            "colorValue": 4279383126,
+            "width": 2.0,
+            "toolIndex": 0,
+            "sortIndex": 0,
+            "points": [
+              [
+                10.0,
+                12.0,
+                0.5
+              ]
+            ]
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 5,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000001c",
+        "actorId": "actor-28",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.move",
+        "payload": {
+          "toPageId": "q",
+          "sortIndex": 5
+        },
+        "dependencies": [],
+        "logicalClock": 28,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000001d",
+        "actorId": "actor-29",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.delete",
+        "payload": {},
+        "dependencies": [],
+        "logicalClock": 29,
+        "pageId": "p",
+        "objectId": "ink"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": [
+        [
+          "object",
+          "p",
+          "ink"
+        ]
+      ]
+    }
+  },
+  {
+    "name": "move and delete/2",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000005",
+        "actorId": "actor-5",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "stroke.create",
+        "payload": {
+          "value": {
+            "objectType": "stroke",
+            "colorValue": 4279383126,
+            "width": 2.0,
+            "toolIndex": 0,
+            "sortIndex": 0,
+            "points": [
+              [
+                10.0,
+                12.0,
+                0.5
+              ]
+            ]
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 5,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000001d",
+        "actorId": "actor-29",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.delete",
+        "payload": {},
+        "dependencies": [],
+        "logicalClock": 29,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000001c",
+        "actorId": "actor-28",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.move",
+        "payload": {
+          "toPageId": "q",
+          "sortIndex": 5
+        },
+        "dependencies": [],
+        "logicalClock": 28,
+        "pageId": "p",
+        "objectId": "ink"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": [
+        [
+          "object",
+          "p",
+          "ink"
+        ]
+      ]
+    }
+  },
+  {
+    "name": "order uses sortIndex then UID/1",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000005",
+        "actorId": "actor-5",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "stroke.create",
+        "payload": {
+          "value": {
+            "objectType": "stroke",
+            "colorValue": 4279383126,
+            "width": 2.0,
+            "toolIndex": 0,
+            "sortIndex": 0,
+            "points": [
+              [
+                10.0,
+                12.0,
+                0.5
+              ]
+            ]
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 5,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000007",
+        "actorId": "actor-7",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "stroke.create",
+        "payload": {
+          "value": {
+            "objectType": "stroke",
+            "colorValue": 4279383126,
+            "width": 2.0,
+            "toolIndex": 0,
+            "sortIndex": 0,
+            "points": [
+              [
+                10.0,
+                12.0,
+                0.5
+              ]
+            ]
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 7,
+        "pageId": "p",
+        "objectId": "other"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000001e",
+        "actorId": "actor-30",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.reorder",
+        "payload": {
+          "properties": {
+            "sortIndex": 5
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 30,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000001f",
+        "actorId": "actor-31",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.reorder",
+        "payload": {
+          "properties": {
+            "sortIndex": 5
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 31,
+        "pageId": "p",
+        "objectId": "other"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {
+              "ink": {
+                "colorValue": 4279383126,
+                "width": 2.0,
+                "toolIndex": 0,
+                "sortIndex": 5,
+                "points": [
+                  [
+                    10.0,
+                    12.0,
+                    0.5
+                  ]
+                ],
+                "objectType": "stroke"
+              },
+              "other": {
+                "colorValue": 4279383126,
+                "width": 2.0,
+                "toolIndex": 0,
+                "sortIndex": 5,
+                "points": [
+                  [
+                    10.0,
+                    12.0,
+                    0.5
+                  ]
+                ],
+                "objectType": "stroke"
+              }
+            },
+            "order": [
+              "ink",
+              "other"
+            ]
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": []
+    }
+  },
+  {
+    "name": "order uses sortIndex then UID/2",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000005",
+        "actorId": "actor-5",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "stroke.create",
+        "payload": {
+          "value": {
+            "objectType": "stroke",
+            "colorValue": 4279383126,
+            "width": 2.0,
+            "toolIndex": 0,
+            "sortIndex": 0,
+            "points": [
+              [
+                10.0,
+                12.0,
+                0.5
+              ]
+            ]
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 5,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000007",
+        "actorId": "actor-7",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "stroke.create",
+        "payload": {
+          "value": {
+            "objectType": "stroke",
+            "colorValue": 4279383126,
+            "width": 2.0,
+            "toolIndex": 0,
+            "sortIndex": 0,
+            "points": [
+              [
+                10.0,
+                12.0,
+                0.5
+              ]
+            ]
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 7,
+        "pageId": "p",
+        "objectId": "other"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000001f",
+        "actorId": "actor-31",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.reorder",
+        "payload": {
+          "properties": {
+            "sortIndex": 5
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 31,
+        "pageId": "p",
+        "objectId": "other"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000001e",
+        "actorId": "actor-30",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.reorder",
+        "payload": {
+          "properties": {
+            "sortIndex": 5
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 30,
+        "pageId": "p",
+        "objectId": "ink"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {
+              "ink": {
+                "colorValue": 4279383126,
+                "width": 2.0,
+                "toolIndex": 0,
+                "sortIndex": 5,
+                "points": [
+                  [
+                    10.0,
+                    12.0,
+                    0.5
+                  ]
+                ],
+                "objectType": "stroke"
+              },
+              "other": {
+                "colorValue": 4279383126,
+                "width": 2.0,
+                "toolIndex": 0,
+                "sortIndex": 5,
+                "points": [
+                  [
+                    10.0,
+                    12.0,
+                    0.5
+                  ]
+                ],
+                "objectType": "stroke"
+              }
+            },
+            "order": [
+              "ink",
+              "other"
+            ]
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": []
+    }
+  },
+  {
+    "name": "metadata LWW/1",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000005",
+        "actorId": "actor-5",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "stroke.create",
+        "payload": {
+          "value": {
+            "objectType": "stroke",
+            "colorValue": 4279383126,
+            "width": 2.0,
+            "toolIndex": 0,
+            "sortIndex": 0,
+            "points": [
+              [
+                10.0,
+                12.0,
+                0.5
+              ]
+            ]
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 5,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000020",
+        "actorId": "alice",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.set",
+        "payload": {
+          "properties": {
+            "title": "Alice"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 40
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000021",
+        "actorId": "zed",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.set",
+        "payload": {
+          "properties": {
+            "title": "Zed",
+            "folder": "Folder"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 40
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Zed",
+        "folder": "Folder",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {
+              "ink": {
+                "colorValue": 4279383126,
+                "width": 2.0,
+                "toolIndex": 0,
+                "sortIndex": 0,
+                "points": [
+                  [
+                    10.0,
+                    12.0,
+                    0.5
+                  ]
+                ],
+                "objectType": "stroke"
+              }
+            },
+            "order": [
+              "ink"
+            ]
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": []
+    }
+  },
+  {
+    "name": "metadata LWW/2",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000005",
+        "actorId": "actor-5",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "stroke.create",
+        "payload": {
+          "value": {
+            "objectType": "stroke",
+            "colorValue": 4279383126,
+            "width": 2.0,
+            "toolIndex": 0,
+            "sortIndex": 0,
+            "points": [
+              [
+                10.0,
+                12.0,
+                0.5
+              ]
+            ]
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 5,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000021",
+        "actorId": "zed",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.set",
+        "payload": {
+          "properties": {
+            "title": "Zed",
+            "folder": "Folder"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 40
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000020",
+        "actorId": "alice",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.set",
+        "payload": {
+          "properties": {
+            "title": "Alice"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 40
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Zed",
+        "folder": "Folder",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {
+              "ink": {
+                "colorValue": 4279383126,
+                "width": 2.0,
+                "toolIndex": 0,
+                "sortIndex": 0,
+                "points": [
+                  [
+                    10.0,
+                    12.0,
+                    0.5
+                  ]
+                ],
+                "objectType": "stroke"
+              }
+            },
+            "order": [
+              "ink"
+            ]
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": []
+    }
+  },
+  {
+    "name": "Quill format/delete/anchor Unicode/1",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000006",
+        "actorId": "actor-6",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.create",
+        "payload": {
+          "value": {
+            "objectType": "text",
+            "fontSize": 16.0,
+            "colorValue": 4279383126,
+            "width": 100.0,
+            "rotation": 0.0,
+            "dx": 1.0,
+            "dy": 2.0,
+            "sortIndex": 1
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 6,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000000a",
+        "actorId": "actor-10",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.insert",
+        "payload": {
+          "afterAtomId": null,
+          "atoms": [
+            {
+              "id": "00000000-0000-0000-0000-0000000003e9",
+              "text": "Zażółć 👩🏽‍💻"
+            },
+            {
+              "id": "00000000-0000-0000-0000-0000000003ea",
+              "text": "\n"
+            }
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 10,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000028",
+        "actorId": "actor-40",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.format",
+        "payload": {
+          "atomIds": [
+            "00000000-0000-0000-0000-0000000003e9"
+          ],
+          "attributes": {
+            "bold": true,
+            "color": "#ff0000"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 40,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000029",
+        "actorId": "actor-41",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.delete",
+        "payload": {
+          "atomIds": [
+            "00000000-0000-0000-0000-0000000003e9"
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 41,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000002a",
+        "actorId": "actor-42",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.insert",
+        "payload": {
+          "afterAtomId": "00000000-0000-0000-0000-0000000003e9",
+          "atoms": [
+            {
+              "id": "00000000-0000-0000-0000-0000000003eb",
+              "text": "Łódź"
+            }
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 42,
+        "pageId": "p",
+        "objectId": "text"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {
+              "text": {
+                "fontSize": 16.0,
+                "colorValue": 4279383126,
+                "width": 100.0,
+                "rotation": 0.0,
+                "dx": 1.0,
+                "dy": 2.0,
+                "sortIndex": 1,
+                "objectType": "text",
+                "text": "Łódź",
+                "delta": [
+                  {
+                    "insert": "Łódź\n"
+                  }
+                ],
+                "assets": {}
+              }
+            },
+            "order": [
+              "text"
+            ]
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": []
+    }
+  },
+  {
+    "name": "Quill format/delete/anchor Unicode/2",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000006",
+        "actorId": "actor-6",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.create",
+        "payload": {
+          "value": {
+            "objectType": "text",
+            "fontSize": 16.0,
+            "colorValue": 4279383126,
+            "width": 100.0,
+            "rotation": 0.0,
+            "dx": 1.0,
+            "dy": 2.0,
+            "sortIndex": 1
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 6,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000000a",
+        "actorId": "actor-10",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.insert",
+        "payload": {
+          "afterAtomId": null,
+          "atoms": [
+            {
+              "id": "00000000-0000-0000-0000-0000000003e9",
+              "text": "Zażółć 👩🏽‍💻"
+            },
+            {
+              "id": "00000000-0000-0000-0000-0000000003ea",
+              "text": "\n"
+            }
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 10,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000028",
+        "actorId": "actor-40",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.format",
+        "payload": {
+          "atomIds": [
+            "00000000-0000-0000-0000-0000000003e9"
+          ],
+          "attributes": {
+            "bold": true,
+            "color": "#ff0000"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 40,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000002a",
+        "actorId": "actor-42",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.insert",
+        "payload": {
+          "afterAtomId": "00000000-0000-0000-0000-0000000003e9",
+          "atoms": [
+            {
+              "id": "00000000-0000-0000-0000-0000000003eb",
+              "text": "Łódź"
+            }
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 42,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000029",
+        "actorId": "actor-41",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.delete",
+        "payload": {
+          "atomIds": [
+            "00000000-0000-0000-0000-0000000003e9"
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 41,
+        "pageId": "p",
+        "objectId": "text"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {
+              "text": {
+                "fontSize": 16.0,
+                "colorValue": 4279383126,
+                "width": 100.0,
+                "rotation": 0.0,
+                "dx": 1.0,
+                "dy": 2.0,
+                "sortIndex": 1,
+                "objectType": "text",
+                "text": "Łódź",
+                "delta": [
+                  {
+                    "insert": "Łódź\n"
+                  }
+                ],
+                "assets": {}
+              }
+            },
+            "order": [
+              "text"
+            ]
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": []
+    }
+  },
+  {
+    "name": "Quill format/delete/anchor Unicode/3",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000006",
+        "actorId": "actor-6",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.create",
+        "payload": {
+          "value": {
+            "objectType": "text",
+            "fontSize": 16.0,
+            "colorValue": 4279383126,
+            "width": 100.0,
+            "rotation": 0.0,
+            "dx": 1.0,
+            "dy": 2.0,
+            "sortIndex": 1
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 6,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000000a",
+        "actorId": "actor-10",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.insert",
+        "payload": {
+          "afterAtomId": null,
+          "atoms": [
+            {
+              "id": "00000000-0000-0000-0000-0000000003e9",
+              "text": "Zażółć 👩🏽‍💻"
+            },
+            {
+              "id": "00000000-0000-0000-0000-0000000003ea",
+              "text": "\n"
+            }
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 10,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000029",
+        "actorId": "actor-41",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.delete",
+        "payload": {
+          "atomIds": [
+            "00000000-0000-0000-0000-0000000003e9"
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 41,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000028",
+        "actorId": "actor-40",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.format",
+        "payload": {
+          "atomIds": [
+            "00000000-0000-0000-0000-0000000003e9"
+          ],
+          "attributes": {
+            "bold": true,
+            "color": "#ff0000"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 40,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000002a",
+        "actorId": "actor-42",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.insert",
+        "payload": {
+          "afterAtomId": "00000000-0000-0000-0000-0000000003e9",
+          "atoms": [
+            {
+              "id": "00000000-0000-0000-0000-0000000003eb",
+              "text": "Łódź"
+            }
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 42,
+        "pageId": "p",
+        "objectId": "text"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {
+              "text": {
+                "fontSize": 16.0,
+                "colorValue": 4279383126,
+                "width": 100.0,
+                "rotation": 0.0,
+                "dx": 1.0,
+                "dy": 2.0,
+                "sortIndex": 1,
+                "objectType": "text",
+                "text": "Łódź",
+                "delta": [
+                  {
+                    "insert": "Łódź\n"
+                  }
+                ],
+                "assets": {}
+              }
+            },
+            "order": [
+              "text"
+            ]
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": []
+    }
+  },
+  {
+    "name": "Quill format/delete/anchor Unicode/4",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000006",
+        "actorId": "actor-6",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.create",
+        "payload": {
+          "value": {
+            "objectType": "text",
+            "fontSize": 16.0,
+            "colorValue": 4279383126,
+            "width": 100.0,
+            "rotation": 0.0,
+            "dx": 1.0,
+            "dy": 2.0,
+            "sortIndex": 1
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 6,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000000a",
+        "actorId": "actor-10",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.insert",
+        "payload": {
+          "afterAtomId": null,
+          "atoms": [
+            {
+              "id": "00000000-0000-0000-0000-0000000003e9",
+              "text": "Zażółć 👩🏽‍💻"
+            },
+            {
+              "id": "00000000-0000-0000-0000-0000000003ea",
+              "text": "\n"
+            }
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 10,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000029",
+        "actorId": "actor-41",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.delete",
+        "payload": {
+          "atomIds": [
+            "00000000-0000-0000-0000-0000000003e9"
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 41,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000002a",
+        "actorId": "actor-42",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.insert",
+        "payload": {
+          "afterAtomId": "00000000-0000-0000-0000-0000000003e9",
+          "atoms": [
+            {
+              "id": "00000000-0000-0000-0000-0000000003eb",
+              "text": "Łódź"
+            }
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 42,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000028",
+        "actorId": "actor-40",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.format",
+        "payload": {
+          "atomIds": [
+            "00000000-0000-0000-0000-0000000003e9"
+          ],
+          "attributes": {
+            "bold": true,
+            "color": "#ff0000"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 40,
+        "pageId": "p",
+        "objectId": "text"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {
+              "text": {
+                "fontSize": 16.0,
+                "colorValue": 4279383126,
+                "width": 100.0,
+                "rotation": 0.0,
+                "dx": 1.0,
+                "dy": 2.0,
+                "sortIndex": 1,
+                "objectType": "text",
+                "text": "Łódź",
+                "delta": [
+                  {
+                    "insert": "Łódź\n"
+                  }
+                ],
+                "assets": {}
+              }
+            },
+            "order": [
+              "text"
+            ]
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": []
+    }
+  },
+  {
+    "name": "Quill format/delete/anchor Unicode/5",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000006",
+        "actorId": "actor-6",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.create",
+        "payload": {
+          "value": {
+            "objectType": "text",
+            "fontSize": 16.0,
+            "colorValue": 4279383126,
+            "width": 100.0,
+            "rotation": 0.0,
+            "dx": 1.0,
+            "dy": 2.0,
+            "sortIndex": 1
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 6,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000000a",
+        "actorId": "actor-10",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.insert",
+        "payload": {
+          "afterAtomId": null,
+          "atoms": [
+            {
+              "id": "00000000-0000-0000-0000-0000000003e9",
+              "text": "Zażółć 👩🏽‍💻"
+            },
+            {
+              "id": "00000000-0000-0000-0000-0000000003ea",
+              "text": "\n"
+            }
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 10,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000002a",
+        "actorId": "actor-42",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.insert",
+        "payload": {
+          "afterAtomId": "00000000-0000-0000-0000-0000000003e9",
+          "atoms": [
+            {
+              "id": "00000000-0000-0000-0000-0000000003eb",
+              "text": "Łódź"
+            }
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 42,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000028",
+        "actorId": "actor-40",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.format",
+        "payload": {
+          "atomIds": [
+            "00000000-0000-0000-0000-0000000003e9"
+          ],
+          "attributes": {
+            "bold": true,
+            "color": "#ff0000"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 40,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000029",
+        "actorId": "actor-41",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.delete",
+        "payload": {
+          "atomIds": [
+            "00000000-0000-0000-0000-0000000003e9"
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 41,
+        "pageId": "p",
+        "objectId": "text"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {
+              "text": {
+                "fontSize": 16.0,
+                "colorValue": 4279383126,
+                "width": 100.0,
+                "rotation": 0.0,
+                "dx": 1.0,
+                "dy": 2.0,
+                "sortIndex": 1,
+                "objectType": "text",
+                "text": "Łódź",
+                "delta": [
+                  {
+                    "insert": "Łódź\n"
+                  }
+                ],
+                "assets": {}
+              }
+            },
+            "order": [
+              "text"
+            ]
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": []
+    }
+  },
+  {
+    "name": "Quill format/delete/anchor Unicode/6",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000006",
+        "actorId": "actor-6",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.create",
+        "payload": {
+          "value": {
+            "objectType": "text",
+            "fontSize": 16.0,
+            "colorValue": 4279383126,
+            "width": 100.0,
+            "rotation": 0.0,
+            "dx": 1.0,
+            "dy": 2.0,
+            "sortIndex": 1
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 6,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000000a",
+        "actorId": "actor-10",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.insert",
+        "payload": {
+          "afterAtomId": null,
+          "atoms": [
+            {
+              "id": "00000000-0000-0000-0000-0000000003e9",
+              "text": "Zażółć 👩🏽‍💻"
+            },
+            {
+              "id": "00000000-0000-0000-0000-0000000003ea",
+              "text": "\n"
+            }
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 10,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000002a",
+        "actorId": "actor-42",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.insert",
+        "payload": {
+          "afterAtomId": "00000000-0000-0000-0000-0000000003e9",
+          "atoms": [
+            {
+              "id": "00000000-0000-0000-0000-0000000003eb",
+              "text": "Łódź"
+            }
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 42,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000029",
+        "actorId": "actor-41",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.delete",
+        "payload": {
+          "atomIds": [
+            "00000000-0000-0000-0000-0000000003e9"
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 41,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000028",
+        "actorId": "actor-40",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.format",
+        "payload": {
+          "atomIds": [
+            "00000000-0000-0000-0000-0000000003e9"
+          ],
+          "attributes": {
+            "bold": true,
+            "color": "#ff0000"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 40,
+        "pageId": "p",
+        "objectId": "text"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {
+              "text": {
+                "fontSize": 16.0,
+                "colorValue": 4279383126,
+                "width": 100.0,
+                "rotation": 0.0,
+                "dx": 1.0,
+                "dy": 2.0,
+                "sortIndex": 1,
+                "objectType": "text",
+                "text": "Łódź",
+                "delta": [
+                  {
+                    "insert": "Łódź\n"
+                  }
+                ],
+                "assets": {}
+              }
+            },
+            "order": [
+              "text"
+            ]
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": []
+    }
+  },
+  {
+    "name": "Quill concurrent attributes/1",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000006",
+        "actorId": "actor-6",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.create",
+        "payload": {
+          "value": {
+            "objectType": "text",
+            "fontSize": 16.0,
+            "colorValue": 4279383126,
+            "width": 100.0,
+            "rotation": 0.0,
+            "dx": 1.0,
+            "dy": 2.0,
+            "sortIndex": 1
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 6,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000000a",
+        "actorId": "actor-10",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.insert",
+        "payload": {
+          "afterAtomId": null,
+          "atoms": [
+            {
+              "id": "00000000-0000-0000-0000-0000000003e9",
+              "text": "Zażółć 👩🏽‍💻"
+            },
+            {
+              "id": "00000000-0000-0000-0000-0000000003ea",
+              "text": "\n"
+            }
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 10,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000002b",
+        "actorId": "alice",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.format",
+        "payload": {
+          "atomIds": [
+            "00000000-0000-0000-0000-0000000003e9"
+          ],
+          "attributes": {
+            "italic": true,
+            "color": "#ff0000"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 50,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000002c",
+        "actorId": "zed",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.format",
+        "payload": {
+          "atomIds": [
+            "00000000-0000-0000-0000-0000000003e9"
+          ],
+          "attributes": {
+            "italic": null,
+            "color": "#0000ff"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 50,
+        "pageId": "p",
+        "objectId": "text"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {
+              "text": {
+                "fontSize": 16.0,
+                "colorValue": 4279383126,
+                "width": 100.0,
+                "rotation": 0.0,
+                "dx": 1.0,
+                "dy": 2.0,
+                "sortIndex": 1,
+                "objectType": "text",
+                "text": "Zażółć 👩🏽‍💻",
+                "delta": [
+                  {
+                    "insert": "Zażółć 👩🏽‍💻",
+                    "attributes": {
+                      "color": "#0000ff"
+                    }
+                  },
+                  {
+                    "insert": "\n"
+                  }
+                ],
+                "assets": {}
+              }
+            },
+            "order": [
+              "text"
+            ]
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": []
+    }
+  },
+  {
+    "name": "Quill concurrent attributes/2",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000006",
+        "actorId": "actor-6",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.create",
+        "payload": {
+          "value": {
+            "objectType": "text",
+            "fontSize": 16.0,
+            "colorValue": 4279383126,
+            "width": 100.0,
+            "rotation": 0.0,
+            "dx": 1.0,
+            "dy": 2.0,
+            "sortIndex": 1
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 6,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000000a",
+        "actorId": "actor-10",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.insert",
+        "payload": {
+          "afterAtomId": null,
+          "atoms": [
+            {
+              "id": "00000000-0000-0000-0000-0000000003e9",
+              "text": "Zażółć 👩🏽‍💻"
+            },
+            {
+              "id": "00000000-0000-0000-0000-0000000003ea",
+              "text": "\n"
+            }
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 10,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000002c",
+        "actorId": "zed",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.format",
+        "payload": {
+          "atomIds": [
+            "00000000-0000-0000-0000-0000000003e9"
+          ],
+          "attributes": {
+            "italic": null,
+            "color": "#0000ff"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 50,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000002b",
+        "actorId": "alice",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.format",
+        "payload": {
+          "atomIds": [
+            "00000000-0000-0000-0000-0000000003e9"
+          ],
+          "attributes": {
+            "italic": true,
+            "color": "#ff0000"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 50,
+        "pageId": "p",
+        "objectId": "text"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {
+              "text": {
+                "fontSize": 16.0,
+                "colorValue": 4279383126,
+                "width": 100.0,
+                "rotation": 0.0,
+                "dx": 1.0,
+                "dy": 2.0,
+                "sortIndex": 1,
+                "objectType": "text",
+                "text": "Zażółć 👩🏽‍💻",
+                "delta": [
+                  {
+                    "insert": "Zażółć 👩🏽‍💻",
+                    "attributes": {
+                      "color": "#0000ff"
+                    }
+                  },
+                  {
+                    "insert": "\n"
+                  }
+                ],
+                "assets": {}
+              }
+            },
+            "order": [
+              "text"
+            ]
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": []
+    }
+  },
+  {
+    "name": "Quill move and format/1",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000006",
+        "actorId": "actor-6",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.create",
+        "payload": {
+          "value": {
+            "objectType": "text",
+            "fontSize": 16.0,
+            "colorValue": 4279383126,
+            "width": 100.0,
+            "rotation": 0.0,
+            "dx": 1.0,
+            "dy": 2.0,
+            "sortIndex": 1
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 6,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000000a",
+        "actorId": "actor-10",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.insert",
+        "payload": {
+          "afterAtomId": null,
+          "atoms": [
+            {
+              "id": "00000000-0000-0000-0000-0000000003e9",
+              "text": "Zażółć 👩🏽‍💻"
+            },
+            {
+              "id": "00000000-0000-0000-0000-0000000003ea",
+              "text": "\n"
+            }
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 10,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000002d",
+        "actorId": "actor-45",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.move",
+        "payload": {
+          "toPageId": "q",
+          "sortIndex": 3
+        },
+        "dependencies": [],
+        "logicalClock": 45,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000002e",
+        "actorId": "actor-46",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.format",
+        "payload": {
+          "atomIds": [
+            "00000000-0000-0000-0000-0000000003e9"
+          ],
+          "attributes": {
+            "bold": true
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 46,
+        "pageId": "p",
+        "objectId": "text"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {
+              "text": {
+                "fontSize": 16.0,
+                "colorValue": 4279383126,
+                "width": 100.0,
+                "rotation": 0.0,
+                "dx": 1.0,
+                "dy": 2.0,
+                "sortIndex": 3,
+                "objectType": "text",
+                "text": "Zażółć 👩🏽‍💻",
+                "delta": [
+                  {
+                    "insert": "Zażółć 👩🏽‍💻",
+                    "attributes": {
+                      "bold": true
+                    }
+                  },
+                  {
+                    "insert": "\n"
+                  }
+                ],
+                "assets": {}
+              }
+            },
+            "order": [
+              "text"
+            ]
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": []
+    }
+  },
+  {
+    "name": "Quill move and format/2",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000006",
+        "actorId": "actor-6",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.create",
+        "payload": {
+          "value": {
+            "objectType": "text",
+            "fontSize": 16.0,
+            "colorValue": 4279383126,
+            "width": 100.0,
+            "rotation": 0.0,
+            "dx": 1.0,
+            "dy": 2.0,
+            "sortIndex": 1
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 6,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000000a",
+        "actorId": "actor-10",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.insert",
+        "payload": {
+          "afterAtomId": null,
+          "atoms": [
+            {
+              "id": "00000000-0000-0000-0000-0000000003e9",
+              "text": "Zażółć 👩🏽‍💻"
+            },
+            {
+              "id": "00000000-0000-0000-0000-0000000003ea",
+              "text": "\n"
+            }
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 10,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000002e",
+        "actorId": "actor-46",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.format",
+        "payload": {
+          "atomIds": [
+            "00000000-0000-0000-0000-0000000003e9"
+          ],
+          "attributes": {
+            "bold": true
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 46,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000002d",
+        "actorId": "actor-45",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.move",
+        "payload": {
+          "toPageId": "q",
+          "sortIndex": 3
+        },
+        "dependencies": [],
+        "logicalClock": 45,
+        "pageId": "p",
+        "objectId": "text"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {
+              "text": {
+                "fontSize": 16.0,
+                "colorValue": 4279383126,
+                "width": 100.0,
+                "rotation": 0.0,
+                "dx": 1.0,
+                "dy": 2.0,
+                "sortIndex": 3,
+                "objectType": "text",
+                "text": "Zażółć 👩🏽‍💻",
+                "delta": [
+                  {
+                    "insert": "Zażółć 👩🏽‍💻",
+                    "attributes": {
+                      "bold": true
+                    }
+                  },
+                  {
+                    "insert": "\n"
+                  }
+                ],
+                "assets": {}
+              }
+            },
+            "order": [
+              "text"
+            ]
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": []
+    }
+  },
+  {
+    "name": "object tombstone/1",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000005",
+        "actorId": "actor-5",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "stroke.create",
+        "payload": {
+          "value": {
+            "objectType": "stroke",
+            "colorValue": 4279383126,
+            "width": 2.0,
+            "toolIndex": 0,
+            "sortIndex": 0,
+            "points": [
+              [
+                10.0,
+                12.0,
+                0.5
+              ]
+            ]
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 5,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000002f",
+        "actorId": "actor-47",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.delete",
+        "payload": {},
+        "dependencies": [],
+        "logicalClock": 47,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000030",
+        "actorId": "actor-48",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.set",
+        "payload": {
+          "properties": {
+            "width": 4
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 48,
+        "pageId": "p",
+        "objectId": "ink"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": [
+        [
+          "object",
+          "p",
+          "ink"
+        ]
+      ]
+    }
+  },
+  {
+    "name": "object tombstone/2",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000005",
+        "actorId": "actor-5",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "stroke.create",
+        "payload": {
+          "value": {
+            "objectType": "stroke",
+            "colorValue": 4279383126,
+            "width": 2.0,
+            "toolIndex": 0,
+            "sortIndex": 0,
+            "points": [
+              [
+                10.0,
+                12.0,
+                0.5
+              ]
+            ]
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 5,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000030",
+        "actorId": "actor-48",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.set",
+        "payload": {
+          "properties": {
+            "width": 4
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 48,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000002f",
+        "actorId": "actor-47",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.delete",
+        "payload": {},
+        "dependencies": [],
+        "logicalClock": 47,
+        "pageId": "p",
+        "objectId": "ink"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": [
+        [
+          "object",
+          "p",
+          "ink"
+        ]
+      ]
+    }
+  },
+  {
+    "name": "page tombstone/1",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000005",
+        "actorId": "actor-5",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "stroke.create",
+        "payload": {
+          "value": {
+            "objectType": "stroke",
+            "colorValue": 4279383126,
+            "width": 2.0,
+            "toolIndex": 0,
+            "sortIndex": 0,
+            "points": [
+              [
+                10.0,
+                12.0,
+                0.5
+              ]
+            ]
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 5,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000031",
+        "actorId": "actor-49",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.delete",
+        "payload": {},
+        "dependencies": [],
+        "logicalClock": 49,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000032",
+        "actorId": "actor-50",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.set",
+        "payload": {
+          "properties": {
+            "width": 4
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 50,
+        "pageId": "p",
+        "objectId": "ink"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": [
+        [
+          "object",
+          "p",
+          "ink"
+        ],
+        [
+          "page",
+          "",
+          "p"
+        ]
+      ]
+    }
+  },
+  {
+    "name": "page tombstone/2",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000005",
+        "actorId": "actor-5",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "stroke.create",
+        "payload": {
+          "value": {
+            "objectType": "stroke",
+            "colorValue": 4279383126,
+            "width": 2.0,
+            "toolIndex": 0,
+            "sortIndex": 0,
+            "points": [
+              [
+                10.0,
+                12.0,
+                0.5
+              ]
+            ]
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 5,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000032",
+        "actorId": "actor-50",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.set",
+        "payload": {
+          "properties": {
+            "width": 4
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 50,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000031",
+        "actorId": "actor-49",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.delete",
+        "payload": {},
+        "dependencies": [],
+        "logicalClock": 49,
+        "objectId": "p"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": [
+        [
+          "object",
+          "p",
+          "ink"
+        ],
+        [
+          "page",
+          "",
+          "p"
+        ]
+      ]
+    }
+  },
+  {
+    "name": "document tombstone/1",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000005",
+        "actorId": "actor-5",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "stroke.create",
+        "payload": {
+          "value": {
+            "objectType": "stroke",
+            "colorValue": 4279383126,
+            "width": 2.0,
+            "toolIndex": 0,
+            "sortIndex": 0,
+            "points": [
+              [
+                10.0,
+                12.0,
+                0.5
+              ]
+            ]
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 5,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000033",
+        "actorId": "actor-51",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.delete",
+        "payload": {},
+        "dependencies": [],
+        "logicalClock": 51
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000034",
+        "actorId": "actor-52",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.set",
+        "payload": {
+          "properties": {
+            "title": "Late"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 52
+      }
+    ],
+    "expected": {
+      "document": null,
+      "tombstones": [
+        [
+          "document",
+          "",
+          ""
+        ]
+      ]
+    }
+  },
+  {
+    "name": "document tombstone/2",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000005",
+        "actorId": "actor-5",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "stroke.create",
+        "payload": {
+          "value": {
+            "objectType": "stroke",
+            "colorValue": 4279383126,
+            "width": 2.0,
+            "toolIndex": 0,
+            "sortIndex": 0,
+            "points": [
+              [
+                10.0,
+                12.0,
+                0.5
+              ]
+            ]
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 5,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000034",
+        "actorId": "actor-52",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.set",
+        "payload": {
+          "properties": {
+            "title": "Late"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 52
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000033",
+        "actorId": "actor-51",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.delete",
+        "payload": {},
+        "dependencies": [],
+        "logicalClock": 51
+      }
+    ],
+    "expected": {
+      "document": null,
+      "tombstones": [
+        [
+          "document",
+          "",
+          ""
+        ]
+      ]
+    }
+  },
+  {
+    "name": "Undo Redo new UID/1",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000005",
+        "actorId": "actor-5",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "stroke.create",
+        "payload": {
+          "value": {
+            "objectType": "stroke",
+            "colorValue": 4279383126,
+            "width": 2.0,
+            "toolIndex": 0,
+            "sortIndex": 0,
+            "points": [
+              [
+                10.0,
+                12.0,
+                0.5
+              ]
+            ]
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 5,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000035",
+        "actorId": "actor-53",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.delete",
+        "payload": {},
+        "dependencies": [],
+        "logicalClock": 53,
+        "pageId": "p",
+        "objectId": "ink"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000036",
+        "actorId": "actor-54",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "stroke.create",
+        "payload": {
+          "value": {
+            "objectType": "stroke",
+            "colorValue": 4279383126,
+            "width": 2.0,
+            "toolIndex": 0,
+            "sortIndex": 0,
+            "points": [
+              [
+                10.0,
+                12.0,
+                0.5
+              ]
+            ]
+          }
+        },
+        "dependencies": [
+          "00000000-0000-0000-0000-000000000035"
+        ],
+        "logicalClock": 54,
+        "pageId": "p",
+        "objectId": "undo-ink",
+        "revertsOperationId": "00000000-0000-0000-0000-000000000035"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000037",
+        "actorId": "actor-55",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.delete",
+        "payload": {},
+        "dependencies": [
+          "00000000-0000-0000-0000-000000000036"
+        ],
+        "logicalClock": 55,
+        "pageId": "p",
+        "objectId": "undo-ink",
+        "revertsOperationId": "00000000-0000-0000-0000-000000000036"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": [
+        [
+          "object",
+          "p",
+          "ink"
+        ],
+        [
+          "object",
+          "p",
+          "undo-ink"
+        ]
+      ]
+    }
+  },
+  {
+    "name": "image move with verified attachment/1",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000006",
+        "actorId": "actor-6",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.create",
+        "payload": {
+          "value": {
+            "objectType": "text",
+            "fontSize": 16.0,
+            "colorValue": 4279383126,
+            "width": 100.0,
+            "rotation": 0.0,
+            "dx": 1.0,
+            "dy": 2.0,
+            "sortIndex": 1
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 6,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000003c",
+        "actorId": "actor-60",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "asset.attach",
+        "payload": {
+          "assetId": "asset-60",
+          "sha256": "275f1bcbbb585c71e3b2184304eccfa0e37de92022ca3b6f4e9c10df32318d85",
+          "sizeBytes": 9,
+          "mediaType": "image/png"
+        },
+        "dependencies": [],
+        "logicalClock": 60,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000003d",
+        "actorId": "actor-61",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.insert",
+        "payload": {
+          "afterAtomId": null,
+          "atoms": [
+            {
+              "id": "00000000-0000-0000-0000-000000000424",
+              "text": "￼",
+              "embed": {
+                "image": "asset:asset-60"
+              }
+            }
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 61,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000003e",
+        "actorId": "actor-62",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.move",
+        "payload": {
+          "toPageId": "q",
+          "sortIndex": 4
+        },
+        "dependencies": [],
+        "logicalClock": 62,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000003f",
+        "actorId": "actor-63",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.format",
+        "payload": {
+          "atomIds": [
+            "00000000-0000-0000-0000-000000000424"
+          ],
+          "attributes": {
+            "bold": true
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 63,
+        "pageId": "p",
+        "objectId": "text"
+      }
+    ],
+    "assets": [
+      {
+        "receipt": {
+          "assetId": "asset-60",
+          "sha256": "275f1bcbbb585c71e3b2184304eccfa0e37de92022ca3b6f4e9c10df32318d85",
+          "sizeBytes": 9,
+          "mediaType": "image/png"
+        },
+        "base64": "iVBORw0KGgoB"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {
+              "text": {
+                "fontSize": 16.0,
+                "colorValue": 4279383126,
+                "width": 100.0,
+                "rotation": 0.0,
+                "dx": 1.0,
+                "dy": 2.0,
+                "sortIndex": 4,
+                "objectType": "text",
+                "text": "￼",
+                "delta": [
+                  {
+                    "insert": {
+                      "image": "asset:asset-60"
+                    },
+                    "attributes": {
+                      "bold": true
+                    }
+                  }
+                ],
+                "assets": {
+                  "asset-60": {
+                    "sha256": "275f1bcbbb585c71e3b2184304eccfa0e37de92022ca3b6f4e9c10df32318d85",
+                    "sizeBytes": 9,
+                    "mediaType": "image/png"
+                  }
+                }
+              }
+            },
+            "order": [
+              "text"
+            ]
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": []
+    }
+  },
+  {
+    "name": "image move with verified attachment/2",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000006",
+        "actorId": "actor-6",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.create",
+        "payload": {
+          "value": {
+            "objectType": "text",
+            "fontSize": 16.0,
+            "colorValue": 4279383126,
+            "width": 100.0,
+            "rotation": 0.0,
+            "dx": 1.0,
+            "dy": 2.0,
+            "sortIndex": 1
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 6,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000003c",
+        "actorId": "actor-60",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "asset.attach",
+        "payload": {
+          "assetId": "asset-60",
+          "sha256": "275f1bcbbb585c71e3b2184304eccfa0e37de92022ca3b6f4e9c10df32318d85",
+          "sizeBytes": 9,
+          "mediaType": "image/png"
+        },
+        "dependencies": [],
+        "logicalClock": 60,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000003d",
+        "actorId": "actor-61",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.insert",
+        "payload": {
+          "afterAtomId": null,
+          "atoms": [
+            {
+              "id": "00000000-0000-0000-0000-000000000424",
+              "text": "￼",
+              "embed": {
+                "image": "asset:asset-60"
+              }
+            }
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 61,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000003f",
+        "actorId": "actor-63",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.format",
+        "payload": {
+          "atomIds": [
+            "00000000-0000-0000-0000-000000000424"
+          ],
+          "attributes": {
+            "bold": true
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 63,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000003e",
+        "actorId": "actor-62",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.move",
+        "payload": {
+          "toPageId": "q",
+          "sortIndex": 4
+        },
+        "dependencies": [],
+        "logicalClock": 62,
+        "pageId": "p",
+        "objectId": "text"
+      }
+    ],
+    "assets": [
+      {
+        "receipt": {
+          "assetId": "asset-60",
+          "sha256": "275f1bcbbb585c71e3b2184304eccfa0e37de92022ca3b6f4e9c10df32318d85",
+          "sizeBytes": 9,
+          "mediaType": "image/png"
+        },
+        "base64": "iVBORw0KGgoB"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {
+              "text": {
+                "fontSize": 16.0,
+                "colorValue": 4279383126,
+                "width": 100.0,
+                "rotation": 0.0,
+                "dx": 1.0,
+                "dy": 2.0,
+                "sortIndex": 4,
+                "objectType": "text",
+                "text": "￼",
+                "delta": [
+                  {
+                    "insert": {
+                      "image": "asset:asset-60"
+                    },
+                    "attributes": {
+                      "bold": true
+                    }
+                  }
+                ],
+                "assets": {
+                  "asset-60": {
+                    "sha256": "275f1bcbbb585c71e3b2184304eccfa0e37de92022ca3b6f4e9c10df32318d85",
+                    "sizeBytes": 9,
+                    "mediaType": "image/png"
+                  }
+                }
+              }
+            },
+            "order": [
+              "text"
+            ]
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": []
+    }
+  },
+  {
+    "name": "image detach after deleting embed/1",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000006",
+        "actorId": "actor-6",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.create",
+        "payload": {
+          "value": {
+            "objectType": "text",
+            "fontSize": 16.0,
+            "colorValue": 4279383126,
+            "width": 100.0,
+            "rotation": 0.0,
+            "dx": 1.0,
+            "dy": 2.0,
+            "sortIndex": 1
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 6,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000003c",
+        "actorId": "actor-60",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "asset.attach",
+        "payload": {
+          "assetId": "asset-60",
+          "sha256": "275f1bcbbb585c71e3b2184304eccfa0e37de92022ca3b6f4e9c10df32318d85",
+          "sizeBytes": 9,
+          "mediaType": "image/png"
+        },
+        "dependencies": [],
+        "logicalClock": 60,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000003d",
+        "actorId": "actor-61",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.insert",
+        "payload": {
+          "afterAtomId": null,
+          "atoms": [
+            {
+              "id": "00000000-0000-0000-0000-000000000424",
+              "text": "￼",
+              "embed": {
+                "image": "asset:asset-60"
+              }
+            }
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 61,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000040",
+        "actorId": "actor-64",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.delete",
+        "payload": {
+          "atomIds": [
+            "00000000-0000-0000-0000-000000000424"
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 64,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000041",
+        "actorId": "actor-65",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "asset.detach",
+        "payload": {
+          "assetId": "asset-60"
+        },
+        "dependencies": [],
+        "logicalClock": 65,
+        "pageId": "p",
+        "objectId": "text"
+      }
+    ],
+    "assets": [
+      {
+        "receipt": {
+          "assetId": "asset-60",
+          "sha256": "275f1bcbbb585c71e3b2184304eccfa0e37de92022ca3b6f4e9c10df32318d85",
+          "sizeBytes": 9,
+          "mediaType": "image/png"
+        },
+        "base64": "iVBORw0KGgoB"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {
+              "text": {
+                "fontSize": 16.0,
+                "colorValue": 4279383126,
+                "width": 100.0,
+                "rotation": 0.0,
+                "dx": 1.0,
+                "dy": 2.0,
+                "sortIndex": 1,
+                "objectType": "text",
+                "text": "",
+                "delta": [],
+                "assets": {}
+              }
+            },
+            "order": [
+              "text"
+            ]
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": []
+    }
+  },
+  {
+    "name": "pdf move with verified attachment/1",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000006",
+        "actorId": "actor-6",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.create",
+        "payload": {
+          "value": {
+            "objectType": "text",
+            "fontSize": 16.0,
+            "colorValue": 4279383126,
+            "width": 100.0,
+            "rotation": 0.0,
+            "dx": 1.0,
+            "dy": 2.0,
+            "sortIndex": 1
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 6,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000046",
+        "actorId": "actor-70",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "asset.attach",
+        "payload": {
+          "assetId": "asset-70",
+          "sha256": "c5afafda0df2452ab048bb94c1ee2d2ba52b1c884d24edb1161e6caf67310f1e",
+          "sizeBytes": 15,
+          "mediaType": "application/pdf"
+        },
+        "dependencies": [],
+        "logicalClock": 70,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000047",
+        "actorId": "actor-71",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.insert",
+        "payload": {
+          "afterAtomId": null,
+          "atoms": [
+            {
+              "id": "00000000-0000-0000-0000-00000000042e",
+              "text": "￼",
+              "embed": {
+                "pdf": "asset:asset-70"
+              }
+            }
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 71,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000048",
+        "actorId": "actor-72",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.move",
+        "payload": {
+          "toPageId": "q",
+          "sortIndex": 4
+        },
+        "dependencies": [],
+        "logicalClock": 72,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000049",
+        "actorId": "actor-73",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.format",
+        "payload": {
+          "atomIds": [
+            "00000000-0000-0000-0000-00000000042e"
+          ],
+          "attributes": {
+            "bold": true
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 73,
+        "pageId": "p",
+        "objectId": "text"
+      }
+    ],
+    "assets": [
+      {
+        "receipt": {
+          "assetId": "asset-70",
+          "sha256": "c5afafda0df2452ab048bb94c1ee2d2ba52b1c884d24edb1161e6caf67310f1e",
+          "sizeBytes": 15,
+          "mediaType": "application/pdf"
+        },
+        "base64": "JVBERi0xLjQKcGFyaXR5"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {
+              "text": {
+                "fontSize": 16.0,
+                "colorValue": 4279383126,
+                "width": 100.0,
+                "rotation": 0.0,
+                "dx": 1.0,
+                "dy": 2.0,
+                "sortIndex": 4,
+                "objectType": "text",
+                "text": "￼",
+                "delta": [
+                  {
+                    "insert": {
+                      "pdf": "asset:asset-70"
+                    },
+                    "attributes": {
+                      "bold": true
+                    }
+                  }
+                ],
+                "assets": {
+                  "asset-70": {
+                    "sha256": "c5afafda0df2452ab048bb94c1ee2d2ba52b1c884d24edb1161e6caf67310f1e",
+                    "sizeBytes": 15,
+                    "mediaType": "application/pdf"
+                  }
+                }
+              }
+            },
+            "order": [
+              "text"
+            ]
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": []
+    }
+  },
+  {
+    "name": "pdf move with verified attachment/2",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000006",
+        "actorId": "actor-6",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.create",
+        "payload": {
+          "value": {
+            "objectType": "text",
+            "fontSize": 16.0,
+            "colorValue": 4279383126,
+            "width": 100.0,
+            "rotation": 0.0,
+            "dx": 1.0,
+            "dy": 2.0,
+            "sortIndex": 1
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 6,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000046",
+        "actorId": "actor-70",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "asset.attach",
+        "payload": {
+          "assetId": "asset-70",
+          "sha256": "c5afafda0df2452ab048bb94c1ee2d2ba52b1c884d24edb1161e6caf67310f1e",
+          "sizeBytes": 15,
+          "mediaType": "application/pdf"
+        },
+        "dependencies": [],
+        "logicalClock": 70,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000047",
+        "actorId": "actor-71",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.insert",
+        "payload": {
+          "afterAtomId": null,
+          "atoms": [
+            {
+              "id": "00000000-0000-0000-0000-00000000042e",
+              "text": "￼",
+              "embed": {
+                "pdf": "asset:asset-70"
+              }
+            }
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 71,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000049",
+        "actorId": "actor-73",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.format",
+        "payload": {
+          "atomIds": [
+            "00000000-0000-0000-0000-00000000042e"
+          ],
+          "attributes": {
+            "bold": true
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 73,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000048",
+        "actorId": "actor-72",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.move",
+        "payload": {
+          "toPageId": "q",
+          "sortIndex": 4
+        },
+        "dependencies": [],
+        "logicalClock": 72,
+        "pageId": "p",
+        "objectId": "text"
+      }
+    ],
+    "assets": [
+      {
+        "receipt": {
+          "assetId": "asset-70",
+          "sha256": "c5afafda0df2452ab048bb94c1ee2d2ba52b1c884d24edb1161e6caf67310f1e",
+          "sizeBytes": 15,
+          "mediaType": "application/pdf"
+        },
+        "base64": "JVBERi0xLjQKcGFyaXR5"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {
+              "text": {
+                "fontSize": 16.0,
+                "colorValue": 4279383126,
+                "width": 100.0,
+                "rotation": 0.0,
+                "dx": 1.0,
+                "dy": 2.0,
+                "sortIndex": 4,
+                "objectType": "text",
+                "text": "￼",
+                "delta": [
+                  {
+                    "insert": {
+                      "pdf": "asset:asset-70"
+                    },
+                    "attributes": {
+                      "bold": true
+                    }
+                  }
+                ],
+                "assets": {
+                  "asset-70": {
+                    "sha256": "c5afafda0df2452ab048bb94c1ee2d2ba52b1c884d24edb1161e6caf67310f1e",
+                    "sizeBytes": 15,
+                    "mediaType": "application/pdf"
+                  }
+                }
+              }
+            },
+            "order": [
+              "text"
+            ]
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": []
+    }
+  },
+  {
+    "name": "pdf detach after deleting embed/1",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000006",
+        "actorId": "actor-6",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "object.create",
+        "payload": {
+          "value": {
+            "objectType": "text",
+            "fontSize": 16.0,
+            "colorValue": 4279383126,
+            "width": 100.0,
+            "rotation": 0.0,
+            "dx": 1.0,
+            "dy": 2.0,
+            "sortIndex": 1
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 6,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000046",
+        "actorId": "actor-70",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "asset.attach",
+        "payload": {
+          "assetId": "asset-70",
+          "sha256": "c5afafda0df2452ab048bb94c1ee2d2ba52b1c884d24edb1161e6caf67310f1e",
+          "sizeBytes": 15,
+          "mediaType": "application/pdf"
+        },
+        "dependencies": [],
+        "logicalClock": 70,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000047",
+        "actorId": "actor-71",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.insert",
+        "payload": {
+          "afterAtomId": null,
+          "atoms": [
+            {
+              "id": "00000000-0000-0000-0000-00000000042e",
+              "text": "￼",
+              "embed": {
+                "pdf": "asset:asset-70"
+              }
+            }
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 71,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000004a",
+        "actorId": "actor-74",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "text.delete",
+        "payload": {
+          "atomIds": [
+            "00000000-0000-0000-0000-00000000042e"
+          ]
+        },
+        "dependencies": [],
+        "logicalClock": 74,
+        "pageId": "p",
+        "objectId": "text"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-00000000004b",
+        "actorId": "actor-75",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "asset.detach",
+        "payload": {
+          "assetId": "asset-70"
+        },
+        "dependencies": [],
+        "logicalClock": 75,
+        "pageId": "p",
+        "objectId": "text"
+      }
+    ],
+    "assets": [
+      {
+        "receipt": {
+          "assetId": "asset-70",
+          "sha256": "c5afafda0df2452ab048bb94c1ee2d2ba52b1c884d24edb1161e6caf67310f1e",
+          "sizeBytes": 15,
+          "mediaType": "application/pdf"
+        },
+        "base64": "JVBERi0xLjQKcGFyaXR5"
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "p": {
+            "title": "One",
+            "isBookmarked": false,
+            "objects": {
+              "text": {
+                "fontSize": 16.0,
+                "colorValue": 4279383126,
+                "width": 100.0,
+                "rotation": 0.0,
+                "dx": 1.0,
+                "dy": 2.0,
+                "sortIndex": 1,
+                "objectType": "text",
+                "text": "",
+                "delta": [],
+                "assets": {}
+              }
+            },
+            "order": [
+              "text"
+            ]
+          },
+          "q": {
+            "title": "Two",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          },
+          "r": {
+            "title": "Three",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": []
+    }
+  }
+]

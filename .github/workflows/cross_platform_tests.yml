@@ -139,6 +139,9 @@ jobs:
       - name: Verify legacy SQLite migration staging
         run: python3 -m unittest discover -s tool -p 'test_stage11_migrate.py'
 
+      - name: Verify Python projection against the shared Dart corpus
+        run: python3 tool/verify_projection_corpus.py
+
   postgres-http-e2e:
     if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') && !contains(github.event.head_commit.message, '[ci:android-only]') }}
     name: PostgreSQL HTTP smoke (account, sync, sharing, backup)

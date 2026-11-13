@@ -11,6 +11,7 @@ import 'package:program/data/drift/notes_database.dart';
 import 'package:program/data/sync/api_client.dart';
 import 'package:program/data/sync/editor_v2_account_runtime.dart';
 import 'package:program/data/sync/operation_protocol.dart';
+import 'package:program/data/sync/operation_store.dart';
 import 'package:program/features/editor/state/editor_controller.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 
@@ -106,6 +107,145 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   useIsolatedNativeTestDocuments();
   useInMemoryTestTextStorage();
+
+  for (final scenario in [
+    (ack: 'pending', object: false),
+    (ack: 'after', object: false),
+    (ack: 'before', object: false),
+    (ack: 'pending', object: true),
+  ]) {
+    final ackPosition = scenario.ack;
+    final alreadyAcknowledged = ackPosition != 'pending';
+    test(
+      'remote deletion rebases moved ink, ACK=$ackPosition, object=${scenario.object}',
+      () async {
+        final f = _Fixture(NativeDatabase.memory());
+        addTearDown(f.close);
+        await f.runtime.startForCurrentAccount(isCurrent: () => true);
+        final note = await f.repository.createNotebook();
+        final source = note.pages.single.id;
+        final actor = f.runtime.engine.actorIdForDocument(note.uid);
+        await f.runtime.store.writeLocalBatch(
+          actorId: actor,
+          documentId: note.uid,
+          operations: [
+            const LocalOperationDraft(
+              kind: OperationKind.pageCreate,
+              objectId: 'surviving-destination',
+              payload: {
+                'value': {'title': 'Destination', 'isBookmarked': false},
+              },
+            ),
+            LocalOperationDraft(
+              kind: OperationKind.strokeCreate,
+              pageId: source,
+              objectId: 'source-delete-ink',
+              payload: const {
+                'value': {
+                  'objectType': 'stroke',
+                  'colorValue': 0xFF123456,
+                  'width': 2.0,
+                  'toolIndex': 0,
+                  'sortIndex': 0,
+                  'points': [
+                    [10.0, 12.0, 0.5],
+                  ],
+                },
+              },
+            ),
+          ],
+          apply: f.runtime.projector.apply,
+        );
+        await f.runtime.engine.syncNow();
+        final moved = await f.runtime.store.writeLocal(
+          actorId: actor,
+          documentId: note.uid,
+          pageId: source,
+          objectId: 'source-delete-ink',
+          kind: OperationKind.objectMove,
+          payload: const {'toPageId': 'surviving-destination', 'sortIndex': 4},
+          apply: f.runtime.projector.apply,
+        );
+        final removed = OperationEnvelope(
+          operationId: '00000000-0000-4000-8000-00000000f001',
+          actorId: 'source-delete-peer',
+          actorSeq: 1,
+          logicalClock: moved.logicalClock + 1,
+          dependencies: [f.accepted.last['operationId'] as String],
+          documentId: note.uid,
+          objectId: scenario.object ? 'source-delete-ink' : source,
+          pageId: scenario.object ? source : null,
+          kind: scenario.object
+              ? OperationKind.objectDelete
+              : OperationKind.pageDelete,
+          payload: const {},
+        );
+        if (ackPosition != 'before') f.accepted.add(removed.toJson());
+        if (alreadyAcknowledged) {
+          f.accepted.add(moved.toJson());
+          await f.runtime.store.acknowledge(
+            moved.operationId,
+            serverSequence: f.accepted.length,
+          );
+        }
+        if (ackPosition == 'before') f.accepted.add(removed.toJson());
+        final editor = EditorController(
+          repository: f.repository,
+          notebook: (await f.repository.getNotebook(note.uid))!,
+          operationWriter: f.runtime.writer,
+          saveDebounce: const Duration(days: 1),
+        );
+        addTearDown(editor.dispose);
+        await editor.historyReady;
+        await editor.preferencesReady;
+        editor.viewScale = 1.5;
+        editor.viewPan = const Offset(42, 17);
+        f.runtime.attachEditor(editor);
+        f.rejectPosts = true;
+        await f.runtime.engine.syncNow();
+        final saved = (await f.repository.getNotebook(note.uid))!;
+        expect(saved.pages, hasLength(scenario.object ? 2 : 1));
+        expect(saved.pages.last.id, 'surviving-destination');
+        expect(
+          saved.pages.last.inkStrokes,
+          hasLength(ackPosition == 'before' ? 1 : 0),
+        );
+        expect(
+          editor.pages.last.inkStrokes,
+          hasLength(ackPosition == 'before' ? 1 : 0),
+        );
+        expect(editor.viewScale, 1.5);
+        expect(editor.viewPan, const Offset(42, 17));
+        if (ackPosition != 'before') {
+          expect(
+            await f.runtime.recoveryReport(),
+            contains('source-delete-ink'),
+          );
+        }
+        expect(
+          (await f.runtime.store.operation(moved.operationId))!.toJson(),
+          moved.toJson(),
+        );
+        expect(
+          await f.runtime.store.pending(includeDeferred: true),
+          hasLength(alreadyAcknowledged ? 0 : 1),
+        );
+        f.rejectPosts = false;
+        if (!alreadyAcknowledged) {
+          await f.runtime.store.scheduleRetry(
+            moved.operationId,
+            delay: Duration.zero,
+          );
+        }
+        await f.runtime.engine.syncNow();
+        expect(await f.runtime.store.pending(includeDeferred: true), isEmpty);
+        expect(
+          await f.runtime.store.checkpoint('account:startup-account'),
+          f.accepted.length,
+        );
+      },
+    );
+  }
 
   test('obsolete account cannot bind the repository or start HTTP', () async {
     final fixture = _Fixture(NativeDatabase.memory());

@@ -30,6 +30,42 @@ class EditorSqliteProjector {
   final OperationStore _store;
   final ShareInkEditAdapter _ink = ShareInkEditAdapter();
 
+  /// Removes only optimistic relocations invalidated by an earlier server
+  /// source-page deletion. The caller archives content in this transaction.
+  Future<void> removeMovesAfterSourceDeletion(
+    OperationEnvelope deletion,
+    List<OperationEnvelope> moves,
+  ) async {
+    for (final id in moves.map((move) => move.objectId!).toSet()) {
+      final rows = await database
+          .customSelect(
+            'SELECT page_uid FROM ink_stroke_rows WHERE uid = ? '
+            'UNION ALL SELECT page_uid FROM image_block_rows WHERE uid = ? '
+            'UNION ALL SELECT page_uid FROM text_block_rows WHERE uid = ?',
+            variables: [
+              Variable<String>(id),
+              Variable<String>(id),
+              Variable<String>(id),
+            ],
+          )
+          .get();
+      if (rows.isEmpty) {
+        continue;
+      }
+      if (rows.length != 1) {
+        throw StateError('Source deletion has an ambiguous moved UID.');
+      }
+      await _deleteObject(
+        OperationEnvelope.fromJson({
+          ...deletion.toJson(),
+          'type': 'object.delete',
+          'pageId': rows.single.read<String>('page_uid'),
+          'objectId': id,
+        }),
+      );
+    }
+  }
+
   Future<void> apply(OperationEnvelope operation) async {
     operation.validateForV2Projection();
     if (operation.kind == OperationKind.documentCreate) {

@@ -380,6 +380,7 @@ class OperationStore {
           coveredCursor:
               coveredCursor ??
               (checkpointScope == null ? 0 : await checkpoint(checkpointScope)),
+          serverSequence: serverSequence,
         );
         final actorScope = _remoteActorScope(operation.actorId);
         if (serverSequence > await checkpoint(actorScope)) {
@@ -398,6 +399,7 @@ class OperationStore {
     required String source,
     required Future<void> Function() apply,
     int? coveredCursor,
+    int? serverSequence,
   }) async {
     if (entry.causalCursor != null) {
       final appliedCursor =
@@ -468,10 +470,16 @@ class OperationStore {
     }
     // The server may accept an old concurrent edit as an ignored no-op.
     // Record its actor sequence and cursor without resurrecting the target.
-    final pageMoveTombstones =
+    final pageObjectTombstones =
         !deleted && entry.kind == OperationKind.pageDelete
-        ? await _movedObjectsOnPage(entry.documentId, entry.objectId!)
+        ? await _objectsOnPage(entry.documentId, entry.objectId!)
         : const <String>[];
+    final sourceMoves =
+        !deleted &&
+            entry.kind == OperationKind.pageDelete &&
+            serverSequence != null
+        ? await movesAfterSourceDeletion(entry, serverSequence)
+        : const <OperationEnvelope>[];
     final deletedMoveDestination =
         !deleted &&
         entry.kind == OperationKind.objectMove &&
@@ -526,8 +534,11 @@ class OperationStore {
     }
     if (!deleted) {
       await _writeTombstone(entry);
-      for (final uid in pageMoveTombstones) {
+      for (final uid in pageObjectTombstones) {
         await _writeMoveTombstone(entry, entry.objectId!, uid);
+      }
+      for (final move in sourceMoves) {
+        await _writeMoveTombstone(entry, entry.objectId!, move.objectId!);
       }
       if (deletedMoveDestination &&
           !await _hasLiveObject(entry.documentId, entry.objectId!)) {
@@ -553,7 +564,67 @@ class OperationStore {
         null;
   }
 
-  Future<List<String>> _movedObjectsOnPage(String document, String page) async {
+  /// Local moves accepted after the source deletion are server no-ops.
+  /// Their optimistic copies must be archived and removed, including when
+  /// the ACK arrived before the deletion was pulled. Earlier ACKs survive.
+  Future<List<OperationEnvelope>> movesAfterSourceDeletion(
+    OperationEnvelope deletion,
+    int cursor,
+  ) async {
+    if (deletion.kind != OperationKind.pageDelete) {
+      return [];
+    }
+    final rows = await database
+        .customSelect(
+          'SELECT o.envelope_json FROM operations o '
+          'LEFT JOIN operation_ack ack ON ack.operation_id = o.operation_id '
+          "WHERE o.document_id = ? AND o.page_id = ? AND o.kind = 'object.move' "
+          "AND o.source = 'local' AND (ack.server_sequence IS NULL OR ack.server_sequence > ?)",
+          variables: [
+            Variable<String>(deletion.documentId),
+            Variable<String>(deletion.objectId!),
+            Variable<int>(cursor),
+          ],
+        )
+        .get();
+    final result = <OperationEnvelope>[];
+    for (final row in rows) {
+      final move = OperationEnvelope.fromJson(
+        Map<String, dynamic>.from(
+          jsonDecode(row.read<String>('envelope_json')) as Map,
+        ),
+      );
+      if (!await _hasLiveObject(deletion.documentId, move.objectId!)) {
+        continue;
+      }
+      // A second committed relocation needs a full placement rebase. Keep
+      // that case blocked instead of removing a possibly surviving object.
+      final alternate = await database
+          .customSelect(
+            'SELECT 1 FROM operations o LEFT JOIN operation_ack ack '
+            'ON ack.operation_id = o.operation_id '
+            "WHERE o.document_id = ? AND o.object_id = ? AND o.kind = 'object.move' "
+            'AND o.operation_id != ? AND '
+            "(o.source = 'remote' OR ack.server_sequence <= ?) LIMIT 1",
+            variables: [
+              Variable<String>(deletion.documentId),
+              Variable<String>(move.objectId!),
+              Variable<String>(move.operationId),
+              Variable<int>(cursor),
+            ],
+          )
+          .getSingleOrNull();
+      if (alternate != null) {
+        throw StateError(
+          'Source deletion requires a rebase of multiple committed moves.',
+        );
+      }
+      result.add(move);
+    }
+    return result;
+  }
+
+  Future<List<String>> _objectsOnPage(String document, String page) async {
     final result = await database
         .customSelect(
           'SELECT live.uid FROM ('
@@ -561,9 +632,7 @@ class OperationStore {
           'SELECT uid, page_uid FROM image_block_rows UNION ALL '
           'SELECT uid, page_uid FROM text_block_rows'
           ') live JOIN page_rows p ON p.uid = live.page_uid '
-          'WHERE p.notebook_uid = ? AND p.uid = ? AND EXISTS ('
-          "SELECT 1 FROM operations o WHERE o.document_id = p.notebook_uid "
-          "AND o.object_id = live.uid AND o.kind = 'object.move')",
+          'WHERE p.notebook_uid = ? AND p.uid = ?',
           variables: [Variable<String>(document), Variable<String>(page)],
         )
         .get();

@@ -58,6 +58,19 @@ class ServerMirrorTest(unittest.TestCase):
         )
         self.assertEqual(self.run_check(), 0)
 
+    def test_reset_and_retirement_tools_are_part_of_the_mirror(self):
+        for path in (
+            "scripts/reset-all-test-data.sh",
+            "scripts/tests/test_reset_all_test_data.py",
+            "scripts/stage14-retirement-audit.sh",
+            "scripts/tests/test_stage14_retirement_audit.py",
+            "docs/RESET_ALL_TEST_DATA_PL.md",
+        ):
+            self.write(self.source, path, "# canonical reset tool\n")
+        self.assertEqual(self.run_check(), 1)
+        self.assertEqual(self.run_check("--sync"), 0)
+        self.assertEqual(self.run_check(), 0)
+
     def test_stale_backend_is_reported_and_replaced_from_canonical(self):
         path = "api/app/operation_projection.py"
         self.write(self.source, path, "# canonical\n")
