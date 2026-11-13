@@ -1,11 +1,11 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
+import 'package:collection/collection.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 
-import '../../core/storage/app_save_coordinator.dart';
 import '../../core/storage/active_storage_namespace.dart';
+import '../../core/storage/app_save_coordinator.dart';
 import '../../core/storage/storage_namespace_manager.dart';
 import '../../core/storage/text_storage.dart';
 import '../../features/notebook/data/notebook_repository.dart';
@@ -52,7 +52,7 @@ class V2BackupRecoveryService {
     return id;
   }
 
-  String get _scope => 'account:${_accountId}';
+  String get _scope => runtime.engine.checkpointScope;
 
   Future<void> _refreshCredentials() async {
     final expiresAt = session.accessExpiresAt;
@@ -66,6 +66,7 @@ class V2BackupRecoveryService {
 
   void _assertAccount(String id) {
     if (_accountId != id ||
+        runtime.engine.checkpointScope != 'account:$id' ||
         ActiveStorageNamespace.current != StorageNamespace.account(id)) {
       throw StateError('Account namespace changed during v2 backup.');
     }
@@ -88,6 +89,7 @@ class V2BackupRecoveryService {
 
   Future<void> completeRecovery() async {
     final id = _accountId;
+    _assertAccount(id);
     final raw = await readStoredText(_marker(id));
     if (raw == null) {
       return;
@@ -96,6 +98,12 @@ class V2BackupRecoveryService {
     if (record['state'] != 'pending') {
       return;
     }
+    final checkpoint = record['checkpoint'];
+    if (checkpoint is! int ||
+        await runtime.store.checkpoint('account:$id') < checkpoint) {
+      throw StateError('Cannot complete an unapplied recovery archive.');
+    }
+    _assertAccount(id);
     await writeStoredText(
       _marker(id),
       jsonEncode({...record, 'state': 'complete'}),
@@ -292,6 +300,9 @@ class V2BackupRecoveryService {
   /// Restores a verified immutable archive before starting SyncEngine.
   /// A failed or interrupted replay retains the pending marker and cursor.
   Future<bool> recoverVerifiedArchive({required bool databaseWasReset}) async {
+    if (runtime.engine.isStarted) {
+      throw StateError('Stop v2 synchronization before archive recovery.');
+    }
     final accountId = _accountId;
     _assertAccount(accountId);
     await _refreshCredentials();
@@ -312,17 +323,17 @@ class V2BackupRecoveryService {
     final markerKey = _marker(accountId);
     final earlier = await readStoredText(markerKey);
     final pending = earlier == null ? null : _asObject(jsonDecode(earlier));
-    if (pending != null &&
-        pending['state'] == 'pending' &&
-        (pending['backupId'] is! String)) {
+    final resuming = pending?['state'] == 'pending';
+    if (resuming &&
+        (pending!['backupId'] is! String || pending['checkpoint'] is! int)) {
       throw const FormatException('Invalid pending recovery identity.');
     }
 
-    final chosen = pending != null && pending['state'] == 'pending'
+    final chosen = resuming
         ? backups
               .where(
                 (entry) =>
-                    entry is Map && entry['backupId'] == pending['backupId'],
+                    entry is Map && entry['backupId'] == pending!['backupId'],
               )
               .toList()
         : backups;
@@ -333,13 +344,14 @@ class V2BackupRecoveryService {
     final verified = await _downloadValidArchive(chosen, accountId);
     final backupId = verified.id;
     final archiveCursor = verified.cursor;
-    if (pending != null &&
-        pending['state'] == 'pending' &&
-        pending['backupId'] != backupId) {
+    if (resuming &&
+        (pending!['backupId'] != backupId ||
+            pending['checkpoint'] != archiveCursor)) {
       throw StateError('Recovery snapshot changed during restart.');
     }
-    final localCursor = await runtime.store.checkpoint(_scope);
-    if (!databaseWasReset && localCursor > archiveCursor) {
+    final scope = 'account:$accountId';
+    final localCursor = await runtime.store.checkpoint(scope);
+    if (!resuming && localCursor > archiveCursor) {
       throw StateError('Older backup cannot roll back the v2 checkpoint.');
     }
     if ((await runtime.store.pending(
@@ -348,13 +360,20 @@ class V2BackupRecoveryService {
     )).isNotEmpty) {
       throw StateError('Local pending edits block archive recovery.');
     }
-    if (pending == null || pending['state'] != 'pending') {
+    if (!resuming) {
+      if (!databaseWasReset) {
+        throw StateError('Archive recovery requires a reset database.');
+      }
       final oldJournal = await repository.database
           .customSelect('SELECT COUNT(*) AS total FROM operations')
           .getSingle();
       if (oldJournal.read<int>('total') != 0) {
         throw StateError('Archive recovery requires a fresh v2 journal.');
       }
+    } else if (localCursor > 0 &&
+        localCursor < archiveCursor &&
+        !verified.history.any((item) => item.cursor == localCursor)) {
+      throw StateError('Local recovery checkpoint is not in the archive.');
     }
     _assertAccount(accountId);
     await writeStoredText(
@@ -378,6 +397,17 @@ class V2BackupRecoveryService {
         throw const FormatException('Non-monotonic archived cursor.');
       }
       previous = cursor;
+      if (cursor <= localCursor) {
+        final applied = await runtime.store.operation(operation.operationId);
+        if (applied == null ||
+            !const DeepCollectionEquality().equals(
+              applied.toJson(),
+              operation.toJson(),
+            )) {
+          throw StateError('Applied recovery history does not match archive.');
+        }
+        continue;
+      }
       if (operation.kind == OperationKind.assetAttach) {
         final digest = operation.payload['sha256'];
         final bytes = assets[digest];
@@ -391,7 +421,7 @@ class V2BackupRecoveryService {
       }
       await runtime.store.applyRemote(
         operation,
-        checkpointScope: _scope,
+        checkpointScope: scope,
         serverSequence: cursor,
         coveredCursor: cursor - 1,
         apply: () => operation.documentId == OperationEnvelope.libraryDocumentId
@@ -404,7 +434,10 @@ class V2BackupRecoveryService {
     if (previous != archiveCursor) {
       throw const FormatException('Archive ends before the saved checkpoint.');
     }
-    if (await runtime.store.checkpoint(_scope) != archiveCursor) {
+    final expectedCursor = localCursor > archiveCursor
+        ? localCursor
+        : archiveCursor;
+    if (await runtime.store.checkpoint(scope) != expectedCursor) {
       throw StateError('Operational recovery checkpoint mismatch.');
     }
     final check = await repository.database
@@ -420,7 +453,9 @@ class V2BackupRecoveryService {
       if (entry.value == null) {
         continue;
       }
+      _assertAccount(accountId);
       final current = await readStoredText(entry.key);
+      _assertAccount(accountId);
       if (current == null || current.trim().isEmpty) {
         await writeStoredText(entry.key, entry.value!);
       }

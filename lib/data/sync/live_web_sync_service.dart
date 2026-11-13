@@ -1101,9 +1101,30 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
     ]);
   }
 
-  String _stateKey(String id) {
+  static String _stateKey(String id) {
     final suffix = sha256.convert(utf8.encode(id)).toString().substring(0, 16);
     return 'server_sync_state_$suffix.json';
+  }
+
+  /// A legacy delete may exist only in the v1 outbox, without a SQLite row.
+  /// Do not switch writers while a device still holds unsent legacy intent.
+  static Future<void> requireEmptyLegacyOutbox(String userId) async {
+    final raw = await readStoredText(_stateKey(userId));
+    if (raw == null) {
+      return;
+    }
+    final state = jsonDecode(raw);
+    if (state is! Map<String, dynamic> || state['version'] != 1) {
+      throw const FormatException('Invalid saved legacy sync state.');
+    }
+    final pending = state['pending'];
+    if (pending is! List ||
+        pending.any((uid) => uid is! String || uid.isEmpty)) {
+      throw const FormatException('Invalid saved legacy outbox.');
+    }
+    if (pending.isNotEmpty) {
+      throw StateError('V2 activation blocked by unsent legacy edits.');
+    }
   }
 
   Future<void> _loadState(String userId) async {

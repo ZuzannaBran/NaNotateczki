@@ -136,6 +136,9 @@ jobs:
       - name: Verify offline canary activation guards
         run: python3 -m unittest discover -s server/scripts/tests -p 'test_stage13_canary_activation.py'
 
+      - name: Verify legacy SQLite migration staging
+        run: python3 -m unittest discover -s tool -p 'test_stage11_migrate.py'
+
   postgres-http-e2e:
     if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') && !contains(github.event.head_commit.message, '[ci:android-only]') }}
     name: PostgreSQL HTTP smoke (account, sync, sharing, backup)
@@ -215,7 +218,7 @@ jobs:
           NN_STAGE12_DEVICE_ID: linux
           # The disposable JWT must outlive the initial native compilation.
           access_token_minutes: '45'
-        run: xvfb-run -a bash scripts/run-stage12-real.sh --quick
+        run: xvfb-run -a bash scripts/run-stage12-real.sh
 
   stylus-input:
     if: ${{ !contains(github.event.head_commit.message, '[ci:failed-only]') && !contains(github.event.head_commit.message, '[ci:android-only]') }}

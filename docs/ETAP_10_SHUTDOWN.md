@@ -94,6 +94,9 @@ Na serwerze nie ma teraz poleceń do wykonania.
   offline pojawiają się tylko po bezpiecznym lokalnym flush.
 - `test/cross_platform/save_and_exit_test.dart` i
   `test/sync_engine_test.dart`: zapis gestu, outbox, replay po restarcie.
+- `test/app_scope_v2_shutdown_test.dart`: rzeczywisty AppScope z testowym
+  HTTP i SQLite czeka na stop writerów przed zamknięciem, wznawia je po
+  anulowaniu przez system i weryfikuje kopię v2 przed revoke przy logout.
 
 ## Akceptacja na rzeczywistych urządzeniach (niezautomatyzowana)
 

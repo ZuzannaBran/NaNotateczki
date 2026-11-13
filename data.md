@@ -6,7 +6,8 @@ plików i lokalnego backupu → próba synchronizacji → weryfikacja backupu
 konto/wersja → zatrzymanie transportów przed zmianą konta. V2 sprawdza
 niewysłany i odroczony outbox po `SyncEngine.syncNow`; oczekujące wpisy
 oznaczają brak ACK, a nie zgodę na wyczyszczenie kolejki. Planner i ustawienia
-CAS muszą zostać sprawdzone przed backupem.
+CAS muszą zostać sprawdzone przed backupem. Zamykanie okna również czeka
+na drenaż usług, a po anulowaniu przez system wznawia ten sam namespace.
 
 Całość ma limit 45 s i raport etapu błędu. Timeout na Future nie jest
 anulowaniem operacji: przy nieukończonym drenażu starego transportu konto
@@ -40,7 +41,8 @@ Bez produkcyjnej aktywacji v2.
 - Lost SQLite/IndexedDB lub recovery `pending` wywołują bezstratny,
   idempotentny replay do lokalnej bazy i catch-up nowych operacji przed
   odblokowaniem edycji. Starszy checkpoint nie cofa zachowanego nowszego;
-  tombstone trwa po restarcie. Marker pending wiąże próbę z backupId.
+  tombstone trwa po restarcie. Marker pending wiąże próbę z backupId
+  i checkpointem. Wznowienie weryfikuje zapisany prefiks bez cofania kursora.
 - Scheduler korzysta z dotychczasowych opóźnień 15/30/60/120/300/900/1800
   sekund i trybu dirty; nie serializuje niezmienionych dokumentów do
   pełnych JSON. Zachowuje limit 64 MiB oraz pełnego archiwum 100000 zdarzeń.

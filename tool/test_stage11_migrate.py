@@ -46,6 +46,35 @@ class Stage11MigrationTests(unittest.TestCase):
                 'PRAGMA user_version'
             ).fetchone()[0], 6)
 
+    def test_recent_schemas_preserve_journal_tables_and_source(self):
+        for version, table in ((7, 'operation_asset_bytes'),
+                               (8, 'editor_history')):
+            with self.subTest(version=version):
+                data = Path(self.temp.name) / str(version)
+                data.mkdir()
+                database = data / 'notes.sqlite'
+                with sqlite3.connect(database) as db:
+                    db.executescript(f'''
+                        PRAGMA user_version = {version};
+                        CREATE TABLE notebook_rows (uid TEXT PRIMARY KEY);
+                        CREATE TABLE page_rows (uid TEXT PRIMARY KEY);
+                        CREATE TABLE image_block_rows (uid TEXT PRIMARY KEY,
+                            path TEXT, bytes BLOB);
+                        CREATE TABLE {table} (value BLOB NOT NULL);
+                        INSERT INTO {table} VALUES (x'1aff');
+                    ''')
+                checksum = digest(database)
+                report = stage_migration(data)
+                self.assertEqual(report['status'], 'staged-not-activated')
+                self.assertEqual(report['schemaVersion'], version)
+                self.assertEqual(report['rowCounts'][table], 1)
+                self.assertEqual(digest(database), checksum)
+                self.assertEqual(report, stage_migration(data))
+                with sqlite3.connect(data / 'local' / 'notes.sqlite') as db:
+                    self.assertEqual(db.execute(
+                        f'SELECT value FROM {table}'
+                    ).fetchone(), (b'\x1a\xff',))
+
     def test_local_migration_preserves_source_and_outbox(self):
         before = digest(self.data / 'notes.sqlite')
         report = stage_migration(self.data)

@@ -33,6 +33,26 @@ void main() {
     textStorageWriteOverride = null;
   });
 
+  test('v2 cutover preserves unsent legacy deletions', () async {
+    var raw = '{"version":1,"cursor":3,"pending":["deleted-note"]}';
+    textStorageReadOverride = (key) async {
+      expect(key, startsWith('server_sync_state_'));
+      return raw;
+    };
+    textStorageWriteOverride = (_, _) async => fail('Must not edit v1 state');
+    await expectLater(
+      LiveWebSyncService.requireEmptyLegacyOutbox('owner'),
+      throwsStateError,
+    );
+    raw = '{"version":1,"cursor":3,"pending":"invalid"}';
+    await expectLater(
+      LiveWebSyncService.requireEmptyLegacyOutbox('owner'),
+      throwsFormatException,
+    );
+    raw = '{"version":1,"cursor":3,"pending":[]}';
+    await LiveWebSyncService.requireEmptyLegacyOutbox('owner');
+  });
+
   test(
     'shared incoming revision waits for the host to finish writing',
     () async {

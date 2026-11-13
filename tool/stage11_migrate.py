@@ -17,6 +17,7 @@ from urllib.parse import quote
 
 MANIFEST = '.stage11_manifest.json'
 INCOMPLETE = '.stage11_incomplete'
+MAX_SUPPORTED_SCHEMA = 8
 SQLITE_FILES = ('notes.sqlite', 'notes.sqlite-wal', 'notes.sqlite-shm',
                 'notes.sqlite-journal')
 BASE_FILES = SQLITE_FILES + (
@@ -127,7 +128,7 @@ def _inspect_database(path: Path) -> tuple[int, dict[str, int]]:
             if db.execute('PRAGMA foreign_key_check').fetchall():
                 raise MigrationError('SQLite foreign_key_check failed')
             version = int(db.execute('PRAGMA user_version').fetchone()[0])
-            if not 1 <= version <= 6:
+            if not 1 <= version <= MAX_SUPPORTED_SCHEMA:
                 raise MigrationError(f'Unknown legacy SQLite schema: {version}')
             existing = {row[0] for row in db.execute(
                 "SELECT name FROM sqlite_master WHERE type='table'")}

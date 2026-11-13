@@ -14,7 +14,7 @@ serwer i NIE zmienia aktywnej ścieżki SQLite aplikacji.
   konta mogą trafić wyłącznie do accounts/<sha256(userId)[:40]>, a
   nieprzypisane wyłącznie do local/. Import Local → konto jest osobnym
   procesem po wyraźnej decyzji użytkownika.
-- Sprawdza SQLite quick_check, foreign_key_check, user_version 1–6
+- Sprawdza SQLite quick_check, foreign_key_check, user_version 1–8
   i liczby notatników, stron, elementów, outboxu i tombstones.
 - Kopiuje istniejące SQLite, WAL/SHM/journal, ustawienia i dane planera,
   account_profile.json, storage_layout.json, identyfikator urządzenia,
@@ -117,7 +117,9 @@ albo przerwanie HTTP pozostawia edytor zablokowany.
 
 Na urządzeniu nawet obecność `document.set` nie oznacza wykonanej
 migracji: każdy istniejący notebook musi mieć `document.create`
-w dzienniku v2. Aktywacja pustego konta testowego odrzuca błąd
+w dzienniku v2. Niewysłany outbox v1 blokuje aktywację nawet wtedy,
+gdy lokalny notebook został już usunięty. Aktywacja pustego konta
+testowego odrzuca błąd
 sprawdzenia procesu API, nieznane tabele i zweryfikowane assety.
 
 **Konta historyczne:** staging etapu 11 nie przenosi jeszcze danych

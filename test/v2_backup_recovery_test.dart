@@ -320,6 +320,16 @@ void main() {
     'restart mid-restore is idempotent with durable pending marker',
     () async {
       final server = _Server();
+      server.history.add(
+        event(
+          3,
+          OperationKind.pageSet,
+          objectId: 'page-one',
+          payload: {
+            'properties': {'title': 'Renamed'},
+          },
+        ),
+      );
       final source = _Client(server);
       addTearDown(source.close);
       await source.seed();
@@ -327,8 +337,8 @@ void main() {
       final target = _Client(server);
       addTearDown(target.close);
       target.backup.afterRecoveryOperation = (index) async {
-        if (index == 1) {
-          throw StateError('Simulated crash after first SQLite commit');
+        if (index == 2) {
+          throw StateError('Simulated crash after two SQLite commits');
         }
       };
       await expectLater(
@@ -336,19 +346,44 @@ void main() {
         throwsStateError,
       );
       expect(await target.backup.hasInterruptedRecovery(accountId), true);
-      expect(await target.runtime.store.checkpoint('account:$accountId'), 1);
+      expect(await target.runtime.store.checkpoint('account:$accountId'), 2);
       target.backup.afterRecoveryOperation = null;
       expect(
         await target.backup.recoverVerifiedArchive(databaseWasReset: false),
         true,
       );
-      expect(await target.runtime.store.checkpoint('account:$accountId'), 2);
+      expect(await target.runtime.store.checkpoint('account:$accountId'), 3);
       expect(
         (await target.db.customSelect('SELECT * FROM operations').get()),
-        hasLength(2),
+        hasLength(3),
       );
     },
   );
+
+  test('restart after catch-up but before marker completion is safe', () async {
+    final server = _Server();
+    final source = _Client(server);
+    addTearDown(source.close);
+    await source.seed();
+    await source.backup.uploadVerifiedSnapshot(deviceId: deviceId);
+    server.history.add(event(3, OperationKind.documentDelete));
+    final target = _Client(server);
+    addTearDown(target.close);
+    await target.backup.recoverVerifiedArchive(databaseWasReset: true);
+    await target.runtime.startForCurrentAccount(isCurrent: () => true);
+    await target.runtime.stop();
+    expect(await target.runtime.store.checkpoint('account:$accountId'), 3);
+    expect(await target.backup.hasInterruptedRecovery(accountId), true);
+
+    expect(
+      await target.backup.recoverVerifiedArchive(databaseWasReset: false),
+      true,
+    );
+    expect(await target.runtime.store.checkpoint('account:$accountId'), 3);
+    expect(await target.repo.fetchNotebooks(), isEmpty);
+    await target.backup.completeRecovery();
+    expect(await target.backup.hasInterruptedRecovery(accountId), false);
+  });
 
   test('corrupt archived media is rejected before SQLite writes', () async {
     final server = _Server();

@@ -48,13 +48,15 @@
    pobierz assety przez `/v2/assets/<sha>` z weryfikacją bajtów.
 6. Zapisz marker `pending`, a potem replay kopert przez
    `OperationStore.applyRemote` z tym samym projektorem SQLite/Library,
-   jedną transakcją na operację. Powtórka po restarcie jest idempotentna.
+   jedną transakcją na operację. Po restarcie porównaj już utrwalone
+   koperty z tym samym archiwum i zacznij replay od pierwszej brakującej.
+   Jeżeli catch-up zdążył przesunąć kursor dalej, nie cofaj go.
    Nie zmieniaj oryginalnych ID ani aktorów.
 7. Sprawdź SQLite `quick_check`, dokładny checkpoint, odbuduj
    nieautorytatywne cache biblioteki. Synchronizuj kolejne operacje przez
    `SyncEngine` przed odblokowaniem edytora. Nowszy tombstone nie może
    wskrzesić wcześniejszego UID. Oznacz marker `complete` dopiero
-   po udanym catch-up.
+   po udanym catch-up i po skasowaniu znacznika odzyskiwania SQLite.
 8. Istniejącej bazy z nowszym checkpointem nie nadpisuj starszym
    backupem. Pending lokalny outbox blokuje recovery, a zmiana
    namespace/konta wstrzymuje dalszą pracę.

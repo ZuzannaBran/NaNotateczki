@@ -300,7 +300,7 @@ z runnera oraz osobnego PostgreSQL. Nie zastępuje gestów UI na dwóch
 fizycznych urządzeniach, Share host/guest ani macierzy wszystkich OS.
 
 Job `v2-controller-e2e` w Actions uruchamia istniejący
-`server/scripts/run-stage12-real.sh --quick` i ten test na Linuxie/Xvfb.
+`server/scripts/run-stage12-real.sh` i ten test na Linuxie/Xvfb.
 Pełny workflow obejmuje go automatycznie; marker
 `[ci:failed-only] [ci:v2-e2e]` wybiera analizę/testy natywne i ten stos,
 bez budowania pozostałych platform. `--quick` pomija tylko osobny stress

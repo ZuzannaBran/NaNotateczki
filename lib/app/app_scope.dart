@@ -47,9 +47,26 @@ import 'account_protocol_editor_gate.dart';
 import 'unsupported_account_protocol_screen.dart';
 
 class AppScope extends StatefulWidget {
-  const AppScope({super.key, this.onNamespaceSwitch});
+  const AppScope({super.key, this.onNamespaceSwitch})
+    : _openDatabase = null,
+      _testApiClient = null,
+      _testExit = null;
+
+  @visibleForTesting
+  const AppScope.forTesting({
+    super.key,
+    this.onNamespaceSwitch,
+    required Future<DatabaseOpenResult> Function() openDatabase,
+    required ApiClient apiClient,
+    Future<ui.AppExitResponse> Function()? exit,
+  }) : _openDatabase = openDatabase,
+       _testApiClient = apiClient,
+       _testExit = exit;
 
   final VoidCallback? onNamespaceSwitch;
+  final Future<DatabaseOpenResult> Function()? _openDatabase;
+  final ApiClient? _testApiClient;
+  final Future<ui.AppExitResponse> Function()? _testExit;
 
   @override
   State<AppScope> createState() => _AppScopeState();
@@ -103,6 +120,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   );
   final ValueNotifier<bool> _allowOfflineExit = ValueNotifier<bool>(false);
   Future<void>? _exitDrain;
+  Future<void>? _exitWriterDrain;
   bool _allowExit = false;
   bool _openErrorRecorded = false;
 
@@ -113,6 +131,9 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     final namespace = ActiveStorageNamespace.fromProfile(profile);
     _namespace = namespace;
     ActiveStorageNamespace.activate(namespace);
+    if (widget._openDatabase case final open?) {
+      return open();
+    }
     return NotesDatabase.open(
       databaseName: kIsWeb
           ? namespace.webDatabaseName
@@ -402,7 +423,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     unawaited(
       _openFuture
           .then((opened) => opened.database.close())
-          .catchError((Object _, StackTrace __) {}),
+          .catchError((Object _, StackTrace _) {}),
     );
     final backupService = _backupService;
     if (backupService != null) {
@@ -440,6 +461,10 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     return ui.AppExitResponse.cancel;
   }
 
+  Future<ui.AppExitResponse> _requestPlatformExit() =>
+      widget._testExit?.call() ??
+      ServicesBinding.instance.exitApplication(ui.AppExitType.required);
+
   Future<void> _finishPendingWorkAndExit({bool preserveOffline = false}) async {
     final repository = _repository;
     final backupService = _backupService;
@@ -451,7 +476,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         return;
       }
       _allowExit = true;
-      await ServicesBinding.instance.exitApplication(ui.AppExitType.required);
+      await _requestPlatformExit();
       return;
     }
 
@@ -463,6 +488,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       flushLocal: _flushLocallyForShutdown,
       syncRemote: _syncRemotelyForShutdown,
       verifyBackup: _verifyShutdownBackup,
+      stopServices: () => _exitWriterDrain = _quiesceAccountWriters(),
       onPhase: (phase) => _exitPhase.value = phase,
       timeout: const Duration(seconds: 45),
     );
@@ -470,13 +496,11 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       await coordinator.run(preserveOffline: preserveOffline);
       _allowExit = true;
       _exitFailure.value = null;
-      final response = await ServicesBinding.instance.exitApplication(
-        ui.AppExitType.required,
-      );
+      final response = await _requestPlatformExit();
       if (response == ui.AppExitResponse.cancel) {
         _allowExit = false;
-        scheduler.resumeAfterExitCancellation();
         _finishingExit.value = false;
+        _cancelPendingExit();
       }
     } catch (error, stackTrace) {
       _allowExit = false;
@@ -503,6 +527,25 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     _exitFailure.value = null;
     _allowOfflineExit.value = false;
     _backupScheduler?.resumeAfterExitCancellation();
+    final drain = _exitWriterDrain;
+    if (drain != null) {
+      unawaited(_resumeAfterExitDrain(drain));
+    }
+  }
+
+  Future<void> _resumeAfterExitDrain(Future<void> drain) async {
+    try {
+      await drain;
+    } catch (_) {
+      // Quiescence has released its fence. Startup still verifies its scope.
+    }
+    if (mounted &&
+        !_finishingExit.value &&
+        !_allowExit &&
+        identical(_exitWriterDrain, drain)) {
+      _exitWriterDrain = null;
+      await _startAccountSync();
+    }
   }
 
   bool _handleGlobalKeyEvent(KeyEvent event) {
@@ -693,14 +736,16 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   Future<String> _v2ActorId() =>
       loadPersistentOperationActor(OperationStore(_repository!.database));
 
-  bool _isCurrentAccountBootstrap(String userId, int generation) =>
+  bool _ownsAccountScope(String userId, int generation) =>
       mounted &&
       _accountBootstrapBarrier.isCurrent(generation) &&
       !_switchingNamespace &&
       _accountSession?.isSignedIn == true &&
-      _accountSession?.isBusy == false &&
       _accountSession?.userId == userId &&
       _namespace == StorageNamespace.account(userId);
+
+  bool _isCurrentAccountBootstrap(String userId, int generation) =>
+      _ownsAccountScope(userId, generation) && _accountSession?.isBusy == false;
 
   /// Completes a previously authorized Local import before enabling backups.
   Future<void> _importPendingLocalData(String userId, int generation) async {
@@ -808,6 +853,14 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     if (!isCurrent()) {
       return;
     }
+    await _liveSync?.flushPersistedOutbox();
+    if (!isCurrent()) {
+      return;
+    }
+    await LiveWebSyncService.requireEmptyLegacyOutbox(userId);
+    if (!isCurrent()) {
+      return;
+    }
     var runtime = _v2AccountRuntime;
     if (runtime == null) {
       final actorId = await _v2ActorId();
@@ -820,6 +873,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         accountId: userId,
         actorId: actorId,
         onLibraryChanged: library.reloadFromAccount,
+        enableRealtime: widget._testApiClient == null,
       );
       // Publish ownership before startup so logout can stop this transport.
       _v2AccountRuntime = runtime;
@@ -842,6 +896,10 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
             await verifiedBackup.wasDatabaseInitialized(userId));
     if (missingDatabase || interrupted) {
       // Replay must finish before the editor writer or REST pull can run.
+      await runtime.stop();
+      if (!isCurrent()) {
+        return;
+      }
       await recovery.recoverVerifiedArchive(databaseWasReset: missingDatabase);
       if (!isCurrent()) {
         await runtime.stop();
@@ -867,8 +925,16 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         await runtime.store.checkpoint('account:$userId') != currentCursor) {
       throw StateError('V2 recovery has not reached the server checkpoint.');
     }
-    await recovery.completeRecovery();
+    if (!isCurrent()) {
+      return;
+    }
     await verifiedBackup.markDatabaseInitialized(userId);
+    // Keep the archive's pending marker until the separate SQLite recovery
+    // flag has been cleared. A crash between these writes can resume safely.
+    if (missingDatabase) {
+      await repository.database.clearRecoveryMarker();
+    }
+    await recovery.completeRecovery();
     _databaseWasReset = false;
     _databaseFreshFile = false;
     await runtime.libraryOperations.refreshReadModel();
@@ -901,10 +967,9 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       await runtime.stop();
       return;
     }
-    _bootstrappedAccount = userId;
     try {
-      await _syncAccountSettings();
-      await _syncPlanner();
+      await _accountSettingsSync!.syncNow();
+      await _plannerSync!.syncNow();
     } catch (error, stackTrace) {
       AppErrorLog.instance.record(
         error,
@@ -921,11 +986,14 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     // Capture the non-null owner, not the mutable nullable startup local.
     final backupRuntime = runtime;
     backupScheduler.reconcileBeforeBackup = () async {
-      if (!isCurrent()) {
+      // Logout makes the session busy before its final backup, but retains
+      // its identity and generation until writers are actually drained.
+      bool ownsScope() => _ownsAccountScope(userId, generation);
+      if (!ownsScope()) {
         throw StateError('Account changed before v2 backup.');
       }
       await backupRuntime.engine.syncNow();
-      if (!isCurrent() ||
+      if (!ownsScope() ||
           backupRuntime.engine.lastError != null ||
           (await backupRuntime.store.pending(
             limit: 1,
@@ -951,6 +1019,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     });
     // Share v1 remains disabled for operational accounts.
     setState(() {
+      _bootstrappedAccount = userId;
       _incompatibleProtocolUser = null;
     });
   }
@@ -964,6 +1033,8 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     final preferences = _preferences;
     final planner = _studyPlanner;
     if (!mounted ||
+        _finishingExit.value ||
+        _allowExit ||
         session == null ||
         !session.isSignedIn ||
         session.isBusy ||
@@ -1201,7 +1272,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         _backupService = backupService;
         final cloudSync = _cloudSync ?? CloudSyncService(repository);
         _cloudSync = cloudSync;
-        final apiClient = _apiClient ?? ApiClient();
+        final apiClient = _apiClient ?? widget._testApiClient ?? ApiClient();
         _apiClient = apiClient;
         _activityWake ??= AppActivityWakeService(apiClient: apiClient);
         final newAccountSession = _accountSession == null;

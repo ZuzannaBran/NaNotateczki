@@ -6,8 +6,10 @@
   i braku starych dokumentów, eventów v1, backupów lub share v1.
 - `NotebookRepository.enableAccountOperations` wymaga rzeczywistej
   `document.create` dla każdego istniejącego notebooka SQLite.
+  `LiveWebSyncService.requireEmptyLegacyOutbox` blokuje start v2 także
+  po niewysłanym usunięciu v1, które nie ma już wiersza SQLite.
   Testy regresyjne: `test/api_client_test.dart`,
-  `test/notebook_repository_v2_account_test.dart`,
+  `test/notebook_repository_v2_account_test.dart`, `test/live_web_sync_service_test.dart`,
   `server/api/tests/test_account_protocol_fence.py`.
 - Serwerowy `stage13-activate-empty-canary.sh` nie akceptuje
   nieznanego statusu API, nowych account-owned tabel ani assetów.
@@ -39,6 +41,8 @@
   `unsupported_account_protocol_screen.dart` oferują
   kontrolowane ponowienie albo logout offline, również przy blokadzie v2.
 - Regresje: `test/shutdown_coordinator_test.dart`,
+  `test/app_scope_v2_shutdown_test.dart` (drenaż, anulowanie zamknięcia
+  przez system oraz kolejność backup v2 → revoke),
   `test/account_session_controller_test.dart`,
   `test/planner_sync_service_test.dart`,
   `test/account_settings_sync_service_test.dart`,
@@ -241,7 +245,7 @@ Root widget przekazujący sterowanie do scope aplikacji.
 
 - 5: `NotesApp`.
 
-### `lib/app/app_scope.dart` (1627 linii)
+### `lib/app/app_scope.dart` (2038 linii)
 
 Otwiera bazę, buduje serwisy/Providery, nakłada zapisany kolor akcentu bez
 przebudowywania `MaterialApp` i planuje backup po zapisie. Scope przechwytuje
@@ -262,19 +266,19 @@ aplikacji, również w dialogach, zachowując przewijanie gestami i myszą.
   niezależny od migracji bazy notatek.
 - Dostarcza klient API, ładowaną asynchronicznie sesję/profil konta, zdalny
   backup i live sync; repozytorium przekazuje zmiany do schedulerów po zapisie.
-- 47: `AppScope`; 56: `_AppScopeState`; 438: `didRequestAppExit`.
-  158: `_flushLocallyForShutdown`, 251: `_prepareAccountLogout`.
+- 49: `AppScope`; 75: `_AppScopeState`; 456: `didRequestAppExit`.
+  176: `_flushLocallyForShutdown`, 269: `_prepareAccountLogout`.
   `_startAccountSync` automatycznie odtwarza stan po logowaniu i restarcie
   na wszystkich platformach, zanim uruchomi backup.
-- 125: `_quiesceAccountWriters` unieważnia bootstrap, czeka na koniec gestu,
+- 144: `_quiesceAccountWriters` unieważnia bootstrap, czeka na koniec gestu,
   drenuje planera, ustawienia i writery przed zmianą namespace/API identity.
-- 590: `_syncAccountSettings`; 696: `_v2ActorId`;
-  699: `_isCurrentAccountBootstrap`; 798: `_startV2Account`;
-  959: `_startAccountSync`. Każdy startup ma generację; późny odczyt
+- 630: `_syncAccountSettings`; 736: `_v2ActorId`;
+  747: `_isCurrentAccountBootstrap`; 840: `_startV2Account`;
+  1027: `_startAccountSync`. Każdy startup ma generację; późny odczyt
   protokołu/aktora nie może uruchomić opuszczonego konta ani zwolnić UI.
-- 1443: `AppUiScale`; 1491: `_ExitGuardOverlay`;
-  1582: `_FinishingExitOverlay`; 1699: `_BackupScheduler`;
-  1895: `flushForExit`.
+- 1513: `AppUiScale`; 1561: `_ExitGuardOverlay`;
+  1652: `_FinishingExitOverlay`; 1769: `_BackupScheduler`;
+  1965: `flushForExit`.
 
 ### `lib/app/account_bootstrap_barrier.dart`
 
@@ -3560,6 +3564,8 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   `recoverVerifiedArchive` sprawdza sumy, wykonuje idempotentny replay
   przez `OperationStore` + `EditorSqliteProjector`, odświeża read model,
   a marker `pending` umożliwia wznowienie po restarcie.
+  Wznowienie sprawdza koperty w lokalnym prefiksie i nie cofa kursora
+  nawet po przerwaniu między catch-up a oznaczeniem zakończenia recovery.
 - `lib/app/app_scope.dart`: brak wcześniej zainicjalizowanej bazy lub
   przerwane recovery blokuje start edytora v2 do ukończenia replay,
   dogrania nowszych operacji i porównania checkpointu z serwerem;
