@@ -9,7 +9,6 @@ import 'package:program/core/theme/app_theme.dart';
 import 'package:program/core/theme/app_typography.dart';
 import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
-import 'package:program/data/sync/cloud_sync_service.dart';
 import 'package:program/features/editor/presentation/widgets/editor_toolbar.dart';
 import 'package:program/features/editor/state/ink_color_presets.dart';
 import 'package:program/features/library/presentation/library_catalog.dart';
@@ -55,7 +54,6 @@ void main() {
     await repository.createNotebook(folder: 'Saved');
     final controller = LibraryController(
       repository,
-      CloudSyncService(repository),
       LocalBackupService(repository),
     );
     await controller.loadItems();
@@ -79,7 +77,6 @@ void main() {
 
     final restored = LibraryController(
       repository,
-      CloudSyncService(repository),
       LocalBackupService(repository),
     );
     await restored.initialize();
@@ -140,7 +137,6 @@ void main() {
     final board = await repository.createBoard(folder: 'Physics');
     final controller = LibraryController(
       repository,
-      CloudSyncService(repository),
       LocalBackupService(repository),
     );
     final preferences = AppPreferencesController();
@@ -408,7 +404,6 @@ void main() {
     await repository.createNotebook(folder: 'Plain');
     final controller = LibraryController(
       repository,
-      CloudSyncService(repository),
       LocalBackupService(repository),
     );
     await controller.loadItems();
@@ -562,7 +557,6 @@ void main() {
     await repository.createNotebook(folder: 'Plain folder');
     final controller = LibraryController(
       repository,
-      CloudSyncService(repository),
       LocalBackupService(repository),
     );
     await controller.loadItems();
@@ -651,7 +645,6 @@ void main() {
     }
     final controller = LibraryController(
       repository,
-      CloudSyncService(repository),
       LocalBackupService(repository),
     );
     await controller.loadItems();
@@ -767,7 +760,6 @@ void main() {
     }
     final controller = LibraryController(
       repository,
-      CloudSyncService(repository),
       LocalBackupService(repository),
     );
     await controller.loadItems();
@@ -895,7 +887,6 @@ void main() {
     final board = await repository.createBoard(folder: 'Corners');
     final controller = LibraryController(
       repository,
-      CloudSyncService(repository),
       LocalBackupService(repository),
     );
     await controller.loadItems();

@@ -1,3 +1,25 @@
+## Stan bieżący: pakiet 11, zapis konta tylko v2
+
+- `lib/app/app_scope.dart` montuje konto dopiero po gotowości jego
+  dziennika v2. Nie uruchamia silnika snapshotów. Przed zalogowaniem nie
+  montuje edytora Local na bazie konta. Tryb Local pozostaje izolowany.
+- `lib/data/sync/legacy_sync_archive.dart` tylko odczytuje ostatni
+  stan starego urządzenia dla importera `LegacyV2ProjectionCutover`.
+- Share używa `StudyShareV2GuestEditor` i `/v2/study-shares`; wygląd
+  jest oddzielny od operacji, a zapisu całej notatki nie ma.
+- `RemoteBackupService` przechowuje znacznik obecności bazy.
+  `V2BackupRecoveryService` zapisuje i odtwarza archiwum operacyjne.
+- Kanoniczny serwer i jego lustro: `0016_retire_legacy_sync.sql`,
+  `api/app/owner_lock.py`, `scripts/deploy-v2.sh`.
+  Nowe i puste konta są v2 bez flagi klienta. Zarchiwizowane
+  konta wymagają konwersji albo jawnego resetu testowego.
+- Testy: `test/app_scope_v2_shutdown_test.dart`,
+  `test/study_share_http_test.dart`, `test/legacy_v2_projection_cutover_test.dart`,
+  `server/api/tests/test_http_boundary.py`,
+  `server/api/tests/test_stage12_real_stack.py`.
+  Dalsze sekcje o aktywnym v1 opisują stan historyczny.
+
+
 ## Pakiet 8 — bezpieczna aktywacja v2 (2026-11-12)
 
 - `ApiClient.ensureV2AccountReady` sprawdza autoryzowany endpoint

@@ -15,7 +15,6 @@ import '../../../core/widgets/app_header_divider.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../data/sync/account_session_controller.dart';
 import '../../../data/sync/editor_v2_account_runtime.dart';
-import '../../../data/sync/live_web_sync_service.dart';
 import '../../../data/sync/study_share_service.dart';
 import '../../board/presentation/board_screen.dart';
 import '../../editor/presentation/editor_settings_screen.dart';
@@ -120,12 +119,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
   Widget build(BuildContext context) {
     final controller = context.watch<LibraryController>();
     final accountSession = context.watch<AccountSessionController?>();
-    final liveSync = context.watch<LiveWebSyncService?>();
+    final runtime = context.watch<EditorV2AccountRuntime?>();
     final selectedItem = controller.selectedItem();
     final share = _activeShare;
-    liveSync?.setSharedDocumentUid(
-      kIsWeb && share != null ? share.documentUid : null,
-    );
     if (share != null &&
         (share.expiresAt.isBefore(DateTime.now().toUtc()) ||
             accountSession?.isSignedIn != true)) {
@@ -140,14 +136,14 @@ class _LibraryScreenState extends State<LibraryScreen> {
     }
     if (kIsWeb &&
         accountSession != null &&
-        liveSync != null &&
+        runtime != null &&
         accountSession.isSignedIn &&
         !_restoringShare &&
         _activeShare == null &&
         _shareRestoredForAccount != accountSession.userId) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          unawaited(_restoreShare(accountSession, liveSync));
+          unawaited(_restoreShare(accountSession, runtime));
         }
       });
     }
@@ -267,9 +263,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
                             bottom: 0,
                             width: leftZoneWidth,
                             child: ColoredBox(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.surfaceContainerLowest,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerLowest,
                               child: const SizedBox.expand(),
                             ),
                           ),
@@ -510,7 +506,6 @@ class _LibraryScreenState extends State<LibraryScreen> {
           setState(() => _activeShare = updated);
         }
       },
-      remoteEpoch: context.read<LiveWebSyncService?>()?.remoteApplyEpoch ?? 0,
     );
   }
 
@@ -611,9 +606,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   Future<void> _restoreShare(
     AccountSessionController session,
-    LiveWebSyncService sync,
+    EditorV2AccountRuntime runtime,
   ) async {
-    final runtime = context.read<EditorV2AccountRuntime?>();
     final userId = session.userId;
     if (_restoringShare ||
         userId == null ||
@@ -626,7 +620,6 @@ class _LibraryScreenState extends State<LibraryScreen> {
     try {
       final service = StudyShareService(
         session: session,
-        liveSync: runtime == null ? sync : null,
         v2Runtime: runtime,
         repository: context.read<NotebookRepository>(),
       );
@@ -656,10 +649,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
       return;
     }
     final session = context.read<AccountSessionController?>();
-    final sync = context.read<LiveWebSyncService?>();
-    if (session == null ||
-        (runtime == null && sync == null) ||
-        !session.isSignedIn) {
+    if (session == null || runtime == null || !session.isSignedIn) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Sign in to share a study session.')),
       );
@@ -667,7 +657,6 @@ class _LibraryScreenState extends State<LibraryScreen> {
     }
     final service = _studyShareService ??= StudyShareService(
       session: session,
-      liveSync: runtime == null ? sync : null,
       v2Runtime: runtime,
       repository: context.read<NotebookRepository>(),
     );
@@ -2003,7 +1992,6 @@ class _LibraryWorkspace extends StatelessWidget {
     this.share,
     this.shareService,
     required this.onShareExtended,
-    required this.remoteEpoch,
     this.onOpenNavigation,
     super.key,
   });
@@ -2015,7 +2003,6 @@ class _LibraryWorkspace extends StatelessWidget {
   final ActiveStudyShare? share;
   final StudyShareService? shareService;
   final ValueChanged<ActiveStudyShare> onShareExtended;
-  final int remoteEpoch;
   final VoidCallback? onOpenNavigation;
 
   @override
@@ -2043,11 +2030,12 @@ class _LibraryWorkspace extends StatelessWidget {
 
     final operationRuntime = context.read<EditorV2AccountRuntime?>();
     return _PersistentWorkspaceEditor(
-      key: ValueKey('${item!.uid}:${operationRuntime == null ? 'v1' : 'v2'}'),
+      key: ValueKey(
+        '${item!.uid}:${operationRuntime == null ? 'local' : 'v2'}',
+      ),
       operationRuntime: operationRuntime,
       item: item!,
       repository: context.read<NotebookRepository>(),
-      remoteEpoch: remoteEpoch,
       showToolbar: showToolbar,
       showCompactTimer: showCompactTimer,
       onOpenNavigation: onOpenNavigation,
@@ -2064,7 +2052,6 @@ class _PersistentWorkspaceEditor extends StatefulWidget {
     required this.item,
     required this.repository,
     required this.operationRuntime,
-    required this.remoteEpoch,
     required this.showToolbar,
     required this.showCompactTimer,
     required this.onOpenNavigation,
@@ -2077,7 +2064,6 @@ class _PersistentWorkspaceEditor extends StatefulWidget {
   final Notebook item;
   final NotebookRepository repository;
   final EditorV2AccountRuntime? operationRuntime;
-  final int remoteEpoch;
   final bool showToolbar;
   final bool showCompactTimer;
   final VoidCallback? onOpenNavigation;
@@ -2092,16 +2078,13 @@ class _PersistentWorkspaceEditor extends StatefulWidget {
 
 class _PersistentWorkspaceEditorState
     extends State<_PersistentWorkspaceEditor> {
-  Timer? _remoteRefreshRetry;
   Timer? _appearanceTimer;
   bool _publishingAppearance = false;
   bool _appearanceChangedWhilePublishing = false;
   String? _lastAppearanceKey;
-  LiveWebSyncService? _registeredSync;
   late final EditorController _editor = EditorController(
     repository: widget.repository,
     notebook: widget.item,
-    saveDebounce: _shareDebounce,
     operationWriter: widget.operationRuntime?.writer,
   );
 
@@ -2111,15 +2094,6 @@ class _PersistentWorkspaceEditorState
     widget.operationRuntime?.attachEditor(_editor);
     _configureSharePreview();
     _editor.backgroundSettingsListenable.addListener(_scheduleAppearance);
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _registeredSync = widget.operationRuntime == null
-        ? context.read<LiveWebSyncService?>()
-        : null;
-    _registerRemoteGuard();
     _scheduleAppearance();
   }
 
@@ -2138,21 +2112,6 @@ class _PersistentWorkspaceEditorState
           ? share!.id
           : null,
     );
-  }
-
-  void _registerRemoteGuard() {
-    final sync = _registeredSync;
-    if (sync == null) {
-      return;
-    }
-    if (widget.share != null && kIsWeb) {
-      sync.setSharedRemoteApplyGuard(
-        widget.item.uid,
-        () => _editor.canApplyConfirmedRemoteNotebook,
-      );
-    } else {
-      sync.clearSharedRemoteApplyGuard(widget.item.uid);
-    }
   }
 
   void _scheduleAppearance() {
@@ -2202,59 +2161,20 @@ class _PersistentWorkspaceEditorState
     }
   }
 
-  Duration get _shareDebounce => widget.share == null
-      ? EditorController.defaultSaveDebounce
-      : const Duration(milliseconds: 20);
-
   @override
   void didUpdateWidget(covariant _PersistentWorkspaceEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _editor.saveDebounce = _shareDebounce;
     if (oldWidget.share?.id != widget.share?.id) {
       _lastAppearanceKey = null;
       _configureSharePreview();
-      _registerRemoteGuard();
       _scheduleAppearance();
     }
-    if (widget.operationRuntime == null &&
-        oldWidget.remoteEpoch != widget.remoteEpoch) {
-      _remoteRefreshRetry?.cancel();
-      unawaited(_refreshRemoteContent(widget.remoteEpoch));
-    }
-  }
-
-  Future<void> _refreshRemoteContent(int epoch) async {
-    // Never interrupt an active stroke or Quill edit to apply a revision.
-    if (!_editor.canApplyConfirmedRemoteNotebook) {
-      _retryRemoteContent(epoch);
-      return;
-    }
-    final current = await widget.repository.getNotebook(widget.item.uid);
-    if (!mounted || widget.remoteEpoch != epoch || current == null) {
-      return;
-    }
-    if (!_editor.applyConfirmedRemoteNotebook(current)) {
-      _retryRemoteContent(epoch);
-    }
-  }
-
-  void _retryRemoteContent(int epoch) {
-    if (!mounted || widget.remoteEpoch != epoch) {
-      return;
-    }
-    _remoteRefreshRetry?.cancel();
-    _remoteRefreshRetry = Timer(
-      const Duration(milliseconds: 150),
-      () => unawaited(_refreshRemoteContent(epoch)),
-    );
   }
 
   @override
   void dispose() {
-    _remoteRefreshRetry?.cancel();
     _appearanceTimer?.cancel();
     _editor.backgroundSettingsListenable.removeListener(_scheduleAppearance);
-    _registeredSync?.clearSharedRemoteApplyGuard(widget.item.uid);
     widget.operationRuntime?.detachEditor(_editor);
     _editor.dispose();
     super.dispose();

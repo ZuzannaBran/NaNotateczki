@@ -407,35 +407,6 @@ class EditorController extends ChangeNotifier {
       !_isObjectTransformActive &&
       !InkActivityTracker.instance.hasActiveContacts;
 
-  /// Updates confirmed document content without changing local navigation.
-  ///
-  /// The caller must apply the server snapshot to the repository first.
-  /// Never replace work that is still being edited or saved.
-  bool applyConfirmedRemoteNotebook(Notebook incoming) {
-    if (incoming.uid != notebook.uid) {
-      throw ArgumentError('Remote notebook UID does not match the editor.');
-    }
-    if (operationWriter != null || !canApplyConfirmedRemoteNotebook) {
-      return false;
-    }
-    final selectedPageId = currentPage.id;
-    notebook = incoming;
-    pages = incoming.pages;
-    final matchingPage = pages.indexWhere((page) => page.id == selectedPageId);
-    currentPageIndex = matchingPage < 0
-        ? currentPageIndex.clamp(0, pages.length - 1).toInt()
-        : matchingPage;
-    // Undo history belongs to the previous revision, not the new one.
-    _undoActions.clear();
-    _redoActions.clear();
-    _notifyHistoryChanged();
-    for (final page in pages) {
-      _touchInkPageRevision(page.id);
-    }
-    notifyListeners();
-    return true;
-  }
-
   /// Applies confirmed metadata without replacing the pages or viewport.
   bool applyConfirmedV2DocumentMetadata({
     required String title,
@@ -1420,9 +1391,8 @@ class EditorController extends ChangeNotifier {
       lassoMaxX = math.max(lassoMaxX, point.dx);
       lassoMaxY = math.max(lassoMaxY, point.dy);
     }
-    final inkCandidates = inkSpatialIndexFor(
-      page.inkStrokes,
-    ).query(Rect.fromLTRB(lassoMinX, lassoMinY, lassoMaxX, lassoMaxY));
+    final inkCandidates = inkSpatialIndexFor(page.inkStrokes)
+        .query(Rect.fromLTRB(lassoMinX, lassoMinY, lassoMaxX, lassoMaxY));
     for (final s in inkCandidates) {
       final isSelectedInk =
           !s.tool.isEraser &&

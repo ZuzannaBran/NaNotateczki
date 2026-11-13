@@ -1,13 +1,9 @@
-import 'dart:convert';
-import 'dart:typed_data';
-
 import '../../core/storage/app_save_coordinator.dart';
 import '../../features/editor/state/page_background.dart';
 import '../../features/notebook/data/notebook_repository.dart';
 import 'account_session_controller.dart';
 import 'api_client.dart';
 import 'editor_v2_account_runtime.dart';
-import 'live_web_sync_service.dart';
 
 class ActiveStudyShare {
   const ActiveStudyShare({
@@ -15,21 +11,19 @@ class ActiveStudyShare {
     required this.documentUid,
     required this.title,
     required this.expiresAt,
-    this.protocol = 'v1',
   });
 
   final String id;
   final String documentUid;
   final String title;
   final DateTime expiresAt;
-  final String protocol;
+  String get protocol => 'v2';
 
   ActiveStudyShare copyWith({DateTime? expiresAt}) => ActiveStudyShare(
     id: id,
     documentUid: documentUid,
     title: title,
     expiresAt: expiresAt ?? this.expiresAt,
-    protocol: protocol,
   );
 
   String get link => Uri.base
@@ -41,14 +35,12 @@ class ActiveStudyShare {
 class StudyShareService {
   StudyShareService({
     required this.session,
-    this.liveSync,
-    this.v2Runtime,
+    required this.v2Runtime,
     required this.repository,
   });
 
   final AccountSessionController session;
-  final LiveWebSyncService? liveSync;
-  final EditorV2AccountRuntime? v2Runtime;
+  final EditorV2AccountRuntime v2Runtime;
   final NotebookRepository repository;
 
   Future<void> _refreshIfNeeded() async {
@@ -68,13 +60,7 @@ class StudyShareService {
   Future<void> ensureSavedOnAccount(String uid) async {
     await _refreshIfNeeded();
     final runtime = v2Runtime;
-    final legacy = liveSync;
-    if (runtime == null && (legacy == null || !legacy.isStarted)) {
-      throw StateError(
-        'Enable account synchronization before sharing a document.',
-      );
-    }
-    if (runtime != null && !runtime.engine.isStarted) {
+    if (!runtime.engine.isStarted) {
       throw StateError('The v2 account is not ready to share.');
     }
     await AppSaveCoordinator.instance.flushPending();
@@ -82,24 +68,15 @@ class StudyShareService {
     if (await repository.getNotebook(uid) == null) {
       throw StateError('The source document is no longer available.');
     }
-    if (runtime != null) {
-      await runtime.engine.syncNow();
-      final pending = await runtime.store.pending(
-        documentId: uid,
-        limit: 1,
-        includeDeferred: true,
-      );
-      if (runtime.engine.lastError != null || pending.isNotEmpty) {
-        throw StateError(
-          'Commit pending v2 operations before creating a share link.',
-        );
-      }
-      return;
-    }
-    await legacy!.syncNow();
-    if (legacy.lastError != null || legacy.hasPendingChanges) {
+    await runtime.engine.syncNow();
+    final pending = await runtime.store.pending(
+      documentId: uid,
+      limit: 1,
+      includeDeferred: true,
+    );
+    if (runtime.engine.lastError != null || pending.isNotEmpty) {
       throw StateError(
-        'The document is not saved on your account yet. Retry synchronization.',
+        'Commit pending v2 operations before creating a share link.',
       );
     }
   }
@@ -110,8 +87,7 @@ class StudyShareService {
     required String password,
   }) async {
     await ensureSavedOnAccount(documentUid);
-    final path = v2Runtime == null ? '/v1/study-shares' : '/v2/study-shares';
-    final response = await session.apiClient.postJson(path, {
+    final response = await session.apiClient.postJson('/v2/study-shares', {
       'documentUid': documentUid,
       'title': title,
       'password': password,
@@ -127,19 +103,18 @@ class StudyShareService {
       documentUid: documentUid,
       title: title,
       expiresAt: DateTime.parse(body['expiresAt'] as String),
-      protocol: v2Runtime == null ? 'v1' : 'v2',
     );
   }
 
   Future<List<ActiveStudyShare>> activeShares() async {
     await _refreshIfNeeded();
-    final response = await session.apiClient.get('/v1/study-shares/active');
+    final response = await session.apiClient.get('/v2/study-shares/active');
     final json = response.decodeJson();
     if (json is! Map<String, dynamic> || json['sessions'] is! List) {
       throw const FormatException('Invalid active shares response.');
     }
     return (json['sessions'] as List).map((item) {
-      if (item is! Map<String, dynamic>) {
+      if (item is! Map<String, dynamic> || item['protocol'] != 'v2') {
         throw const FormatException('Invalid session record.');
       }
       return ActiveStudyShare(
@@ -147,19 +122,8 @@ class StudyShareService {
         documentUid: item['documentUid'] as String,
         title: item['title'] as String,
         expiresAt: DateTime.parse(item['expiresAt'] as String),
-        protocol: item['protocol'] == 'v2' ? 'v2' : 'v1',
       );
     }).toList();
-  }
-
-  Future<void> publish(ActiveStudyShare share, Uint8List png) async {
-    await _refreshIfNeeded();
-    await session.apiClient.request(
-      'PUT',
-      '/v1/study-shares/${share.id}/frame',
-      body: png,
-      headers: {'Content-Type': 'image/png'},
-    );
   }
 
   /// Appearance is independent from document content revisions.
@@ -169,7 +133,7 @@ class StudyShareService {
     required PageBackgroundSettings background,
   }) async {
     await _refreshIfNeeded();
-    await session.apiClient.putJson('/v1/study-shares/${share.id}/appearance', {
+    await session.apiClient.putJson('/v2/study-shares/${share.id}/appearance', {
       'darkMode': darkMode,
       'backgroundStyle': background.style.index,
       'backgroundSpacing': background.spacing,
@@ -179,7 +143,7 @@ class StudyShareService {
   Future<ActiveStudyShare> extend(ActiveStudyShare share) async {
     await _refreshIfNeeded();
     final response = await session.apiClient.postJson(
-      '/v1/study-shares/${share.id}/extend',
+      '/v2/study-shares/${share.id}/extend',
       <String, dynamic>{},
     );
     final body = response.decodeJson();
@@ -196,49 +160,16 @@ class StudyShareService {
     // Revoke access first; slow local saves must never extend guest privileges.
     await session.apiClient.request(
       'DELETE',
-      '/v1/study-shares/${share.id}',
+      '/v2/study-shares/${share.id}',
       body: const <int>[],
     );
     try {
       await AppSaveCoordinator.instance.flushPending();
       await repository.waitForPendingSaves();
-      if (v2Runtime != null) {
-        await v2Runtime!.engine.syncNow();
-      } else if (liveSync?.isStarted == true) {
-        await liveSync!.syncNow();
-      }
+      await v2Runtime.engine.syncNow();
     } catch (_) {
       // Owner data remains in the local repository for subsequent sync.
     }
-  }
-}
-
-class SharedStudyDocument {
-  const SharedStudyDocument({
-    required this.notebook,
-    required this.revision,
-    this.appearance,
-  });
-
-  final Map<String, dynamic> notebook;
-  final int revision;
-  final Map<String, dynamic>? appearance;
-
-  factory SharedStudyDocument.fromResponse(Object? body) {
-    if (body is! Map<String, dynamic> ||
-        body['notebook'] is! Map<String, dynamic> ||
-        body['revision'] is! int) {
-      throw const FormatException('Invalid shared document response.');
-    }
-    final appearance = body['appearance'];
-    if (appearance != null && appearance is! Map<String, dynamic>) {
-      throw const FormatException('Invalid shared appearance.');
-    }
-    return SharedStudyDocument(
-      notebook: body['notebook'] as Map<String, dynamic>,
-      revision: body['revision'] as int,
-      appearance: appearance as Map<String, dynamic>?,
-    );
   }
 }
 
@@ -249,78 +180,40 @@ class StudyShareGuestClient {
   final ApiClient _api;
 
   Future<Map<String, dynamic>> join(String id, String password) async {
-    final response = await _api.postJson('/v1/study-shares/$id/join', {
+    final response = await _api.postJson('/v2/study-shares/$id/join', {
       'password': password,
     }, authenticated: false);
     final body = response.decodeJson();
     if (body is! Map<String, dynamic> ||
         body['ticket'] is! String ||
         body['title'] is! String ||
+        body['protocol'] != 'v2' ||
+        body['documentUid'] is! String ||
+        (body['documentUid'] as String).isEmpty ||
         body['revision'] is! int) {
       throw const FormatException('Invalid session ticket response.');
     }
     return body;
   }
 
-  Future<Uint8List> frame(String id, String ticket) async {
+  Future<Map<String, dynamic>?> appearance(String id, String ticket) async {
     final response = await _api.request(
       'GET',
-      '/v1/study-shares/$id/frame',
+      '/v2/study-shares/$id/appearance',
       authenticated: false,
       headers: {'Authorization': 'Bearer $ticket'},
     );
-    return response.bodyBytes;
-  }
-
-  Future<SharedStudyDocument> readDocument(String id, String ticket) async {
-    final response = await _api.request(
-      'GET',
-      '/v1/study-shares/$id/document',
-      authenticated: false,
-      headers: {'Authorization': 'Bearer $ticket'},
-    );
-    return SharedStudyDocument.fromResponse(response.decodeJson());
-  }
-
-  Future<SharedStudyDocument> writeDocument(
-    String id,
-    String ticket, {
-    required int baseRevision,
-    required Map<String, dynamic> baseNotebook,
-    required Map<String, dynamic> notebook,
-  }) async {
-    final createdAt = notebook['createdAt'];
-    final baseCreatedAt = baseNotebook['createdAt'];
-    final localTime = createdAt is String ? DateTime.tryParse(createdAt) : null;
-    final baseTime = baseCreatedAt is String
-        ? DateTime.tryParse(baseCreatedAt)
-        : null;
-    // Re-encoding a timezone must not change immutable session metadata.
-    final submitted = {
-      ...notebook,
-      if (localTime != null &&
-          baseTime != null &&
-          localTime.isAtSameMomentAs(baseTime))
-        'createdAt': baseCreatedAt,
-    };
-    final response = await _api.request(
-      'PUT',
-      '/v1/study-shares/$id/document',
-      authenticated: false,
-      headers: {'Authorization': 'Bearer $ticket'},
-      body: utf8.encode(
-        jsonEncode({
-          'baseRevision': baseRevision,
-          'baseNotebook': baseNotebook,
-          'notebook': submitted,
-        }),
-      ),
-    );
-    return SharedStudyDocument.fromResponse(response.decodeJson());
+    final body = response.decodeJson();
+    if (body is! Map<String, dynamic> ||
+        (body['appearance'] != null &&
+            body['appearance'] is! Map<String, dynamic>)) {
+      throw const FormatException('Invalid shared appearance.');
+    }
+    return body['appearance'] as Map<String, dynamic>?;
   }
 
   Uri eventsUri(String id) {
-    final uri = _api.resolve('/v1/study-shares/$id/events');
+    final uri = _api.resolve('/v2/study-shares/$id/events');
     return uri.replace(scheme: uri.scheme == 'https' ? 'wss' : 'ws');
   }
 

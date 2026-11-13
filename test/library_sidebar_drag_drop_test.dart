@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 
 import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
-import 'package:program/data/sync/cloud_sync_service.dart';
 import 'package:program/features/library/presentation/library_controller.dart';
 import 'package:program/features/library/presentation/library_screen.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
@@ -31,7 +30,6 @@ void main() {
     await repository.createNotebook(folder: 'Destination');
     final controller = LibraryController(
       repository,
-      CloudSyncService(repository),
       LocalBackupService(repository),
     );
     await controller.loadItems();
@@ -69,11 +67,8 @@ void main() {
       final database = NotesDatabase(NativeDatabase.memory());
       addTearDown(database.close);
       final repository = NotebookRepository(database);
-      LibraryController newController() => LibraryController(
-        repository,
-        CloudSyncService(repository),
-        LocalBackupService(repository),
-      );
+      LibraryController newController() =>
+          LibraryController(repository, LocalBackupService(repository));
       final controller = newController();
       addTearDown(controller.dispose);
       await controller.initialize();
@@ -166,7 +161,6 @@ void main() {
     );
     final controller = LibraryController(
       repository,
-      CloudSyncService(repository),
       LocalBackupService(repository),
     );
     await controller.loadItems();
@@ -274,7 +268,6 @@ void main() {
       repository = NotebookRepository(database);
       controller = LibraryController(
         repository,
-        CloudSyncService(repository),
         LocalBackupService(repository),
       );
       await controller.initialize();

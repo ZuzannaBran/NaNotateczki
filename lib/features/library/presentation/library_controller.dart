@@ -11,7 +11,6 @@ import '../../../core/error/app_error_log.dart';
 import '../../../core/storage/app_save_coordinator.dart';
 import '../../../core/storage/text_storage.dart';
 import '../../../data/backup/local_backup_service.dart';
-import '../../../data/sync/cloud_sync_service.dart';
 import '../../../data/sync/library_v2_operation_service.dart';
 import '../../editor/state/ink_color_presets.dart';
 import '../../notebook/data/notebook_repository.dart';
@@ -55,7 +54,6 @@ class FolderCoverStyle {
 class LibraryController extends ChangeNotifier {
   LibraryController(
     this.repository,
-    this.cloudSyncService,
     this.backup, {
     this.wasReset = false,
     this.freshFile = false,
@@ -69,7 +67,6 @@ class LibraryController extends ChangeNotifier {
   }
 
   final NotebookRepository repository;
-  final CloudSyncService cloudSyncService;
   final LocalBackupService backup;
   final bool wasReset;
   final bool freshFile;
@@ -78,16 +75,12 @@ class LibraryController extends ChangeNotifier {
   bool _bannerDismissed = false;
   bool isLoading = false;
   bool _isDisposed = false;
-  bool isSyncing = false;
   bool isLoadingSelectedItem = false;
   bool isRecoveringCorruptDocuments = false;
   List<Notebook> items = <Notebook>[];
   String? selectedItemId;
   String selectedFolder = '';
   String searchQuery = '';
-  String? cloudPath;
-  DateTime? lastSyncedAt;
-  CloudSyncResult? lastSyncResult;
   Object? loadError;
   LibraryV2OperationService? _v2LibraryOperations;
 
@@ -163,7 +156,6 @@ class LibraryController extends ChangeNotifier {
     if (!wasReset && !freshFile && !repository.lastFetchSkippedCorruptRows) {
       await repository.cleanupOrphanedImages(items);
     }
-    await _loadCloudPath();
   }
 
   /// Refreshes folders, covers and tasks after verified account recovery.
@@ -257,8 +249,7 @@ class LibraryController extends ChangeNotifier {
         'Corrupt documents were detected, but no recoverable local backup '
         'copies were found.',
         null,
-        source:
-            'LibraryController.restoreCorruptDocumentsFromBackup(no_candidates)',
+        source: 'LibraryController.restoreCorruptDocumentsFromBackup(no_candidates)',
       );
       notifyListeners();
       return 0;
@@ -306,25 +297,6 @@ class LibraryController extends ChangeNotifier {
       notifyListeners();
     }
     return restored;
-  }
-
-  Future<void> syncNow() async {
-    isSyncing = true;
-    notifyListeners();
-    try {
-      lastSyncResult = await cloudSyncService.sync(items);
-      lastSyncedAt = DateTime.now();
-      await loadItems();
-    } finally {
-      isSyncing = false;
-      notifyListeners();
-    }
-  }
-
-  Future<void> setCloudPath(String path) async {
-    await cloudSyncService.setCloudPath(path);
-    cloudPath = path;
-    notifyListeners();
   }
 
   List<Notebook> get visibleItems {
@@ -1021,15 +993,6 @@ class LibraryController extends ChangeNotifier {
       return folders.first;
     }
     return _defaultFolderName;
-  }
-
-  Future<void> _loadCloudPath() async {
-    final loadedPath = await cloudSyncService.getCloudPath();
-    if (_isDisposed) {
-      return;
-    }
-    cloudPath = loadedPath;
-    notifyListeners();
   }
 
   Future<void> _loadFolders() async {

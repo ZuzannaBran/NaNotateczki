@@ -1,3 +1,18 @@
+## Bieżący kontrakt zapisu po pakiecie 11
+
+Konto i Share zapisują dokumenty wyłącznie operacjami v2. Planner
+używa rewizji CAS, ustawienia `/v2/account-settings`, a backup zdalny
+formatu 3 z dziennikiem. Autoryzacja i zegar zachowują adresy `/v1/auth`
+oraz `/v1/time`; nie są protokołem zapisu notatek. Local nie łączy się
+z kontem i może trzymać własny backup na urządzeniu.
+
+Migracja 0016 aktywuje puste konta, zakłada marker dla nowych użytkowników
+i odbiera roli API możliwość modyfikacji historycznych tabel snapshotów.
+Stare dokumenty są dostępne tylko dla importera. Ich zachowanie nie
+oznacza możliwości uruchomienia starego synchronizatora. Dalsze
+opisy produkcyjnego v1 są historyczne.
+
+
 ## Pakiet 7: zamykanie, wylogowanie i restart (2026-11-12)
 
 Zarówno desktop exit, jak i explicit logout korzystają z tej samej kolejności:

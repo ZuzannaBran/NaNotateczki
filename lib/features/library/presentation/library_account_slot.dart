@@ -17,7 +17,8 @@ import '../../../data/backup/remote_backup_scheduler.dart';
 import '../../notebook/data/notebook_repository.dart';
 import '../../../data/sync/account_session_controller.dart';
 import '../../../data/sync/api_client.dart';
-import '../../../data/sync/live_web_sync_service.dart';
+import '../../../data/sync/editor_v2_account_runtime.dart';
+import '../../../data/sync/sync_engine.dart';
 
 TextStyle _accountSecondaryTextStyle(BuildContext context) => TextStyle(
   fontSize: AppTypography.small,
@@ -31,9 +32,9 @@ Future<void> showLibraryAccountDialog(
 }) {
   final session = context.read<AccountSessionController?>();
   final backup = context.read<RemoteBackupScheduler?>();
-  final sync = context.read<LiveWebSyncService?>();
+  final sync = context.read<EditorV2AccountRuntime?>();
   final repository = context.read<NotebookRepository?>();
-  if (session == null || backup == null || sync == null) {
+  if (session == null || backup == null) {
     return Future<void>.value();
   }
   session.beginAccountInteraction();
@@ -44,7 +45,7 @@ Future<void> showLibraryAccountDialog(
       providers: [
         ChangeNotifierProvider<AccountSessionController>.value(value: session),
         ChangeNotifierProvider<RemoteBackupScheduler>.value(value: backup),
-        ChangeNotifierProvider<LiveWebSyncService>.value(value: sync),
+        Provider<EditorV2AccountRuntime?>.value(value: sync),
         if (repository != null)
           Provider<NotebookRepository>.value(value: repository),
       ],
@@ -65,8 +66,8 @@ class LibraryAccountSlot extends StatelessWidget {
   Widget build(BuildContext context) {
     final session = context.watch<AccountSessionController?>();
     final backup = context.watch<RemoteBackupScheduler?>();
-    final sync = context.watch<LiveWebSyncService?>();
-    if (session == null || backup == null || sync == null) {
+    final sync = context.watch<EditorV2AccountRuntime?>()?.engine;
+    if (session == null || backup == null) {
       return const SizedBox.shrink();
     }
     final subtitle = session.isSignedIn
@@ -127,10 +128,10 @@ class LibraryAccountSlot extends StatelessWidget {
 
   String _remoteSubtitle(
     RemoteBackupScheduler backup,
-    LiveWebSyncService sync,
+    SyncEngine? sync,
     DateTime now,
   ) {
-    if (backup.lastError != null || sync.lastError != null) {
+    if (backup.lastError != null || sync?.lastError != null) {
       return 'Sync needs attention';
     }
     if (backup.isUploading) {
@@ -140,8 +141,8 @@ class LibraryAccountSlot extends StatelessWidget {
     if (verifiedAt != null) {
       return 'Backup ${_relativeTime(verifiedAt, now)}';
     }
-    if (liveSyncAvailable && sync.isStarted) {
-      return sync.hasPendingChanges ? 'Syncing changes' : 'Live sync active';
+    if (liveSyncAvailable && sync?.isStarted == true) {
+      return 'V2 sync active';
     }
     return backup.isEnabled ? 'Remote backup enabled' : 'Connecting to account';
   }
@@ -236,8 +237,8 @@ class _AccountDialogState extends State<_AccountDialog> {
     _serviceNotices.acknowledge(session, session.error);
     final backup = context.read<RemoteBackupScheduler>();
     _serviceNotices.acknowledge(backup, backup.lastError);
-    final sync = context.read<LiveWebSyncService>();
-    _serviceNotices.acknowledge(sync, sync.lastError);
+    final sync = context.read<EditorV2AccountRuntime?>()?.engine;
+    if (sync != null) _serviceNotices.acknowledge(sync, sync.lastError);
     _usernameController.text =
         session.lastAccountUsername ?? session.username ?? '';
     _localNameController.text = session.localDisplayName ?? '';
@@ -269,11 +270,11 @@ class _AccountDialogState extends State<_AccountDialog> {
   Widget build(BuildContext context) {
     final session = context.watch<AccountSessionController>();
     final backup = context.watch<RemoteBackupScheduler>();
-    final sync = context.watch<LiveWebSyncService>();
+    final sync = context.watch<EditorV2AccountRuntime?>()?.engine;
     for (final (source, message) in <(Object, String?)>[
       (session, session.error),
       (backup, backup.lastError),
-      (sync, sync.lastError),
+      if (sync != null) (sync, sync.lastError),
     ]) {
       if (_serviceNotices.shouldPresent(source, message)) {
         _newServiceError = message;
@@ -282,7 +283,7 @@ class _AccountDialogState extends State<_AccountDialog> {
     if (_newServiceError != null &&
         session.error != _newServiceError &&
         backup.lastError != _newServiceError &&
-        sync.lastError != _newServiceError) {
+        sync?.lastError != _newServiceError) {
       _newServiceError = null;
     }
     final error = _actionError ?? _newServiceError;
@@ -335,7 +336,7 @@ class _AccountDialogState extends State<_AccountDialog> {
   Widget _buildView(
     AccountSessionController session,
     RemoteBackupScheduler backup,
-    LiveWebSyncService sync,
+    SyncEngine? sync,
     String? error,
   ) {
     final child = switch (_view) {
@@ -361,9 +362,8 @@ class _AccountDialogState extends State<_AccountDialog> {
                     'You can switch modes later in account settings.',
           key: const ValueKey('account-welcome-description'),
           textAlign: TextAlign.center,
-          style: _accountSecondaryTextStyle(
-            context,
-          ).copyWith(fontSize: AppTypography.document),
+          style: _accountSecondaryTextStyle(context)
+              .copyWith(fontSize: AppTypography.document),
         ),
         const SizedBox(height: 28),
         FilledButton(
@@ -518,7 +518,7 @@ class _AccountDialogState extends State<_AccountDialog> {
   Widget _buildSettings(
     AccountSessionController session,
     RemoteBackupScheduler backup,
-    LiveWebSyncService sync,
+    SyncEngine? sync,
     String? error,
   ) {
     return Column(
@@ -611,45 +611,12 @@ class _AccountDialogState extends State<_AccountDialog> {
               ),
             ),
             const SizedBox(height: 8),
-            if (kIsWeb && !sync.isStarted)
-              const Text('Account sync starts automatically on Web.')
-            else if (!sync.isStarted) ...[
-              const Text(
-                'Sync starts automatically. These recovery options are '
-                'available if a retry is needed.',
-              ),
-              const SizedBox(height: 12),
-              _SyncPolicyButton(
-                key: const ValueKey('sync-policy-upload'),
-                title: 'Upload local library',
-                description: 'Only when the account library is empty.',
-                onPressed: _isWorking
-                    ? null
-                    : () => _startSync(InitialSyncPolicy.uploadLocal),
-              ),
-              _SyncPolicyButton(
-                key: const ValueKey('sync-policy-download'),
-                title: 'Download remote library',
-                description: 'Only when this browser library is empty.',
-                onPressed: _isWorking
-                    ? null
-                    : () => _startSync(InitialSyncPolicy.downloadRemote),
-              ),
-              _SyncPolicyButton(
-                key: const ValueKey('sync-policy-merge'),
-                title: 'Merge safely',
-                description: 'Keep both versions when content differs.',
-                onPressed: _isWorking
-                    ? null
-                    : () => _startSync(InitialSyncPolicy.mergeSafely),
-              ),
-            ] else
-              Text(
-                sync.hasPendingChanges
-                    ? 'Live sync is active. Changes are waiting to upload.'
-                    : 'Live sync is active and up to date.',
-                key: const ValueKey('live-sync-status'),
-              ),
+            Text(
+              sync?.isStarted == true
+                  ? 'V2 sync is active.'
+                  : 'Connecting to v2.',
+              key: const ValueKey('live-sync-status'),
+            ),
           ],
           const SizedBox(height: 12),
           OutlinedButton(
@@ -957,8 +924,7 @@ class _AccountDialogState extends State<_AccountDialog> {
       }
       return;
     }
-    // Compatibility with standalone session controllers used by embedders.
-    final sync = context.read<LiveWebSyncService>();
+    final runtime = context.read<EditorV2AccountRuntime?>();
     final backup = context.read<RemoteBackupScheduler>();
     final coordinator = ShutdownCoordinator(
       flushLocal: () async {
@@ -967,19 +933,22 @@ class _AccountDialogState extends State<_AccountDialog> {
         final repository = context.read<NotebookRepository?>();
         await repository?.waitForPendingSaves();
         await waitForPendingTextStorageOperations();
-        await sync.flushPersistedOutbox();
         if (AppSaveCoordinator.instance.hasPendingWork ||
             (repository?.hasPendingSaves ?? false)) {
           throw StateError('Local editor writes are still pending.');
         }
       },
       syncRemote: () async {
-        if (!sync.isStarted) {
-          await sync.start(InitialSyncPolicy.mergeSafely);
+        if (runtime == null || !runtime.engine.isStarted) {
+          throw StateError('V2 sync has not started.');
         }
-        await sync.syncNow();
-        if (sync.hasPendingChanges || sync.lastError != null) {
-          throw StateError('Unsent account changes remain in the outbox.');
+        await runtime.engine.syncNow();
+        if (runtime.engine.lastError != null ||
+            (await runtime.store.pending(
+              limit: 1,
+              includeDeferred: true,
+            )).isNotEmpty) {
+          throw StateError('Unsent account operations remain in the outbox.');
         }
       },
       verifyBackup: () async {
@@ -994,7 +963,7 @@ class _AccountDialogState extends State<_AccountDialog> {
       stopServices: () async {
         // Timeouts from the preceding network steps do not cancel I/O.
         // Join all writers before clearing or changing account identity.
-        await sync.stop();
+        await runtime?.stop();
         await backup.stop();
         await waitForPendingTextStorageOperations();
       },
@@ -1134,31 +1103,12 @@ class _AccountDialogState extends State<_AccountDialog> {
     }
   }
 
-  Future<void> _startSync(InitialSyncPolicy policy) async {
-    _startWorking();
-    try {
-      await context.read<LiveWebSyncService>().start(policy);
-      if (!mounted) {
-        return;
-      }
-      if (widget.startupRequired) {
-        Navigator.of(context).pop();
-      } else {
-        setState(() => _actionMessage = 'Live sync started.');
-      }
-    } catch (failure) {
-      _showFailure(failure);
-    } finally {
-      _stopWorking();
-    }
-  }
-
   Future<void> _changePassword() async {
     if (_passwordFormKey.currentState?.validate() != true) {
       return;
     }
     final session = context.read<AccountSessionController>();
-    final sync = context.read<LiveWebSyncService>();
+    final runtime = context.read<EditorV2AccountRuntime?>();
     final backup = context.read<RemoteBackupScheduler>();
     _startWorking();
     try {
@@ -1166,7 +1116,7 @@ class _AccountDialogState extends State<_AccountDialog> {
         _currentPasswordController.text,
         _newPasswordController.text,
       );
-      await sync.stop();
+      await runtime?.stop();
       await backup.stop();
       await session.requireAccountReauthentication();
       _currentPasswordController.clear();
@@ -1217,54 +1167,6 @@ class _AccountDialogState extends State<_AccountDialog> {
       return failure.message;
     }
     return failure.toString();
-  }
-}
-
-class _SyncPolicyButton extends StatelessWidget {
-  const _SyncPolicyButton({
-    super.key,
-    required this.title,
-    required this.description,
-    required this.onPressed,
-  });
-
-  final String title;
-  final String description;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: OutlinedButton(
-        onPressed: onPressed,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: AppTypography.document,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      description,
-                      style: _accountSecondaryTextStyle(context),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 

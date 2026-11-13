@@ -8,7 +8,6 @@ import '../../core/storage/storage_namespace_manager.dart';
 import '../../core/storage/text_storage.dart';
 import 'account_session_controller.dart';
 import 'api_client.dart';
-import 'library_state_merge.dart';
 
 /// Synchronizes account preferences without overwriting unsent local edits.
 class AccountSettingsSyncService {
@@ -16,23 +15,19 @@ class AccountSettingsSyncService {
     required this.apiClient,
     required this.session,
     this.onRemoteApplied,
-    this.useV2 = false,
   });
 
   final ApiClient apiClient;
   final AccountSessionController session;
   final Future<void> Function()? onRemoteApplied;
-  final bool useV2;
 
-  String get _endpoint =>
-      useV2 ? '/v2/account-settings' : '/v1/account-settings';
+  static const _endpoint = '/v2/account-settings';
 
   static const categories = <String>[
     'appPreferences',
     'editorPreferences',
     'recentColors',
     'backupPreferences',
-    'libraryState',
   ];
   Future<void>? _running;
   bool _applying = false;
@@ -45,8 +40,7 @@ class AccountSettingsSyncService {
       _generation == generation &&
       session.isSignedIn &&
       session.userId == userId &&
-      (!useV2 ||
-          ActiveStorageNamespace.current == StorageNamespace.account(userId));
+      ActiveStorageNamespace.current == StorageNamespace.account(userId);
 
   bool get isApplying => _applying;
 
@@ -85,15 +79,13 @@ class AccountSettingsSyncService {
     if (userId == null || !_current(userId, generation)) {
       return;
     }
-    final key = useV2
-        ? 'account_settings_v2_cursor_${_hash(userId)}.json'
-        : _checkpointKey(userId);
+    final key = 'account_settings_v2_cursor_${_hash(userId)}.json';
     // CAS revisions for non-library settings are shared by both protocols.
     // Carry forward the v1 base so an offline device edit is not overwritten
     // during its first v2 pass.
     final saved =
         await readStoredText(key) ??
-        (useV2 ? await readStoredText(_checkpointKey(userId)) : null);
+        await readStoredText(_checkpointKey(userId));
     final checkpoint = saved == null
         ? <String, dynamic>{}
         : _object(jsonDecode(saved));
@@ -110,10 +102,6 @@ class AccountSettingsSyncService {
     var applied = false;
     try {
       for (final category in categories) {
-        // Folder and task state belongs to the v2 operation journal.
-        if (useV2 && category == 'libraryState') {
-          continue;
-        }
         if (!_current(userId, generation)) {
           return;
         }
@@ -139,21 +127,6 @@ class AccountSettingsSyncService {
             ? known!['revision'] as int
             : 0;
         final knownValue = known?['value'];
-        if (category == 'libraryState') {
-          applied =
-              await _syncLibraryState(
-                userId: userId,
-                generation: generation,
-                key: key,
-                fileKey: fileKey,
-                entries: entries,
-                known: known,
-                local: local,
-                serverEntry: serverEntry,
-              ) ||
-              applied;
-          continue;
-        }
         if (known != null && local != null && !_equivalent(local, knownValue)) {
           if (serverEntry != null && _equivalent(local, remoteValue)) {
             entries[category] = {
@@ -266,118 +239,6 @@ class AccountSettingsSyncService {
     }
   }
 
-  Future<bool> _syncLibraryState({
-    required String userId,
-    required int generation,
-    required String key,
-    required String fileKey,
-    required Map<String, dynamic> entries,
-    required Map<String, dynamic>? known,
-    required Object? local,
-    required Map<String, dynamic>? serverEntry,
-  }) async {
-    if (local == null && serverEntry == null) {
-      return false;
-    }
-    var currentRemote = serverEntry;
-    for (var attempt = 0; attempt < 4; attempt++) {
-      if (!_current(userId, generation)) {
-        return false;
-      }
-      final revision = currentRemote?['revision'] as int? ?? 0;
-      final remoteValue = currentRemote?['value'];
-      // An account with an existing server revision must be authoritative
-      // on the first synchronization of this device. In particular, a
-      // historical local folder must not recreate a server-side deletion.
-      // Explicit Local -> Account import is handled separately.
-      final desired =
-          known == null &&
-              currentRemote != null &&
-              remoteValue is Map<String, dynamic>
-          ? Map<String, dynamic>.from(remoteValue)
-          : mergeAccountLibraryState(
-              base: known?['value'],
-              local: local,
-              remote: remoteValue,
-            );
-      final shouldUpload =
-          local != null &&
-          (currentRemote == null || !_equivalent(desired, remoteValue));
-      if (shouldUpload) {
-        try {
-          currentRemote = _object(
-            (await apiClient.putJson('$_endpoint/libraryState', {
-              'expectedRevision': revision,
-              'value': desired,
-            })).decodeJson(),
-          );
-        } on ApiException catch (error) {
-          if (error.statusCode != 409 || attempt == 3) {
-            rethrow;
-          }
-          final fresh = _object(
-            (await apiClient.get('/v1/account-settings')).decodeJson(),
-          );
-          final settings = _object(fresh['settings']);
-          currentRemote = settings['libraryState'] is Map<String, dynamic>
-              ? settings['libraryState'] as Map<String, dynamic>
-              : null;
-          continue;
-        }
-      }
-      final resolved = currentRemote == null
-          ? desired
-          : _object(currentRemote['value']);
-      // The user may have edited planner tasks or folders while REST was
-      // in flight. Never replace newer local bytes with our older snapshot.
-      final latestText = await readStoredText(fileKey);
-      final latestLocal = latestText == null || latestText.isEmpty
-          ? null
-          : jsonDecode(latestText);
-      // Compare any in-flight local edit with the *pre-request* snapshot.
-      // Otherwise a newly fetched remote folder looks like a local deletion.
-      final mergedLocal = _equivalent(latestLocal, local)
-          ? resolved
-          : mergeAccountLibraryState(
-              base: local,
-              local: latestLocal,
-              remote: resolved,
-            );
-      var applied = false;
-      if (_current(userId, generation) &&
-          !_equivalent(latestLocal, mergedLocal)) {
-        _applying = true;
-        try {
-          if (known == null && local != null) {
-            await _savePreimportCopy(userId, 'libraryState', local, generation);
-          }
-          if (!_current(userId, generation)) {
-            return false;
-          }
-          await writeStoredText(fileKey, jsonEncode(mergedLocal));
-          applied = true;
-        } finally {
-          _applying = false;
-        }
-      }
-      if (currentRemote != null) {
-        entries['libraryState'] = {
-          'revision': currentRemote['revision'],
-          'value': resolved,
-        };
-      }
-      if (!_current(userId, generation)) {
-        return false;
-      }
-      await writeStoredText(
-        key,
-        jsonEncode({'version': 1, 'settings': entries}),
-      );
-      return applied;
-    }
-    throw StateError('Account library metadata changed during sync.');
-  }
-
   void stop() {
     _stopped = true;
     _generation++;
@@ -449,7 +310,6 @@ class AccountSettingsSyncService {
       'appPreferences' => 'app_prefs.json',
       'editorPreferences' => 'editor_prefs.json',
       'recentColors' => 'shared_recent_colors.json',
-      'libraryState' => 'library_folders.json',
       'backupPreferences' => 'server_backup_preferences_${_hash(userId)}.json',
       _ => throw ArgumentError.value(category),
     };

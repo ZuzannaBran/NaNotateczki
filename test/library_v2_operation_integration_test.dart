@@ -7,7 +7,6 @@ import 'package:program/core/storage/storage_namespace_manager.dart';
 import 'package:program/core/storage/text_storage.dart';
 import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
-import 'package:program/data/sync/cloud_sync_service.dart';
 import 'package:program/data/sync/editor_sqlite_projector.dart';
 import 'package:program/data/sync/library_v2_operation_service.dart';
 import 'package:program/data/sync/operation_gateway.dart';
@@ -176,7 +175,6 @@ void main() {
     final journal = LibraryV2OperationService(engine: engine, accountId: user);
     final library = LibraryController(
       repository,
-      CloudSyncService(repository),
       LocalBackupService(repository),
     );
     addTearDown(library.dispose);
@@ -274,7 +272,6 @@ void main() {
       );
       final library = LibraryController(
         repository,
-        CloudSyncService(repository),
         LocalBackupService(repository),
       );
       addTearDown(library.dispose);

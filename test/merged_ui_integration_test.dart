@@ -16,7 +16,6 @@ import 'package:program/core/theme/app_typography.dart';
 import 'package:program/core/widgets/app_header_divider.dart';
 import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
-import 'package:program/data/sync/cloud_sync_service.dart';
 import 'package:program/features/editor/presentation/editor_settings_screen.dart';
 import 'package:program/features/library/presentation/library_catalog.dart';
 import 'package:program/features/library/presentation/library_controller.dart';
@@ -581,9 +580,8 @@ Future<void> _snapshot(WidgetTester tester, String name) async {
       'MERGE_REVIEW_PREFIX',
       defaultValue: 'review',
     );
-    await File(
-      '/tmp/nanotateczki-$prefix-$name.png',
-    ).writeAsBytes(bytes!.buffer.asUint8List());
+    await File('/tmp/nanotateczki-$prefix-$name.png')
+        .writeAsBytes(bytes!.buffer.asUint8List());
     image.dispose();
   });
 }
@@ -641,11 +639,7 @@ Future<_MergedApp> _pumpApp(
       documents.add(seeded);
     }
   }
-  final library = LibraryController(
-    repository,
-    CloudSyncService(repository),
-    LocalBackupService(repository),
-  );
+  final library = LibraryController(repository, LocalBackupService(repository));
   await library.loadItems();
   final preferences = AppPreferencesController()..darkMode = darkMode;
   final planner = StudyPlannerController(

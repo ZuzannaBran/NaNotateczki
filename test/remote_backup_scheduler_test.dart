@@ -47,11 +47,9 @@ void main() {
       apiClient: client,
       session: session,
     );
-    final scheduler = RemoteBackupScheduler(
-      service: service,
-      session: session,
-      now: () => now,
-    );
+    final scheduler = RemoteBackupScheduler(session: session, now: () => now)
+      ..uploadOperationalSnapshot = ((id) =>
+          service.uploadVerifiedSnapshot(deviceId: id));
     await tester.pumpWidget(const MaterialApp(home: SizedBox()));
     scheduler.enableForSignedInAccount();
     await tester.pump();
@@ -113,11 +111,9 @@ void main() {
       apiClient: client,
       session: session,
     );
-    final scheduler = RemoteBackupScheduler(
-      service: service,
-      session: session,
-      now: () => now,
-    );
+    final scheduler = RemoteBackupScheduler(session: session, now: () => now)
+      ..uploadOperationalSnapshot = ((id) =>
+          service.uploadVerifiedSnapshot(deviceId: id));
     await tester.pumpWidget(const MaterialApp(home: SizedBox()));
     scheduler.enableForSignedInAccount();
     await scheduler.setIdleSeconds(30);
@@ -154,7 +150,9 @@ void main() {
       apiClient: client,
       session: session,
     );
-    final scheduler = RemoteBackupScheduler(service: service, session: session);
+    final scheduler = RemoteBackupScheduler(session: session)
+      ..uploadOperationalSnapshot = ((id) =>
+          service.uploadVerifiedSnapshot(deviceId: id));
     await tester.pumpWidget(const MaterialApp(home: SizedBox()));
     scheduler.enableForSignedInAccount();
     expect(scheduler.hasPendingBackup, isTrue);
@@ -193,11 +191,13 @@ void main() {
       apiClient: client,
       session: session,
     )..pending = Completer<RemoteBackupReceipt>();
-    final scheduler = RemoteBackupScheduler(
-      service: service,
-      session: session,
-      exitBackupTimeout: const Duration(milliseconds: 1),
-    );
+    final scheduler =
+        RemoteBackupScheduler(
+            session: session,
+            exitBackupTimeout: const Duration(milliseconds: 1),
+          )
+          ..uploadOperationalSnapshot = ((id) =>
+              service.uploadVerifiedSnapshot(deviceId: id));
     await tester.pumpWidget(const MaterialApp(home: SizedBox()));
     scheduler.enableForSignedInAccount();
 
@@ -240,11 +240,9 @@ void main() {
       apiClient: client,
       session: session,
     );
-    scheduler = RemoteBackupScheduler(
-      service: service,
-      session: session,
-      now: () => now,
-    );
+    scheduler = RemoteBackupScheduler(session: session, now: () => now)
+      ..uploadOperationalSnapshot = ((id) =>
+          service.uploadVerifiedSnapshot(deviceId: id));
     final initial = await repository.createNotebook();
     await tester.pumpWidget(const MaterialApp(home: SizedBox()));
     scheduler.enableForSignedInAccount();
@@ -315,7 +313,9 @@ void main() {
       session: session,
     );
     service.pending = Completer<RemoteBackupReceipt>();
-    final scheduler = RemoteBackupScheduler(service: service, session: session);
+    final scheduler = RemoteBackupScheduler(session: session)
+      ..uploadOperationalSnapshot = ((id) =>
+          service.uploadVerifiedSnapshot(deviceId: id));
     scheduler.enableForSignedInAccount();
     unawaited(scheduler.backupNow());
     await tester.pump();
@@ -351,7 +351,6 @@ class _TrackingService extends RemoteBackupService {
     verifiedAt: DateTime.utc(2026, 11, 1),
   );
 
-  @override
   Future<RemoteBackupReceipt> uploadVerifiedSnapshot({
     required String deviceId,
   }) async {

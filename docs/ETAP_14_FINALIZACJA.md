@@ -1,5 +1,38 @@
 # Etap 14 — porządki po migracji
 
+## Pakiet 11 — tylko v2
+
+Klient konta uruchamia v2 bez dodatkowej flagi. Stare synchronizatory
+snapshotów, opcje inicjalnego scalania, edytor gościa v1 i zdalny zapis
+backupu v1 usunięto. Stare tabele i czytniki pozostają potrzebne do
+importu historycznego. Lokalna biblioteka jest osobnym magazynem.
+
+Na serwerze, z aktualnego checkoutu `NaNotateczki-serwer/main`:
+
+```bash
+git pull --ff-only origin main
+bash scripts/deploy-v2.sh
+```
+
+Skrypt wdraża API i migrację 0016, niczego nie kasuje. Jeśli konto testowe
+nadal ma stare wiersze, użyj opisanego w README kanonicznego serwera
+`scripts/stage14-reset-test-account-v2.sh` przed uruchomieniem nowej
+aplikacji. Reset nie jest konieczny dla pustego konta. Na urządzeniu
+uruchom nową wersję po wyczyszczeniu starego **testowego** magazynu konta
+lub zaloguj się na świeżym profilu bez importu Local.
+
+Na Linuksie pobierz `dev` i uruchom `flutter run -d linux`. Klient
+domyślnie łączy się z `https://api.nanotateczki.pl`. Dla Web zbuduj
+`flutter build web --release` z tej samej gałęzi i opublikuj
+`build/web/` w dotychczasowym miejscu hostingu.
+
+Następnie otwórz tę samą notatkę na dwóch klientach, rozłącz jeden, dodaj
+kreskę i tekst, połącz ponownie i uruchom oba od nowa. Sprawdź zgodność
+treści, zaproszenie Share, planner i ręczny backup. Nie wykonano tej
+próby na fizycznym serwerze użytkowniczki.
+
+## Historia przed pakietem 11
+
 Status 2026-11-04: **częściowo wykonany, pełne usunięcie v1 ZABLOKOWANE**.
 Nie jest to potwierdzenie produkcyjnej migracji.
 

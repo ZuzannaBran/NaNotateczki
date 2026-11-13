@@ -17,15 +17,11 @@ class PlannerSyncService {
     required this.apiClient,
     required this.session,
     required this.planner,
-    this.useRevisions = false,
   });
 
   final ApiClient apiClient;
   final AccountSessionController session;
   final StudyPlannerController planner;
-
-  /// Enabled only after the account is migrated to isolated storage.
-  final bool useRevisions;
 
   Future<void>? _running;
   bool _resyncRequested = false;
@@ -84,90 +80,7 @@ class PlannerSyncService {
     } while (_resyncRequested && !_stopped && session.isSignedIn);
   }
 
-  static DateTime _modified(Map<String, dynamic> record) {
-    final raw = record['modifiedAt'];
-    final time = raw is String ? DateTime.tryParse(raw)?.toUtc() : null;
-    if (time == null) {
-      throw const FormatException('Invalid planner sync timestamp');
-    }
-    return time;
-  }
-
   Future<void> _syncPass() async {
-    if (useRevisions) {
-      await _syncRevisionPass();
-      return;
-    }
-    final user = session.userId;
-    if (user == null || !session.isSignedIn || !planner.isLoaded || _stopped) {
-      return;
-    }
-    await planner.flush();
-    final remote = <String, Map<String, dynamic>>{};
-    String? after;
-    do {
-      final response = await apiClient.get(
-        '/v1/planner/entries',
-        query: after == null ? null : {'after': after},
-      );
-      if (_stopped || session.userId != user) {
-        return;
-      }
-      final decoded = response.decodeJson();
-      if (decoded is! Map<String, dynamic> || decoded['entries'] is! List) {
-        throw const FormatException('Invalid planner sync response');
-      }
-      for (final raw in decoded['entries'] as List) {
-        if (raw is! Map<String, dynamic> || raw['id'] is! String) {
-          throw const FormatException('Invalid planner sync entry');
-        }
-        _modified(raw);
-        remote[raw['id'] as String] = raw;
-      }
-      final next = decoded['next'];
-      if (next != null && (next is! String || next == after)) {
-        throw const FormatException('Invalid planner sync cursor');
-      }
-      after = next as String?;
-    } while (after != null);
-
-    if (_stopped || session.userId != user) {
-      return;
-    }
-    planner.applyRemoteRecords(remote.values);
-    await planner.flush();
-
-    for (final item in planner.syncRecords.entries) {
-      if (_stopped || session.userId != user) {
-        return;
-      }
-      final onServer = remote[item.key];
-      if (onServer != null &&
-          (onServer['deleted'] == true ||
-              (item.value['deleted'] != true &&
-                  !_modified(item.value).isAfter(_modified(onServer))))) {
-        continue;
-      }
-      final response = await apiClient
-          .putJson('/v1/planner/entries/${Uri.encodeComponent(item.key)}', {
-            'modifiedAt': item.value['modifiedAt'],
-            'deleted': item.value['deleted'],
-            'entry': item.value['entry'],
-          });
-      if (_stopped || session.userId != user) {
-        return;
-      }
-      final accepted = response.decodeJson();
-      if (accepted is! Map<String, dynamic>) {
-        throw const FormatException('Invalid planner write acknowledgment');
-      }
-      planner.applyRemoteRecords([accepted]);
-    }
-    await planner.flush();
-  }
-
-  /// Reconciles one account using durable CAS revisions, not modifiedAt.
-  Future<void> _syncRevisionPass() async {
     final user = session.userId;
     if (user == null || !session.isSignedIn || !planner.isLoaded || _stopped) {
       return;
@@ -253,13 +166,15 @@ class PlannerSyncService {
             Uuid.NAMESPACE_URL,
             'planner:$user:$id:$expected:$signature',
           );
-          final answer = await apiClient
-              .putJson('/v2/planner/entries/${Uri.encodeComponent(id)}', {
-                'operationId': operationId,
-                'expectedRevision': expected,
-                'deleted': source['deleted'],
-                'entry': source['entry'],
-              });
+          final answer = await apiClient.putJson(
+            '/v2/planner/entries/${Uri.encodeComponent(id)}',
+            {
+              'operationId': operationId,
+              'expectedRevision': expected,
+              'deleted': source['deleted'],
+              'entry': source['entry'],
+            },
+          );
           if (_stopped || session.userId != user) {
             return;
           }

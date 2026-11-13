@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 
 import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
-import 'package:program/data/sync/cloud_sync_service.dart';
 import 'package:program/features/editor/presentation/editor_screen.dart';
 import 'package:program/features/editor/state/editor_controller.dart';
 import 'package:program/features/library/presentation/library_controller.dart';
@@ -33,7 +32,6 @@ void main() {
     );
     final library = LibraryController(
       repository,
-      CloudSyncService(repository),
       LocalBackupService(repository),
     );
     await library.loadItems();

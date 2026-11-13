@@ -7,7 +7,6 @@ void main() {
   Widget app({
     required bool signedIn,
     String? userId,
-    String? legacyReadyUser,
     String? v2ReadyUser,
     String? blockingReason,
     Future<void> Function()? onRetry,
@@ -17,7 +16,6 @@ void main() {
     home: AccountProtocolEditorGate(
       isSignedIn: signedIn,
       userId: userId,
-      legacyReadyUser: legacyReadyUser,
       v2ReadyUser: v2ReadyUser,
       blockingReason: blockingReason,
       onRetry: onRetry ?? () async {},
@@ -35,7 +33,7 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
     await tester.pumpWidget(
-      app(signedIn: true, userId: 'account-a', legacyReadyUser: 'account-a'),
+      app(signedIn: true, userId: 'account-a', v2ReadyUser: 'account-a'),
     );
     expect(find.text('Editor content'), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsNothing);
@@ -48,22 +46,12 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      app(
-        signedIn: true,
-        userId: 'account-b',
-        legacyReadyUser: 'account-a',
-        v2ReadyUser: 'account-a',
-      ),
+      app(signedIn: true, userId: 'account-b', v2ReadyUser: 'account-a'),
     );
     expect(find.text('Editor content'), findsNothing);
 
     await tester.pumpWidget(
-      app(
-        signedIn: true,
-        userId: 'account-b',
-        legacyReadyUser: 'account-a',
-        v2ReadyUser: 'account-b',
-      ),
+      app(signedIn: true, userId: 'account-b', v2ReadyUser: 'account-b'),
     );
     expect(find.text('Editor content'), findsOneWidget);
 

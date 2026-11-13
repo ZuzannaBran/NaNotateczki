@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
-import 'package:program/data/sync/cloud_sync_service.dart';
 import 'package:program/features/library/presentation/library_catalog.dart';
 import 'package:program/features/library/presentation/library_controller.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
@@ -21,11 +20,8 @@ void main() {
     () async {
       final database = NotesDatabase(NativeDatabase.memory());
       final repository = NotebookRepository(database);
-      LibraryController newController() => LibraryController(
-        repository,
-        CloudSyncService(repository),
-        LocalBackupService(repository),
-      );
+      LibraryController newController() =>
+          LibraryController(repository, LocalBackupService(repository));
       final controller = newController();
       addTearDown(database.close);
       addTearDown(controller.dispose);
@@ -103,7 +99,6 @@ void main() {
       final repository = NotebookRepository(database);
       controller = LibraryController(
         repository,
-        CloudSyncService(repository),
         LocalBackupService(repository),
       );
       await controller.initialize();
@@ -188,7 +183,6 @@ void main() {
         final repository = NotebookRepository(database);
         controller = LibraryController(
           repository,
-          CloudSyncService(repository),
           LocalBackupService(repository),
         );
         await controller.initialize();

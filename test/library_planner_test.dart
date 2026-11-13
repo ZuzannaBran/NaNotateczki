@@ -11,7 +11,6 @@ import 'package:program/core/theme/app_colors.dart';
 import 'package:program/core/theme/app_theme.dart';
 import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
-import 'package:program/data/sync/cloud_sync_service.dart';
 import 'package:program/features/editor/presentation/editor_settings_screen.dart';
 import 'package:program/features/library/presentation/library_controller.dart';
 import 'package:program/features/library/presentation/library_screen.dart';
@@ -92,11 +91,8 @@ void main() {
   test('planner tasks survive reload, updates and deletion', () async {
     final db = NotesDatabase(NativeDatabase.memory());
     final repository = NotebookRepository(db);
-    LibraryController newLibrary() => LibraryController(
-      repository,
-      CloudSyncService(repository),
-      LocalBackupService(repository),
-    );
+    LibraryController newLibrary() =>
+        LibraryController(repository, LocalBackupService(repository));
     final library = newLibrary();
     await library.initialize();
     final planner = await library.createPlanner();
@@ -125,9 +121,9 @@ void main() {
     final decoded = repository.decodePortableBackup(portable);
     expect(decoded.plannerTasks.containsKey(planner.uid), isTrue);
     expect((decoded.plannerTasks[planner.uid] as List), hasLength(1));
-    final payload =
-        jsonDecode((await readStoredText('library_folders.json'))!)
-            as Map<String, dynamic>;
+    final payload = jsonDecode(
+      (await readStoredText('library_folders.json'))!,
+    ) as Map<String, dynamic>;
     expect((payload['plannerTasks'] as Map)[planner.uid], hasLength(1));
 
     final restored = newLibrary();
@@ -144,9 +140,9 @@ void main() {
       result.id,
     ]);
     await restored.flushPlannerTasks();
-    final saved =
-        jsonDecode((await readStoredText('library_folders.json'))!)
-            as Map<String, dynamic>;
+    final saved = jsonDecode(
+      (await readStoredText('library_folders.json'))!,
+    ) as Map<String, dynamic>;
     saved['plannerCompletedLast'] = {planner.uid: false};
     await writeStoredText('library_folders.json', jsonEncode(saved));
 
@@ -210,7 +206,6 @@ void main() {
     final repository = NotebookRepository(db);
     final library = LibraryController(
       repository,
-      CloudSyncService(repository),
       LocalBackupService(repository),
     );
     addTearDown(library.dispose);
@@ -369,7 +364,6 @@ void main() {
     });
     final library = LibraryController(
       repository,
-      CloudSyncService(repository),
       LocalBackupService(repository),
     );
     addTearDown(library.dispose);

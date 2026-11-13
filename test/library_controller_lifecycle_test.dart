@@ -4,7 +4,6 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
-import 'package:program/data/sync/cloud_sync_service.dart';
 import 'package:program/features/library/presentation/library_controller.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:program/features/notebook/domain/notebook.dart';
@@ -29,7 +28,6 @@ void main() {
       final repository = _DelayedRepository(db);
       final controller = LibraryController(
         repository,
-        CloudSyncService(repository),
         LocalBackupService(repository),
       );
 

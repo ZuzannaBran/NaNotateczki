@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:crypto/crypto.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -21,193 +20,6 @@ void main() {
     textStorageReadOverride = null;
     textStorageWriteOverride = null;
   });
-
-  test(
-    'uploads a complete snapshot and accepts only verified finalize',
-    () async {
-      final database = NotesDatabase(NativeDatabase.memory());
-      addTearDown(database.close);
-      final repository = NotebookRepository(database);
-      await repository.createNotebook();
-      final values = <String, String>{
-        'library_folders.json': jsonEncode({
-          'folders': ['Notes'],
-          'plannerTasks': <String, dynamic>{},
-        }),
-        'study_planner.json': jsonEncode({
-          'version': 1,
-          'sessions': <dynamic>[],
-        }),
-      };
-      textStorageReadOverride = (key) async => values[key];
-      textStorageWriteOverride = (key, value) async => values[key] = value;
-
-      var call = 0;
-      List<int>? uploaded;
-      final apiClient = ApiClient(
-        baseUri: Uri.parse('https://api.example.com'),
-        httpClient: MockClient((request) async {
-          call++;
-          if (call == 1) {
-            return http.Response(
-              jsonEncode({
-                'accessToken': 'access',
-                'refreshToken': 'refresh-token-with-at-least-forty-characters',
-                'expiresIn': 600,
-                'userId': 'user-1',
-                'username': 'test_user',
-              }),
-              200,
-            );
-          }
-          if (call == 2) {
-            return http.Response(
-              jsonEncode({'backupId': 'backup-1', 'status': 'pending'}),
-              201,
-            );
-          }
-          if (call == 3) {
-            uploaded = request.bodyBytes;
-            return http.Response('', 204);
-          }
-          final bytes = uploaded!;
-          return http.Response(
-            jsonEncode({
-              'backupId': 'backup-1',
-              'status': 'verified',
-              'sha256': sha256.convert(bytes).toString(),
-              'verifiedAt': '2026-10-26T12:00:00Z',
-            }),
-            200,
-          );
-        }),
-      );
-      final session = AccountSessionController(
-        apiClient,
-        credentialStore: _MemoryAccountCredentialStore(),
-      );
-      await session.login('test_user', 'a-secure-password');
-      final service = RemoteBackupService(
-        repository: repository,
-        apiClient: apiClient,
-        session: session,
-      );
-
-      final receipt = await service.uploadVerifiedSnapshot(
-        deviceId: '123e4567-e89b-12d3-a456-426614174000',
-      );
-
-      final envelope =
-          jsonDecode(utf8.decode(uploaded!)) as Map<String, dynamic>;
-      final payload = envelope['payload'] as Map<String, dynamic>;
-      expect(envelope['version'], 2);
-      expect(envelope['accountId'], 'user-1');
-      expect(envelope['schemaVersion'], database.schemaVersion);
-      expect(envelope['operationCheckpoint'], isEmpty);
-      expect(payload['notebooks'], hasLength(1));
-      expect(payload['libraryState'], containsPair('folders', ['Notes']));
-      expect(payload['studyPlannerState'], containsPair('sessions', isEmpty));
-      expect(receipt.backupId, 'backup-1');
-      expect(call, 4);
-    },
-  );
-
-  test('unacknowledged operations cannot enter a checkpoint backup', () async {
-    textStorageReadOverride = (_) async => null;
-    final database = NotesDatabase(NativeDatabase.memory());
-    addTearDown(database.close);
-    final repository = NotebookRepository(database);
-    await repository.createNotebook();
-    await database.customStatement(
-      'INSERT INTO operations (operation_id, actor_id, actor_seq, '
-      'document_id, kind, envelope_json, logical_clock, schema_version, '
-      'source, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [
-        'pending-operation',
-        'actor',
-        1,
-        'document',
-        'document.create',
-        '{}',
-        1,
-        1,
-        'local',
-        0,
-      ],
-    );
-    await database.customStatement(
-      'INSERT INTO operation_outbox (operation_id, queued_at) '
-      'VALUES (?, ?)',
-      ['pending-operation', 0],
-    );
-    final client = ApiClient(
-      baseUri: Uri.parse('https://api.example.com'),
-      httpClient: MockClient((request) async {
-        fail('Pending operations must prevent backup upload.');
-      }),
-    )..setAccessToken('token');
-    addTearDown(client.close);
-    final session = AccountSessionController(client)
-      ..mode = AccountDataMode.account
-      ..userId = 'user-1';
-    addTearDown(session.dispose);
-    final service = RemoteBackupService(
-      repository: repository,
-      apiClient: client,
-      session: session,
-    );
-    await expectLater(
-      service.uploadVerifiedSnapshot(
-        deviceId: '123e4567-e89b-12d3-a456-426614174000',
-      ),
-      throwsA(isA<StateError>()),
-    );
-    final pending = await database
-        .customSelect('SELECT operation_id FROM operation_outbox')
-        .get();
-    expect(pending, hasLength(1));
-  });
-
-  test(
-    'concurrent settings write aborts inconsistent backup capture',
-    () async {
-      final database = NotesDatabase(NativeDatabase.memory());
-      addTearDown(database.close);
-      final repository = NotebookRepository(database);
-      await repository.createNotebook();
-      var reads = 0;
-      textStorageReadOverride = (key) async {
-        if (key != 'app_prefs.json') {
-          return null;
-        }
-        reads++;
-        return reads == 1 ? '{"darkMode":false}' : '{"darkMode":true}';
-      };
-      final client = ApiClient(
-        baseUri: Uri.parse('https://api.example.com'),
-        httpClient: MockClient((request) async {
-          fail('Mixed-state backup must not reach the server.');
-        }),
-      )..setAccessToken('token');
-      addTearDown(client.close);
-      final session = AccountSessionController(client)
-        ..mode = AccountDataMode.account
-        ..userId = 'user-1';
-      addTearDown(session.dispose);
-      final service = RemoteBackupService(
-        repository: repository,
-        apiClient: client,
-        session: session,
-      );
-      await expectLater(
-        service.uploadVerifiedSnapshot(
-          deviceId: '123e4567-e89b-12d3-a456-426614174000',
-        ),
-        throwsA(isA<StateError>()),
-      );
-      expect(reads, 2);
-    },
-  );
 
   test('presence marker distinguishes new database from data loss', () async {
     final stored = <String, String>{};
@@ -238,87 +50,12 @@ void main() {
     expect(stored, hasLength(1));
   });
 
-  test('keeps a backup dirty when data changes during upload', () async {
-    final database = NotesDatabase(NativeDatabase.memory());
-    addTearDown(database.close);
-    final repository = NotebookRepository(database);
-    await repository.createNotebook();
-    final values = <String, String>{};
-    textStorageReadOverride = (key) async => values[key];
-    textStorageWriteOverride = (key, value) async => values[key] = value;
-
-    var call = 0;
-    late RemoteBackupScheduler scheduler;
-    List<int>? uploaded;
-    final apiClient = ApiClient(
-      baseUri: Uri.parse('https://api.example.com'),
-      httpClient: MockClient((request) async {
-        call++;
-        if (call == 1) {
-          return http.Response(
-            jsonEncode({
-              'accessToken': 'access',
-              'refreshToken': 'refresh-token-with-at-least-forty-characters',
-              'expiresIn': 600,
-              'userId': 'user-1',
-              'username': 'test_user',
-            }),
-            200,
-          );
-        }
-        if (call == 2) {
-          return http.Response(
-            jsonEncode({'backupId': 'backup-1', 'status': 'pending'}),
-            201,
-          );
-        }
-        if (call == 3) {
-          uploaded = request.bodyBytes;
-          scheduler.markDirty();
-          return http.Response('', 204);
-        }
-        return http.Response(
-          jsonEncode({
-            'backupId': 'backup-1',
-            'status': 'verified',
-            'sha256': sha256.convert(uploaded!).toString(),
-            'verifiedAt': '2026-10-26T12:00:00Z',
-          }),
-          200,
-        );
-      }),
-    );
-    final session = AccountSessionController(
-      apiClient,
-      credentialStore: _MemoryAccountCredentialStore(),
-    );
-    await session.login('test_user', 'a-secure-password');
-    scheduler = RemoteBackupScheduler(
-      service: RemoteBackupService(
-        repository: repository,
-        apiClient: apiClient,
-        session: session,
-      ),
-      session: session,
-    );
-    addTearDown(scheduler.dispose);
-    scheduler.enableForSignedInAccount();
-
-    await scheduler.backupNow();
-
-    expect(scheduler.lastVerifiedBackup, isNotNull);
-    expect(scheduler.hasPendingBackup, isTrue);
-  });
-
   test(
     'v2 scheduler uses verified operational API, never legacy backup',
     () async {
       final values = <String, String>{};
       textStorageReadOverride = (key) async => values[key];
       textStorageWriteOverride = (key, value) async => values[key] = value;
-      final database = NotesDatabase(NativeDatabase.memory());
-      addTearDown(database.close);
-      final repository = NotebookRepository(database);
       final api = ApiClient(
         baseUri: Uri.parse('https://api.example.com'),
         httpClient: MockClient((request) async {
@@ -330,16 +67,7 @@ void main() {
         ..mode = AccountDataMode.account
         ..userId = 'user-1';
       addTearDown(session.dispose);
-      final legacyCalls = <String>[];
-      final scheduler = RemoteBackupScheduler(
-        service: _RecordingRemoteBackupService(
-          repository: repository,
-          apiClient: api,
-          session: session,
-          deviceIds: legacyCalls,
-        ),
-        session: session,
-      );
+      final scheduler = RemoteBackupScheduler(session: session);
       addTearDown(scheduler.dispose);
       final operationalCalls = <String>[];
       scheduler.uploadOperationalSnapshot = (deviceId) async {
@@ -354,10 +82,10 @@ void main() {
       await scheduler.backupNow();
       expect(scheduler.lastVerifiedBackup?.backupId, 'operational-1');
       expect(operationalCalls, hasLength(1));
-      expect(legacyCalls, isEmpty);
       scheduler.uploadOperationalSnapshot = null;
       await scheduler.backupNow();
-      expect(legacyCalls, hasLength(1));
+      expect(operationalCalls, hasLength(1));
+      expect(scheduler.lastError, contains('V2 backup is unavailable'));
     },
   );
 
@@ -397,12 +125,11 @@ void main() {
       session: sessionA,
       deviceIds: deviceIds,
     );
-    final schedulerA = RemoteBackupScheduler(
-      service: serviceA,
-      session: sessionA,
-    );
+    final schedulerA = RemoteBackupScheduler(session: sessionA);
     addTearDown(schedulerA.dispose);
 
+    schedulerA.uploadOperationalSnapshot = (id) =>
+        serviceA.uploadVerifiedSnapshot(deviceId: id);
     schedulerA.enableForSignedInAccount();
     await schedulerA.backupNow();
     expect(schedulerA.lastVerifiedBackup, isNotNull);
@@ -420,13 +147,12 @@ void main() {
       session: sessionB,
       deviceIds: deviceIds,
     );
-    final schedulerB = RemoteBackupScheduler(
-      service: serviceB,
-      session: sessionB,
-    );
+    final schedulerB = RemoteBackupScheduler(session: sessionB);
     addTearDown(schedulerB.dispose);
     expect(schedulerB.lastVerifiedBackup, isNull);
     expect(schedulerB.lastError, isNull);
+    schedulerB.uploadOperationalSnapshot = (id) =>
+        serviceB.uploadVerifiedSnapshot(deviceId: id);
     schedulerB.enableForSignedInAccount();
     await schedulerB.backupNow();
 
@@ -450,7 +176,6 @@ class _RecordingRemoteBackupService extends RemoteBackupService {
 
   final List<String> deviceIds;
 
-  @override
   Future<RemoteBackupReceipt> uploadVerifiedSnapshot({
     required String deviceId,
   }) async {

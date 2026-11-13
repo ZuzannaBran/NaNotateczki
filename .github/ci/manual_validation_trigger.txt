@@ -1,3 +1,2 @@
-Full verification 2026-11-13
-Revision 7e65403600a5f9183bedab921746c4b2f22c022e
-Offline legacy folders and tasks, deleted move destination and independent Flutter peers.
+Pakiet 11 - pełna weryfikacja V2
+Wycofanie zapisów V1, rejestracja i migracja 0016, Share, backup, planner, dwa procesy Flutter.

@@ -24,7 +24,7 @@ void main() {
     expect(extended.title, original.title);
     expect(extended.expiresAt.isAfter(original.expiresAt), isTrue);
     expect(extended.link, original.link);
-    expect(extended.protocol, 'v1');
+    expect(extended.protocol, 'v2');
   });
 
   test('v2 invitation remains v2 when extended', () {
@@ -33,7 +33,6 @@ void main() {
       documentUid: 'shared-v2-uid',
       title: 'Operational board',
       expiresAt: DateTime.utc(2026, 11, 1, 18),
-      protocol: 'v2',
     );
 
     expect(

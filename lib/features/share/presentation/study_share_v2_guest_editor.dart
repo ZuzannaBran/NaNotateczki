@@ -12,8 +12,9 @@ import '../../../data/sync/operation_asset_gateway.dart';
 import '../../../data/sync/operation_gateway.dart';
 import '../../../data/sync/operation_protocol.dart';
 import '../../../data/sync/operation_store.dart';
-import '../../../data/sync/share_ink_preview_codec.dart';
 import '../../../data/sync/persistent_share_actor.dart';
+import '../../../data/sync/share_ink_preview_codec.dart';
+import '../../../data/sync/study_share_service.dart';
 import '../../../data/sync/sync_engine.dart';
 import '../../../data/sync/v2_delete_conflict_archive.dart';
 import '../../../data/sync/v2_outbox_conflict_policy.dart';
@@ -22,6 +23,7 @@ import '../../board/presentation/board_screen.dart';
 import '../../editor/state/editor_controller.dart';
 import '../../editor/state/editor_v2_operation_writer.dart';
 import '../../editor/state/editor_v2_remote_patch_dispatcher.dart';
+import '../../editor/state/page_background.dart';
 import '../../notebook/data/notebook_repository.dart';
 import '../../notebook/domain/notebook_kind.dart';
 import '../../notebook/presentation/notebook_screen.dart';
@@ -40,6 +42,7 @@ class StudyShareV2GuestEditor extends StatefulWidget {
     required this.updateRevision,
     required this.onEnded,
     required this.onRejoin,
+    this.onHostDarkMode,
     super.key,
   });
 
@@ -49,6 +52,7 @@ class StudyShareV2GuestEditor extends StatefulWidget {
   final int updateRevision;
   final VoidCallback onEnded;
   final VoidCallback onRejoin;
+  final ValueChanged<bool>? onHostDarkMode;
 
   @override
   State<StudyShareV2GuestEditor> createState() =>
@@ -72,6 +76,7 @@ class _StudyShareV2GuestEditorState extends State<StudyShareV2GuestEditor> {
   String? _error;
   bool _needsRejoin = false;
   bool _hasRecovery = false;
+  int _appearanceRequest = 0;
 
   @override
   void initState() {
@@ -223,6 +228,7 @@ class _StudyShareV2GuestEditorState extends State<StudyShareV2GuestEditor> {
         _hasRecovery = archived.isNotEmpty;
       });
       engine.requestSync();
+      unawaited(_refreshAppearance());
     } catch (error) {
       if (!_closed && mounted) {
         setState(() => _error = 'Cannot open v2 study share: $error');
@@ -313,11 +319,53 @@ class _StudyShareV2GuestEditorState extends State<StudyShareV2GuestEditor> {
     _onEngineChanged();
   }
 
+  Future<void> _refreshAppearance() async {
+    final api = _api;
+    final editor = _editor;
+    if (api == null || editor == null || _closed) {
+      return;
+    }
+    final request = ++_appearanceRequest;
+    try {
+      final appearance = await StudyShareGuestClient(apiClient: api)
+          .appearance(widget.shareId, widget.ticket);
+      if (!mounted ||
+          _closed ||
+          request != _appearanceRequest ||
+          !identical(editor, _editor) ||
+          appearance == null) {
+        return;
+      }
+      final dark = appearance['darkMode'];
+      final style = appearance['backgroundStyle'];
+      final spacing = appearance['backgroundSpacing'];
+      if (dark is bool) {
+        widget.onHostDarkMode?.call(dark);
+      }
+      if (style is int &&
+          style >= 0 &&
+          style < PageBackgroundStyle.values.length &&
+          spacing is num &&
+          spacing.isFinite &&
+          spacing > 0) {
+        editor.applySharedBackgroundSettings(
+          PageBackgroundSettings(
+            style: PageBackgroundStyle.values[style],
+            spacing: spacing.toDouble(),
+          ),
+        );
+      }
+    } catch (_) {
+      // Appearance is independent of persisted editing and will retry on events.
+    }
+  }
+
   @override
   void didUpdateWidget(covariant StudyShareV2GuestEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.updateRevision != oldWidget.updateRevision) {
       _engine?.requestSync();
+      unawaited(_refreshAppearance());
     }
   }
 

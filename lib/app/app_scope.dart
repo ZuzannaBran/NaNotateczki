@@ -27,17 +27,17 @@ import '../data/sync/account_session_controller.dart';
 import '../data/sync/account_settings_sync_service.dart';
 import '../data/sync/api_client.dart';
 import '../data/sync/app_activity_wake_service.dart';
-import '../data/sync/cloud_sync_service.dart';
 import '../data/sync/diagnostics_upload_service.dart';
 import '../data/sync/device_clock_check.dart';
 import '../data/sync/editor_v2_account_runtime.dart';
 import '../data/sync/local_account_import_service.dart';
 import '../data/sync/legacy_v2_projection_cutover.dart';
-import '../data/sync/live_web_sync_service.dart';
+import '../data/sync/legacy_sync_archive.dart';
 import '../data/sync/operation_store.dart';
 import '../data/sync/persistent_operation_actor.dart';
 import '../data/sync/planner_sync_service.dart';
 import '../features/editor/state/ink_color_presets.dart';
+import '../features/library/presentation/library_account_slot.dart';
 import '../features/library/presentation/library_controller.dart';
 import '../features/library/presentation/library_screen.dart';
 import '../features/notebook/data/notebook_repository.dart';
@@ -45,7 +45,6 @@ import '../features/notebook/domain/notebook.dart';
 import '../features/planner/state/study_planner_controller.dart';
 import 'account_bootstrap_barrier.dart';
 import 'account_protocol_editor_gate.dart';
-import 'unsupported_account_protocol_screen.dart';
 
 class AppScope extends StatefulWidget {
   const AppScope({super.key, this.onNamespaceSwitch})
@@ -81,13 +80,11 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   String? _localImportFailure;
   NotebookRepository? _repository;
   LocalBackupService? _backupService;
-  CloudSyncService? _cloudSync;
   ApiClient? _apiClient;
   AppActivityWakeService? _activityWake;
   AccountSessionController? _accountSession;
   RemoteBackupService? _remoteBackupService;
   RemoteBackupScheduler? _remoteBackupScheduler;
-  LiveWebSyncService? _liveSync;
   EditorV2AccountRuntime? _v2AccountRuntime;
   AccountSettingsSyncService? _accountSettingsSync;
   PlannerSyncService? _plannerSync;
@@ -107,8 +104,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
   Timer? _rememberedLoginRetry;
   bool _appIsForeground = true;
   String? _bootstrappedAccount;
-  String? _legacyProtocolReadyUser;
-  String? _incompatibleProtocolUser;
+  String? _accountStartupFailure;
   String? _clockCheckedForUser;
   final GlobalKey<ScaffoldMessengerState> _notificationMessengerKey =
       GlobalKey<ScaffoldMessengerState>();
@@ -152,7 +148,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       _settingsDebounce?.cancel();
       _plannerDebounce?.cancel();
       _bootstrappedAccount = null;
-      _legacyProtocolReadyUser = null;
+      _accountStartupFailure = null;
       _plannerSync?.stop();
       _accountSettingsSync?.stop();
       await AppSaveCoordinator.instance.flushPending();
@@ -163,13 +159,11 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       await _backupService?.waitUntilIdle();
       await SharedRecentColors.load();
       await waitForPendingTextStorageOperations();
-      await _liveSync?.stop();
       await _v2AccountRuntime?.stop();
       _libraryController?.attachV2LibraryOperations(null);
       await _remoteBackupScheduler?.stop();
       await _plannerSync?.stopAndDrain();
       await _accountSettingsSync?.stopAndDrain();
-      _incompatibleProtocolUser = null;
     });
   }
 
@@ -200,9 +194,6 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     await scheduler.flushForExit();
     await backupService.waitUntilIdle();
     await waitForPendingTextStorageOperations();
-    if (_accountSession?.isSignedIn == true && _v2AccountRuntime == null) {
-      await _liveSync?.flushPersistedOutbox();
-    }
   }
 
   Future<void> _syncRemotelyForShutdown() async {
@@ -211,33 +202,13 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       return;
     }
     final v2 = _v2AccountRuntime;
-    if (v2 != null) {
-      if (_bootstrappedAccount != session.userId) {
-        throw StateError('V2 runtime has not completed account startup.');
-      }
-      await v2.engine.syncNow();
-      if (v2.engine.lastError != null ||
-          (await v2.store.pending(
-            limit: 1,
-            includeDeferred: true,
-          )).isNotEmpty) {
-        throw StateError('V2 outbox has unacknowledged local operations.');
-      }
-    } else {
-      if (_legacyProtocolReadyUser != session.userId) {
-        throw StateError('Account sync protocol is not verified.');
-      }
-      final sync = _liveSync;
-      if (sync == null) {
-        throw StateError('Account synchronization is unavailable.');
-      }
-      if (!sync.isStarted) {
-        await sync.start(InitialSyncPolicy.mergeSafely);
-      }
-      await sync.syncNow();
-      if (sync.hasPendingChanges || sync.lastError != null) {
-        throw StateError('Pending account changes remain in the outbox.');
-      }
+    if (v2 == null || _bootstrappedAccount != session.userId) {
+      throw StateError('V2 runtime has not completed account startup.');
+    }
+    await v2.engine.syncNow();
+    if (v2.engine.lastError != null ||
+        (await v2.store.pending(limit: 1, includeDeferred: true)).isNotEmpty) {
+      throw StateError('V2 outbox has unacknowledged local operations.');
     }
     await _accountSettingsSync?.syncNow();
     if (_accountSettingsSync?.lastError != null) {
@@ -343,18 +314,35 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
             body: Center(child: CircularProgressIndicator()),
           );
         }
-        if (session.isSignedIn && _incompatibleProtocolUser == session.userId) {
-          return UnsupportedAccountProtocolScreen(
-            onLogOut: session.logout,
-            onLogOutOffline: session.logoutOffline,
+        if (_namespace?.kind == StorageNamespaceKind.account &&
+            !session.isSignedIn) {
+          // Account data never mounts a Local/snapshot editor while credentials
+          // are being restored or after they have expired.
+          return Builder(
+            builder: (context) => Scaffold(
+              body: Center(
+                child: !session.profileLoaded || session.isBusy
+                    ? const CircularProgressIndicator()
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('Sign in to open your account library.'),
+                          FilledButton(
+                            onPressed: () => showLibraryAccountDialog(
+                              context,
+                              liveSyncAvailable: true,
+                            ),
+                            child: const Text('Sign in'),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
           );
         }
         return AccountProtocolEditorGate(
           isSignedIn: session.isSignedIn,
           userId: session.userId,
-          legacyReadyUser: session.hasPendingLocalImport(session.userId ?? '')
-              ? null
-              : _legacyProtocolReadyUser,
           v2ReadyUser: session.hasPendingLocalImport(session.userId ?? '')
               ? null
               : (_v2AccountRuntime == null ? null : _bootstrappedAccount),
@@ -366,7 +354,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
                     'Importing Local data into this account. Editing is '
                         'paused until the transfer and remote acknowledgements '
                         'are complete. Use Retry if the connection is restored.')
-              : null,
+              : _accountStartupFailure,
           child: _v2AccountRuntime != null && session.userId != null
               ? _SyncRecoveryNotice(
                   key: ValueKey(session.userId),
@@ -408,7 +396,6 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     _plannerSync?.stop();
     _backupScheduler?.dispose();
     _remoteBackupScheduler?.dispose();
-    _liveSync?.dispose();
     _v2AccountRuntime?.dispose();
     final scheduler = _remoteBackupScheduler;
     if (scheduler != null) {
@@ -636,15 +623,14 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
 
   Future<void> _syncAccountSettings() async {
     // Settings can be triggered by listeners before the account bootstrap.
-    // Do not issue v1 requests until this account's protocol is verified.
+    // Do not make requests until the account journal is ready.
     if (_accountSession?.isSignedIn == true &&
-        _legacyProtocolReadyUser != _accountSession?.userId &&
         _bootstrappedAccount != _accountSession?.userId) {
       return;
     }
     try {
       // A planner task may still be in its short local save debounce.
-      // Flush it before reading library_folders.json for cloud sync.
+      // Flush it before the account reconciles preferences.
       await _libraryController?.flushPlannerTasks();
       await _accountSettingsSync?.syncNow();
     } catch (error, stackTrace) {
@@ -669,8 +655,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
 
   Future<void> _syncPlanner() async {
     if (_bootstrappedAccount == null ||
-        (_legacyProtocolReadyUser != _bootstrappedAccount &&
-            _v2AccountRuntime == null) ||
+        _v2AccountRuntime == null ||
         _plannerSync == null) {
       return;
     }
@@ -774,62 +759,37 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       setState(() => _localImportFailure = null);
     }
     try {
+      final runtime = _v2AccountRuntime;
+      if (runtime == null) {
+        throw StateError('V2 synchronization is not ready for import.');
+      }
       await LocalAccountImportService(
         accountId: userId,
         repository: repository,
         planner: planner,
         isCurrentAccount: current,
         onLibraryChanged: library.reloadFromAccount,
-        libraryV2: _v2AccountRuntime?.libraryOperations,
+        libraryV2: runtime.libraryOperations,
       ).run();
       if (!current()) {
         return;
       }
-      final runtime = _v2AccountRuntime;
-      if (runtime != null) {
-        await runtime.engine.syncNow();
-        if (!current()) {
-          return;
-        }
-        if (runtime.engine.lastError != null ||
-            (await runtime.store.pending()).isNotEmpty) {
-          throw StateError(
-            'Imported document/library operations are waiting for ACK.',
-          );
-        }
-        await _plannerSync?.syncNow();
-        if (!current()) {
-          return;
-        }
-        if (_plannerSync?.lastError != null) {
-          throw StateError('Imported study entries have not synchronized.');
-        }
-      } else {
-        final sync = _liveSync;
-        if (sync == null || !sync.isStarted) {
-          throw StateError('Account synchronization is not ready for import.');
-        }
-        await sync.syncNow();
-        if (!current()) {
-          return;
-        }
-        if (sync.lastError != null || sync.hasPendingChanges) {
-          throw StateError('Imported documents have not synchronized.');
-        }
-        await _accountSettingsSync?.syncNow();
-        if (!current()) {
-          return;
-        }
-        if (_accountSettingsSync?.lastError != null) {
-          throw StateError('Imported folders and tasks have not synchronized.');
-        }
-        await _plannerSync?.syncNow();
-        if (!current()) {
-          return;
-        }
-        if (_plannerSync?.lastError != null) {
-          throw StateError('Imported study entries have not synchronized.');
-        }
+      await runtime.engine.syncNow();
+      if (!current()) {
+        return;
+      }
+      if (runtime.engine.lastError != null ||
+          (await runtime.store.pending(includeDeferred: true)).isNotEmpty) {
+        throw StateError(
+          'Imported document/library operations are waiting for ACK.',
+        );
+      }
+      await _plannerSync?.syncNow();
+      if (!current()) {
+        return;
+      }
+      if (_plannerSync?.lastError != null) {
+        throw StateError('Imported study entries have not synchronized.');
       }
       await session.completeLocalImport(userId);
       if (mounted) {
@@ -855,12 +815,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     if (repository == null || apiClient == null || library == null) {
       throw StateError('V2 account cannot start without its SQLite scope.');
     }
-    // Server-side canary approval replaces a local build-time bypass.
     final legacyCutover = await apiClient.ensureV2AccountReady();
-    if (!isCurrent()) {
-      return;
-    }
-    await _liveSync?.flushPersistedOutbox();
     if (!isCurrent()) {
       return;
     }
@@ -873,7 +828,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
             isCurrent: isCurrent,
           );
     if (cutover == null) {
-      await LiveWebSyncService.requireEmptyLegacyOutbox(userId);
+      await LegacySyncArchive.requireEmptyLegacyOutbox(userId);
     } else {
       await cutover.prepare(legacyCutover!);
     }
@@ -987,13 +942,11 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       apiClient: apiClient,
       session: _accountSession!,
       planner: _studyPlanner!,
-      useRevisions: true,
     );
     _accountSettingsSync?.stop();
     _accountSettingsSync = AccountSettingsSyncService(
       apiClient: apiClient,
       session: _accountSession!,
-      useV2: true,
       onRemoteApplied: () async {
         await _preferences?.load();
         await _remoteBackupScheduler?.refreshAccountPreference();
@@ -1054,10 +1007,9 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
       unawaited(_syncAccountSettings());
       unawaited(_syncPlanner());
     });
-    // Share v1 remains disabled for operational accounts.
     setState(() {
       _bootstrappedAccount = userId;
-      _incompatibleProtocolUser = null;
+      _accountStartupFailure = null;
     });
   }
 
@@ -1065,7 +1017,6 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     final session = _accountSession;
     final backup = _remoteBackupService;
     final scheduler = _remoteBackupScheduler;
-    final sync = _liveSync;
     final library = _libraryController;
     final preferences = _preferences;
     final planner = _studyPlanner;
@@ -1080,7 +1031,6 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         _namespace != StorageNamespace.account(session.userId!) ||
         backup == null ||
         scheduler == null ||
-        sync == null ||
         library == null ||
         preferences == null ||
         planner == null) {
@@ -1106,135 +1056,14 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         if (!isCurrent()) {
           return;
         }
-        // Never restore an older snapshot or start v1 writers for a v2
-        // account. Keep local data and the outbox untouched on failure.
-        try {
-          await _apiClient!.ensureLegacyAccountProtocol();
-        } on AccountProtocolNotSupported {
-          try {
-            await _startV2Account(userId, generation);
-          } on AccountProtocolNotSupported {
-            if (isCurrent()) {
-              setState(() => _incompatibleProtocolUser = userId);
-            }
-            rethrow;
-          }
-          return;
-        }
-        if (!isCurrent()) {
-          return;
-        }
-        // An account using v1 must never upload its snapshot to v2.
-        scheduler.uploadOperationalSnapshot = null;
-        if (_accountSettingsSync?.useV2 == true) {
-          _accountSettingsSync = AccountSettingsSyncService(
-            apiClient: _apiClient!,
-            session: session,
-            onRemoteApplied: () async {
-              await library.reloadFromAccount();
-              await preferences.load();
-              await scheduler.refreshAccountPreference();
-              scheduler.markDirty();
-            },
-          );
-        }
-        if (_plannerSync?.useRevisions == true) {
-          _plannerSync = PlannerSyncService(
-            apiClient: _apiClient!,
-            session: session,
-            planner: planner,
-          );
-        }
-        if (_incompatibleProtocolUser == userId && mounted) {
-          setState(() => _incompatibleProtocolUser = null);
-        }
-        // Release the editor only after the server confirmed v1.
-        // The gate keeps v2 documents away from snapshot writers.
-        setState(() => _legacyProtocolReadyUser = userId);
-        var restored = false;
-        Object? recoveryFailure;
-        // A new installation has no presence marker. If IndexedDB/SQLite
-        // vanished after an earlier successful account start, recover it.
-        final needsRecovery =
-            _databaseWasReset ||
-            (_databaseFreshFile && await backup.wasDatabaseInitialized(userId));
-        if (needsRecovery) {
-          try {
-            restored = await backup.hydrateFromLatestAccountBackup(
-              databaseWasReset: true,
-            );
-          } catch (error, stackTrace) {
-            recoveryFailure = error;
-            AppErrorLog.instance.record(
-              error,
-              stackTrace,
-              source: 'AppScope.accountBackupRecovery',
-            );
-          }
-        }
-        if (!isCurrent()) {
-          return;
-        }
-        if (restored) {
-          await library.reloadFromAccount();
-          await preferences.load();
-          await planner.load();
-        }
-        // Settings use their own versioned account record rather than
-        // replacing a newer device preference with a stale backup.
-        await _syncAccountSettings();
-        if (!isCurrent()) {
-          return;
-        }
-        await sync.start(InitialSyncPolicy.mergeSafely);
-        if (!isCurrent()) {
-          await sync.stop();
-          return;
-        }
-        try {
-          await _plannerSync?.syncNow();
-        } catch (error, stackTrace) {
-          AppErrorLog.instance.record(
-            error,
-            stackTrace,
-            source: 'AppScope.initialPlannerSync',
-          );
-        }
-        if (!isCurrent()) {
-          return;
-        }
-        if (recoveryFailure != null) {
-          // Keep live sync available but do not upload a potentially
-          // incomplete replacement snapshot. Retry recovery on resume.
-          sync.reportStartupFailure(recoveryFailure);
-          return;
-        }
-        await _importPendingLocalData(userId, generation);
-        if (!isCurrent()) {
-          return;
-        }
-        await backup.markDatabaseInitialized(userId);
-        if (!isCurrent()) {
-          return;
-        }
-        _databaseWasReset = false;
-        _databaseFreshFile = false;
-        _bootstrappedAccount = userId;
-        scheduler.enableForSignedInAccount();
-        _observedIdleSeconds = scheduler.idleSeconds;
-        _settingsPoll?.cancel();
-        _settingsPoll = Timer.periodic(const Duration(seconds: 45), (_) {
-          unawaited(_syncAccountSettings());
-          unawaited(_syncPlanner());
-        });
+        await _startV2Account(userId, generation);
       } catch (error, stackTrace) {
         if (!isCurrent()) {
           return;
         }
-        if (error is AccountProtocolNotSupported) {
-          setState(() => _incompatibleProtocolUser = userId);
+        if (mounted) {
+          setState(() => _accountStartupFailure = error.toString());
         }
-        sync.reportStartupFailure(error);
         AppErrorLog.instance.record(
           error,
           stackTrace,
@@ -1292,23 +1121,11 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
               onChanged: (changes) {
                 _backupScheduler?.schedule(changes: changes);
                 _remoteBackupScheduler?.markDirty();
-                final signedInUser = _accountSession?.userId;
-                if (signedInUser != null &&
-                    _legacyProtocolReadyUser == signedInUser &&
-                    _namespace == StorageNamespace.account(signedInUser)) {
-                  _liveSync?.enqueue(changes);
-                }
-                if (changes.isEmpty) {
-                  // Folder, cover and task metadata live in library_folders.
-                  _scheduleAccountSettingsSync();
-                }
               },
             );
         _repository = repository;
         final backupService = _backupService ?? LocalBackupService(repository);
         _backupService = backupService;
-        final cloudSync = _cloudSync ?? CloudSyncService(repository);
-        _cloudSync = cloudSync;
         final apiClient = _apiClient ?? widget._testApiClient ?? ApiClient();
         _apiClient = apiClient;
         _activityWake ??= AppActivityWakeService(apiClient: apiClient);
@@ -1338,20 +1155,8 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
         _remoteBackupService = remoteBackup;
         final remoteBackupScheduler =
             _remoteBackupScheduler ??
-            RemoteBackupScheduler(
-              service: remoteBackup,
-              session: accountSession,
-            );
+            RemoteBackupScheduler(session: accountSession);
         _remoteBackupScheduler = remoteBackupScheduler;
-        final liveSync =
-            _liveSync ??
-            LiveWebSyncService(
-              repository: repository,
-              apiClient: apiClient,
-              session: accountSession,
-              enableRealtime: true,
-            );
-        _liveSync = liveSync;
         _backupScheduler ??= _BackupScheduler(
           repository: repository,
           backupService: backupService,
@@ -1360,62 +1165,18 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
             _libraryController ??
             LibraryController(
               repository,
-              cloudSync,
               backupService,
               wasReset: result.wasReset,
               freshFile: result.freshFile,
               resetReason: result.resetReason,
             );
         _libraryController = libraryController;
-        liveSync.onRemoteApplied = libraryController.loadItems;
-        liveSync.onPlannerChanged = _syncPlanner;
         final preferences =
             _preferences ?? (AppPreferencesController()..load());
         _preferences = preferences;
         final planner = _studyPlanner ?? StudyPlannerController();
         _studyPlanner = planner;
         _plannerReady ??= planner.load();
-        _plannerSync ??= PlannerSyncService(
-          apiClient: apiClient,
-          session: accountSession,
-          planner: planner,
-        );
-        if (_bootstrappedAccount != accountSession.userId ||
-            _v2AccountRuntime == null) {
-          remoteBackupScheduler.reconcileBeforeBackup = () async {
-            if (!liveSync.isStarted) {
-              throw StateError('Account sync must start before remote backup.');
-            }
-            // Pull changes even when this device has made no local edits.
-            await liveSync.syncNow();
-            if (liveSync.lastError != null || liveSync.hasPendingChanges) {
-              throw StateError(
-                'Pending notebook changes must sync before remote backup.',
-              );
-            }
-            await libraryController.flushPlannerTasks();
-            await _accountSettingsSync?.syncNow();
-            if (_accountSettingsSync?.lastError != null) {
-              throw StateError('Account preferences have not synchronized.');
-            }
-            await _plannerSync?.syncNow();
-            if (_plannerSync?.lastError != null) {
-              throw StateError('Planner has not synchronized.');
-            }
-          };
-        }
-        _accountSettingsSync ??= AccountSettingsSyncService(
-          apiClient: apiClient,
-          session: accountSession,
-          onRemoteApplied: () async {
-            await libraryController.reloadFromAccount();
-            await preferences.load();
-            await remoteBackupScheduler.refreshAccountPreference();
-            // Metadata and preferences downloaded from another device
-            // also belong in the next verified snapshot.
-            remoteBackupScheduler.markDirty();
-          },
-        );
         if (newAccountSession) {
           preferences.addListener(remoteBackupScheduler.markDirty);
           preferences.addListener(_scheduleAccountSettingsSync);
@@ -1446,8 +1207,7 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
             }
             if (!accountSession.isSignedIn) {
               _bootstrappedAccount = null;
-              _legacyProtocolReadyUser = null;
-              _incompatibleProtocolUser = null;
+              _accountStartupFailure = null;
               _clockCheckedForUser = null;
               _settingsPoll?.cancel();
               _settingsDebounce?.cancel();
@@ -1484,7 +1244,6 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
             ChangeNotifierProvider<RemoteBackupScheduler>.value(
               value: remoteBackupScheduler,
             ),
-            ChangeNotifierProvider<LiveWebSyncService>.value(value: liveSync),
             Provider<EditorV2AccountRuntime?>.value(value: _v2AccountRuntime),
             ChangeNotifierProvider<LibraryController>.value(
               value: libraryController,

@@ -7,9 +7,10 @@ tablicy, wklejać obrazy i tekst, porządkować materiały w folderach, a gotowe
 notatki eksportować do PDF albo PNG.
 
 Projekt jest aplikacją Flutterową z lokalnym zapisem danych w Drift/SQLite. Nie
-wymaga konta ani zewnętrznego backendu: notatki są przechowywane lokalnie,
-backup działa jako pliki JSON, a synchronizacja folderowa zapisuje jeden plik
-w wybranym katalogu.
+w trybie Local konta ani backendu: notatki są przechowywane lokalnie,
+a kopie zapasowe pozostają na urządzeniu. Po zalogowaniu synchronizacja
+konta używa wyłącznie V2. Instrukcja uruchomienia jest w
+[dokumencie pakietu 11](docs/ETAP_14_FINALIZACJA.md).
 
 ## Licencja
 
@@ -132,10 +133,8 @@ open source w rozumieniu OSI.
   - tablica lub pojedyncza strona jako plik,
   - wielostronicowy notebook jako folder z plikami `page_XX.png`.
 - Dialog wyboru miejsca zapisu przez `file_picker`.
-- Synchronizacja folderowa bez API keys i bez konta.
-- Plik synchronizacji `notatek_cloud.json` w wybranym katalogu.
-- Scalanie danych metodą "nowsza aktualizacja wygrywa" na podstawie
-  `updatedAt`.
+- Zalogowane urządzenia synchronizują notatki i Share przez dziennik
+  operacji V2. Tryb Local działa niezależnie od konta.
 
 ## Stack techniczny
 
@@ -211,9 +210,6 @@ dart run build_runner build
 
 - OCR jest wyłączony na wszystkich platformach.
 - Import PDF na Linuksie wymaga `pdftoppm`.
-- Synchronizacja folderowa nie jest usługą chmurową sama w sobie. Aplikacja
-  zapisuje plik JSON w katalogu, który może być synchronizowany np. przez
-  Dropbox, Syncthing, iCloud Drive, OneDrive albo inny system plików.
 - Projekt świadomie używa Provider + ChangeNotifier. Nie ma tu Bloc ani
   Riverpoda.
 

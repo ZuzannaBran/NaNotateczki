@@ -7,7 +7,6 @@ import 'package:program/core/input/app_preferences_controller.dart';
 import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/data/sync/api_client.dart';
-import 'package:program/data/sync/cloud_sync_service.dart';
 import 'package:program/data/sync/editor_v2_account_runtime.dart';
 import 'package:program/data/sync/operation_protocol.dart';
 import 'package:program/features/editor/presentation/editor_settings_screen.dart';
@@ -46,7 +45,6 @@ void main() {
     final notebook = await repository.createNotebook();
     final library = LibraryController(
       repository,
-      CloudSyncService(repository),
       LocalBackupService(repository),
     );
     await library.loadItems();
@@ -122,7 +120,6 @@ void main() {
     final notebook = await repository.createNotebook(title: 'Real v2 editor');
     final library = LibraryController(
       repository,
-      CloudSyncService(repository),
       LocalBackupService(repository),
     );
     await library.loadItems();

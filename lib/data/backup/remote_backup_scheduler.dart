@@ -15,7 +15,6 @@ import 'remote_backup_service.dart';
 
 class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
   RemoteBackupScheduler({
-    required this.service,
     required this.session,
     DateTime Function()? now,
     this.exitBackupTimeout = const Duration(minutes: 2),
@@ -31,7 +30,6 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
   static const supportedIdleSeconds = <int>[15, 30, 60, 120, 300, 900, 1800];
   static const failureRetry = Duration(minutes: 5);
 
-  final RemoteBackupService service;
   final AccountSessionController session;
   final Duration exitBackupTimeout;
 
@@ -39,8 +37,7 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
   /// A failed reconciliation must not mark an outdated snapshot as verified.
   Future<void> Function()? reconcileBeforeBackup;
 
-  /// Installed only for an authenticated v2 account; legacy backup remains
-  /// unchanged, and no v1 endpoint is reachable through this callback.
+  /// Installed only after the authenticated v2 account is ready.
   Future<RemoteBackupReceipt> Function(String deviceId)?
   uploadOperationalSnapshot;
   final DateTime Function() _now;
@@ -208,9 +205,10 @@ class RemoteBackupScheduler extends ChangeNotifier with WidgetsBindingObserver {
       final uploadGeneration = _changeGeneration;
       final deviceId = await _deviceId(accountUserId);
       final operational = uploadOperationalSnapshot;
-      final receipt = operational == null
-          ? await service.uploadVerifiedSnapshot(deviceId: deviceId)
-          : await operational(deviceId);
+      if (operational == null) {
+        throw StateError('V2 backup is unavailable before account startup.');
+      }
+      final receipt = await operational(deviceId);
       if (_accountUserId == accountUserId && session.userId == accountUserId) {
         lastVerifiedBackup = receipt;
         lastError = null;

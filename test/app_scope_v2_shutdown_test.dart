@@ -29,6 +29,57 @@ void main() {
   useIsolatedNativeTestDocuments();
   useInMemoryTestTextStorage();
 
+  testWidgets('account storage without a session cannot mount a Local editor', (
+    tester,
+  ) async {
+    const owner = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    FlutterSecureStorage.setMockInitialValues({});
+    addTearDown(
+      () => ActiveStorageNamespace.activate(StorageNamespace.local()),
+    );
+    await writeStoredText(
+      AccountSessionController.profileStorageKey,
+      jsonEncode({
+        'version': 1,
+        'preferredMode': 'account',
+        'onboardingComplete': true,
+        'boundUserId': owner,
+      }),
+    );
+    final database = NotesDatabase(NativeDatabase.memory());
+    final api = ApiClient(
+      baseUri: Uri.parse('https://api.example.com'),
+      httpClient: MockClient(
+        (request) async => throw StateError('Unexpected request'),
+      ),
+    );
+    await tester.pumpWidget(
+      AppScope.forTesting(
+        apiClient: api,
+        openDatabase: () async => DatabaseOpenResult(
+          database: database,
+          wasReset: false,
+          freshFile: false,
+        ),
+      ),
+    );
+    for (
+      var i = 0;
+      i < 30 &&
+          find.text('Sign in to open your account library.').evaluate().isEmpty;
+      i++
+    ) {
+      await tester.pump(const Duration(milliseconds: 10));
+    }
+    expect(find.byType(LibraryScreen), findsNothing);
+    expect(find.text('Sign in to open your account library.'), findsOneWidget);
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('account-username')), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+  });
+
   testWidgets('v2 exit drains writers and logout verifies backup', (
     tester,
   ) async {
@@ -59,8 +110,6 @@ void main() {
             });
           case '/v1/time':
             return http.Response('', 404);
-          case '/v1/auth/protocol':
-            return json({'protocol': 'v2'});
           case '/v2/activation/readiness':
             return json({'protocol': 'v2', 'writeEnabled': true, 'version': 1});
           case '/v2/operations':
@@ -142,6 +191,16 @@ void main() {
     expect(library, findsOneWidget, reason: calls.join(', '));
     final session = tester.element(library).read<AccountSessionController>();
     expect(session.isSignedIn, isTrue);
+    expect(
+      calls,
+      containsAllInOrder([
+        'POST /v1/auth/refresh',
+        'GET /v2/activation/readiness',
+        'GET /v2/operations',
+      ]),
+    );
+    expect(calls.where((call) => call.contains('/v1/auth/protocol')), isEmpty);
+    expect(calls.where((call) => call.contains('/v1/sync/')), isEmpty);
     runtime = tester.element(library).read<EditorV2AccountRuntime?>()!;
     final backupScheduler = tester
         .element(library)
@@ -190,7 +249,14 @@ void main() {
         'POST /v1/auth/logout',
       ]),
     );
-    expect(calls.where((call) => call.contains('/v1/backups')), isEmpty);
+    expect(
+      calls.where(
+        (call) => RegExp(
+          r'/v1/(auth/protocol|sync|planner|account-settings|backups|study-shares)',
+        ).hasMatch(call),
+      ),
+      isEmpty,
+    );
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
   });

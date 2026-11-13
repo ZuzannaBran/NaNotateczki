@@ -28,12 +28,7 @@ class ApiException implements Exception {
   String toString() => 'ApiException($statusCode): $message';
 }
 
-/// Signals that legacy snapshot writers cannot edit a v2 account.
-class AccountProtocolNotSupported extends StateError {
-  AccountProtocolNotSupported()
-    : super('This version cannot edit accounts using sync v2.');
-}
-
+/// Cursors for restoring a historical account into the v2 journal.
 class LegacyCutoverReceipt {
   const LegacyCutoverReceipt(this.legacyCursor, this.operationCursor);
 
@@ -99,32 +94,7 @@ class ApiClient {
     return baseUri.replace(path: '$basePath$path', queryParameters: query);
   }
 
-  /// Fail closed before legacy sync writes to an account activated for v2.
-  /// A 404 is compatible with backend versions predating the protocol probe.
-  Future<void> ensureLegacyAccountProtocol() async {
-    late final ApiResponse response;
-    try {
-      response = await get('/v1/auth/protocol');
-    } on ApiException catch (error) {
-      if (error.statusCode == 404) {
-        return;
-      }
-      rethrow;
-    }
-    final payload = response.decodeJson();
-    if (payload is! Map<String, dynamic>) {
-      throw const FormatException('Invalid account sync protocol response.');
-    }
-    final protocol = payload['protocol'];
-    if (protocol == 'v2') {
-      throw AccountProtocolNotSupported();
-    }
-    if (protocol != 'v1') {
-      throw const FormatException('Unsupported account sync protocol.');
-    }
-  }
-
-  /// Verifies the canary marker and server readiness before starting v2.
+  /// Verifies the persisted protocol marker and server readiness before starting v2.
   /// Missing endpoints never allow a fallback to a legacy writer.
   Future<LegacyCutoverReceipt?> ensureV2AccountReady() async {
     final response = await get('/v2/activation/readiness');
@@ -154,11 +124,6 @@ class ApiClient {
 
   static bool _safeCursor(Object? value) =>
       value is int && value >= 0 && value <= 9007199254740991;
-
-  Uri realtimeUri() {
-    final uri = resolve('/v1/realtime');
-    return uri.replace(scheme: uri.scheme == 'https' ? 'wss' : 'ws');
-  }
 
   Future<ApiResponse> get(
     String path, {

@@ -7,7 +7,6 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/sync/api_client.dart';
 import '../../../data/sync/study_share_service.dart';
-import 'study_share_guest_editor.dart';
 import 'study_share_v2_guest_editor.dart';
 
 /// An invalidated ticket cannot be recovered by transport reconnects.
@@ -70,7 +69,6 @@ class _StudyShareGuestScreenState extends State<_StudyShareGuestScreen> {
   Timer? _clockTimer;
   String? _ticket;
   String? _documentUid;
-  String _protocol = 'v1';
   String? _title;
   String? _error;
   DateTime? _expiresAt;
@@ -101,14 +99,8 @@ class _StudyShareGuestScreenState extends State<_StudyShareGuestScreen> {
       if (!mounted) {
         return;
       }
-      final v2 = response['protocol'] == 'v2';
-      final documentUid = response['documentUid'];
-      if (v2 && (documentUid is! String || documentUid.isEmpty)) {
-        throw const FormatException('V2 invitation has no document identity.');
-      }
       setState(() {
-        _protocol = v2 ? 'v2' : 'v1';
-        _documentUid = documentUid is String ? documentUid : null;
+        _documentUid = response['documentUid'] as String;
         _ticket = response['ticket'] as String;
         _title = response['title'] as String;
         _expiresAt = DateTime.tryParse(response['expiresAt'] as String? ?? '');
@@ -154,7 +146,6 @@ class _StudyShareGuestScreenState extends State<_StudyShareGuestScreen> {
                 // Reconcile edits missed while the WebSocket was offline.
                 setState(() => _documentUpdates++);
                 break;
-              case 'document_changed':
               case 'operations_changed':
               case 'appearance_changed':
                 setState(() => _documentUpdates++);
@@ -321,27 +312,16 @@ class _StudyShareGuestScreenState extends State<_StudyShareGuestScreen> {
                       child: Text(_error!),
                     ),
                   Expanded(
-                    child: _protocol == 'v2'
-                        ? StudyShareV2GuestEditor(
-                            shareId: widget.sessionId,
-                            documentUid: _documentUid!,
-                            ticket: _ticket!,
-                            updateRevision: _documentUpdates,
-                            onEnded: () => _endView(
-                              'This session is no longer available.',
-                            ),
-                            onRejoin: _rejoinView,
-                          )
-                        : StudyShareGuestEditor(
-                            shareId: widget.sessionId,
-                            ticket: _ticket!,
-                            client: _client,
-                            updateRevision: _documentUpdates,
-                            onEnded: () => _endView(
-                              'This session is no longer available.',
-                            ),
-                            onHostDarkMode: widget.onHostDarkMode,
-                          ),
+                    child: StudyShareV2GuestEditor(
+                      shareId: widget.sessionId,
+                      documentUid: _documentUid!,
+                      ticket: _ticket!,
+                      updateRevision: _documentUpdates,
+                      onEnded: () =>
+                          _endView('This session is no longer available.'),
+                      onRejoin: _rejoinView,
+                      onHostDarkMode: widget.onHostDarkMode,
+                    ),
                   ),
                 ],
               ),

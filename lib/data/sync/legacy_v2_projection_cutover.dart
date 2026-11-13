@@ -11,7 +11,7 @@ import '../../features/notebook/domain/notebook.dart';
 import 'account_settings_sync_service.dart';
 import 'api_client.dart';
 import 'library_v2_operation_service.dart';
-import 'live_web_sync_service.dart';
+import 'legacy_sync_archive.dart';
 import 'notebook_merge.dart';
 import 'operation_protocol.dart';
 import 'operation_store.dart';
@@ -73,7 +73,7 @@ class LegacyV2ProjectionCutover {
       if (journal.read<int>('total') != 0) {
         throw StateError('Historical cutover cannot replace a v2 journal.');
       }
-      final localState = await LiveWebSyncService.readCutoverState(accountId);
+      final localState = await LegacySyncArchive.readCutoverState(accountId);
       if (localState.cursor > receipt.legacyCursor) {
         throw StateError('Legacy device cursor is newer than the cutover.');
       }
@@ -84,7 +84,7 @@ class LegacyV2ProjectionCutover {
       await _createQueue();
       final local = {
         for (final notebook in notebooks)
-          notebook.uid: LiveWebSyncService.encodeCutoverNotebook(notebook),
+          notebook.uid: LegacySyncArchive.encodeCutoverNotebook(notebook),
       };
       for (final uid in {...local.keys, ...localState.pending}) {
         _assertCurrent();
@@ -116,7 +116,7 @@ class LegacyV2ProjectionCutover {
                 'Archived legacy revision has unverified identity or media.',
               );
             }
-            base = LiveWebSyncService.encodeCutoverNotebook(remote);
+            base = LegacySyncArchive.encodeCutoverNotebook(remote);
           }
         }
         if (_sameSnapshot(snapshot, base) &&
@@ -247,7 +247,7 @@ class LegacyV2ProjectionCutover {
       }
       final current = notebook == null
           ? null
-          : LiveWebSyncService.encodeCutoverNotebook(notebook);
+          : LegacySyncArchive.encodeCutoverNotebook(notebook);
       final tombstoned = await store.isTombstoned(uid, 'document', uid);
       Future<void> mark(String state, [String? reason]) => db.customStatement(
         'UPDATE legacy_v1_cutover_intents SET state = ?, reason = ? WHERE uid = ?',

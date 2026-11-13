@@ -13,7 +13,6 @@ import 'package:program/features/board/presentation/board_screen.dart';
 import 'package:program/features/editor/presentation/editor_screen.dart';
 import 'package:program/data/backup/local_backup_service.dart';
 import 'package:program/data/drift/notes_database.dart';
-import 'package:program/data/sync/cloud_sync_service.dart';
 import 'package:program/features/editor/presentation/widgets/editor_toolbar.dart';
 import 'package:program/features/editor/presentation/widgets/text_edit_toolbar.dart';
 import 'package:program/features/editor/state/editor_controller.dart';
@@ -75,7 +74,6 @@ void main() {
     final repository = NotebookRepository(database);
     final controller = LibraryController(
       repository,
-      CloudSyncService(repository),
       LocalBackupService(repository),
     );
 
@@ -231,7 +229,6 @@ void main() {
     );
     final controller = LibraryController(
       repository,
-      CloudSyncService(repository),
       LocalBackupService(repository),
     );
     final preferences = AppPreferencesController();
@@ -379,7 +376,6 @@ void main() {
     await repository.updateNotebookMetadata(created.uid, title: 'Nested note');
     final controller = LibraryController(
       repository,
-      CloudSyncService(repository),
       LocalBackupService(repository),
     );
     await controller.loadItems();
@@ -478,7 +474,6 @@ void main() {
     );
     final controller = LibraryController(
       repository,
-      CloudSyncService(repository),
       LocalBackupService(repository),
     );
     await controller.loadItems();
@@ -526,9 +521,9 @@ void main() {
     expect(
       sidebarColor,
       isNot(
-        Theme.of(
-          tester.element(find.text('Projects')),
-        ).appBarTheme.backgroundColor,
+        Theme.of(tester.element(find.text('Projects')))
+            .appBarTheme
+            .backgroundColor,
       ),
     );
     final toggles = [
@@ -795,7 +790,6 @@ void main() {
     final preferences = AppPreferencesController();
     final controller = LibraryController(
       repository,
-      CloudSyncService(repository),
       LocalBackupService(repository),
     );
     await controller.loadItems();
@@ -1008,7 +1002,6 @@ void main() {
     await repository.createNotebook(folder: 'Navigation');
     final library = LibraryController(
       repository,
-      CloudSyncService(repository),
       LocalBackupService(repository),
     );
     await library.loadItems();
@@ -1063,7 +1056,6 @@ void main() {
     await repository.createNotebook(folder: 'Timer layout');
     final controller = LibraryController(
       repository,
-      CloudSyncService(repository),
       LocalBackupService(repository),
     );
     final planner = StudyPlannerController(

@@ -6,7 +6,7 @@ import 'package:http/testing.dart';
 import 'package:program/data/sync/api_client.dart';
 
 void main() {
-  test('uses the production API by default for REST and WebSocket', () {
+  test('uses the production API by default for REST', () {
     const override = String.fromEnvironment('BACKEND_URL');
     final client = ApiClient();
 
@@ -15,10 +15,6 @@ void main() {
       expect(
         client.resolve('/v1/auth/login').toString(),
         'https://api.nanotateczki.pl/v1/auth/login',
-      );
-      expect(
-        client.realtimeUri().toString(),
-        'wss://api.nanotateczki.pl/v1/realtime',
       );
     } else {
       expect(client.baseUri.toString(), override.trim());
@@ -101,76 +97,6 @@ void main() {
             ),
       ),
     );
-  });
-  test('legacy account protocol is accepted before bootstrapping v1', () async {
-    final client = ApiClient(
-      baseUri: Uri.parse('https://api.example.com'),
-      httpClient: MockClient((request) async {
-        expect(request.url.path, '/v1/auth/protocol');
-        expect(request.headers['authorization'], 'Bearer access');
-        return http.Response(jsonEncode({'protocol': 'v1'}), 200);
-      }),
-    );
-    addTearDown(client.close);
-    client.setAccessToken('access');
-    await client.ensureLegacyAccountProtocol();
-  });
-
-  test('v2 account cannot be bootstrapped through legacy writers', () async {
-    final client = ApiClient(
-      baseUri: Uri.parse('https://api.example.com'),
-      httpClient: MockClient(
-        (_) async => http.Response(jsonEncode({'protocol': 'v2'}), 200),
-      ),
-    );
-    addTearDown(client.close);
-    client.setAccessToken('access');
-    await expectLater(
-      client.ensureLegacyAccountProtocol(),
-      throwsA(isA<AccountProtocolNotSupported>()),
-    );
-  });
-
-  test('missing and unknown protocols fail closed', () async {
-    for (final body in <String>['{}', '{"protocol":"v3"}', '[]']) {
-      final client = ApiClient(
-        baseUri: Uri.parse('https://api.example.com'),
-        httpClient: MockClient((_) async => http.Response(body, 200)),
-      );
-      addTearDown(client.close);
-      client.setAccessToken('access');
-      await expectLater(
-        client.ensureLegacyAccountProtocol(),
-        throwsA(isA<FormatException>()),
-      );
-    }
-  });
-
-  test('only 404 from a pre-v2 server permits the legacy fallback', () async {
-    for (final status in <int>[404, 403, 500]) {
-      final client = ApiClient(
-        baseUri: Uri.parse('https://api.example.com'),
-        httpClient: MockClient(
-          (_) async => http.Response('{"detail":"Unavailable"}', status),
-        ),
-      );
-      addTearDown(client.close);
-      client.setAccessToken('access');
-      if (status == 404) {
-        await client.ensureLegacyAccountProtocol();
-      } else {
-        await expectLater(
-          client.ensureLegacyAccountProtocol(),
-          throwsA(
-            isA<ApiException>().having(
-              (error) => error.statusCode,
-              'statusCode',
-              status,
-            ),
-          ),
-        );
-      }
-    }
   });
   test('v2 readiness requires an authenticated successful preflight', () async {
     final visited = <String>[];

@@ -5,12 +5,11 @@ import '../core/storage/shutdown_coordinator.dart';
 /// Blocks account edits until the server's storage protocol is established.
 ///
 /// A previously verified user cannot unlock another account's editor.
-/// Failure to check the protocol keeps legacy snapshot writers unavailable.
+/// No account editor mounts before its v2 writer is ready.
 class AccountProtocolEditorGate extends StatefulWidget {
   const AccountProtocolEditorGate({
     required this.isSignedIn,
     required this.userId,
-    required this.legacyReadyUser,
     required this.v2ReadyUser,
     this.blockingReason,
     required this.onRetry,
@@ -22,7 +21,6 @@ class AccountProtocolEditorGate extends StatefulWidget {
 
   final bool isSignedIn;
   final String? userId;
-  final String? legacyReadyUser;
   final String? v2ReadyUser;
   final String? blockingReason;
   final Future<void> Function() onRetry;
@@ -32,9 +30,7 @@ class AccountProtocolEditorGate extends StatefulWidget {
 
   bool get canEdit =>
       !isSignedIn ||
-      (userId != null &&
-          userId!.isNotEmpty &&
-          (legacyReadyUser == userId || v2ReadyUser == userId));
+      (userId != null && userId!.isNotEmpty && v2ReadyUser == userId);
 
   @override
   State<AccountProtocolEditorGate> createState() =>
