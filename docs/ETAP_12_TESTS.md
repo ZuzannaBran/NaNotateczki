@@ -446,3 +446,18 @@ python3 -m unittest discover -s scripts/tests -p 'test_stage13*.py'
 transfer Local→A→B, pełna migracja istniejących dokumentów i test
 backup/restore na osobnym środowisku. Nie publikować canary na produkcji,
 dopóki nie ma rzeczywistych wyników tych testów.
+
+
+### Próba v2 po migracji i konflikcie
+
+Scenariusz `integration_test/stage12_live_api_test.dart` używa dwóch
+osobnych magazynów SQLite i rzeczywistego API/PostgreSQL/WebSocket.
+Po sprawdzeniu Quill/PDF, Undo/Redo i viewportu zapisuje edycję offline
+na pierwszym kliencie oraz usunięcie na drugim. Sprawdza checkpoint,
+trwałą kopię edycji, ACK oryginalnego aktora i restart bez
+wskrzeszenia UID. Dwa niezależne urządzenia i kopia rzeczywistych
+danych pozostają osobnym scenariuszem przed canary.
+
+Próba odtworzenia porównuje rejestr `verified_assets` przywróconej
+bazy z rozmiarem i SHA-256 rzeczywistych plików. Samo poprawne
+rozpakowanie archiwum nie wystarcza do uznania restore za udany.

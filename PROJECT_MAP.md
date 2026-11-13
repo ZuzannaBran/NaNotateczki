@@ -3634,9 +3634,11 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   profile, nowe źródła, osierocone assety, symlinki, resume i WAL.
 - `server/api/app/legacy_cutover.py`, `legacy_operation_plan.py` i migracja
   0015: dry-run, deterministyczny dziennik v2, trwały receipt i blokada v1.
-- `lib/data/sync/legacy_v2_projection_cutover.dart`: potwierdzenie rewizji
-  i pustego outboxu, transakcyjne archiwum SQLite, odbudowa przez SyncEngine
-  pod bramką AppScope. Regresje w `test/legacy_v2_projection_cutover_test.dart`
+- `lib/data/sync/legacy_v2_projection_cutover.dart`: potwierdzenie rewizji,
+  transakcyjne archiwum SQLite i kolejka intencji offline, odbudowa przez
+  SyncEngine, bezkolizyjne operacje v2 po osiągnięciu checkpointu.
+  `EditorV2AccountRuntime` archiwizuje także konflikt z potwierdzonym
+  zdalnym usunięciem oraz udostępnia raport i jawne odtworzenie kopii. Regresje w `test/legacy_v2_projection_cutover_test.dart`
   i `server/api/tests/test_stage12_real_stack.py`.
 - `docs/ETAP_11_MIGRATION.md`: procedura testowa i granice weryfikacji.
   Nie uruchomiono produkcyjnego cutover.

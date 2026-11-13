@@ -122,15 +122,23 @@ osadzenia Quill z danymi są weryfikowane przez SHA-256. Brak bytes,
 nieobsługiwany embed lub brak zgodności danych blokuje konwersję.
 Ustawienia konta i planer pozostają w ich istniejących rejestrach CAS.
 
-Klient pobiera zarchiwizowaną rewizję każdego lokalnego dokumentu,
-porównuje treść i blokuje przełączenie przy niepotwierdzonych zmianach
-albo outboxie v1. Następnie archiwizuje oryginalne tabele SQLite,
-zapisuje receipt lokalny i opróżnia projekcję w jednej transakcji.
-Standardowy feed v2 wznawia odbudowę od trwałego kursora. Edytor
-pozostaje zamknięty do osiągnięcia checkpointu i zakończenia bootstrapu.
-Nie jest to konwerter niewysłanych snapshotów v1. Należy je wysłać
-przed aktywacją. Błędne potwierdzenie nie powoduje skasowania ich na
-urządzeniu, ale wymaga odzyskania ze starej kopii.
+Klient porównuje lokalne dokumenty z zachowaną rewizją v1.
+W tej samej transakcji archiwizuje tabele SQLite, zapisuje oczekujące
+edycje i usunięcia oraz opróżnia wyłącznie projekcję. Po odtworzeniu
+checkpointu v2 stosuje bezkolizyjne zmiany jako operacje. Zapis statusu
+każdej konwersji jest atomowy razem z jej kopertami i outboxem.
+Ponowienie po restarcie nie tworzy kolejnych kopert dla zakończonej
+pozycji.
+
+Nowa lokalna notatka zachowuje UID, jeśli ten UID nie istnieje i nie
+ma tombstone. Lokalna edycja może być scalona z niezależnym polem
+serwera. Przy kolizji lub nowszej wersji zdalnej nie wykonuje się
+nieodwracalnego usunięcia ani nie wskrzesza dokumentu. Użytkownik
+może skopiować dane odzyskiwania i jawnie odtworzyć zachowaną treść
+jako nową notatkę. Konflikty biblioteki i brak niektórych starszych
+formatów nie są automatycznie konwertowane. Pozostają w archiwum
+do przejrzenia. Nadal należy zsynchronizować wszystkie znane klienty
+przed produkcyjną aktywacją, szczególnie outboxy gości Share.
 
 Świeży, pusty identyfikator testowy nadal obsługuje
 `scripts/stage13-activate-empty-canary.sh`. Nie wykonano cutover

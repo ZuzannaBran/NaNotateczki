@@ -736,7 +736,7 @@ void main() {
     );
   });
 
-  test('remote metadata preserves offline ink; delete waits for ACK', () async {
+  test('remote metadata merges and a deletion archives offline ink', () async {
     final f = _Fixture(NativeDatabase.memory());
     addTearDown(f.close);
     expect(
@@ -814,10 +814,16 @@ void main() {
     );
     f.accepted.add(deletion.toJson());
     await f.runtime.engine.syncNow();
-    expect(await f.runtime.store.checkpoint('account:startup-account'), cursor);
-    expect(await f.runtime.store.operation(deletion.operationId), isNull);
-    final preserved = (await f.repository.getNotebook(note.uid))!;
-    expect(preserved.pages.single.inkStrokes.single.id, local.objectId);
+    expect(
+      await f.runtime.store.checkpoint('account:startup-account'),
+      cursor + 1,
+    );
+    expect(await f.runtime.store.operation(deletion.operationId), isNotNull);
+    expect(await f.repository.getNotebook(note.uid), isNull);
+    final archive = jsonDecode((await f.runtime.recoveryReport())!) as Map;
+    final preserved = (archive['concurrentDeletes'] as List).single as Map;
+    expect(preserved['notebook_json'], contains('offline-ink'));
+    expect(preserved['local_json'], contains(local.operationId));
     expect(
       (await f.runtime.store.pending(
         includeDeferred: true,

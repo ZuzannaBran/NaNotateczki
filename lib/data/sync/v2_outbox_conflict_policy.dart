@@ -63,6 +63,31 @@ class V2OutboxConflictPolicy {
     });
   }
 
+  /// A server-accepted object tombstone wins over pending edits of that
+  /// object once the live contents and intent have been archived.
+  static bool canArchiveObjectDelete(
+    OperationEnvelope deletion,
+    List<OperationEnvelope> pending,
+  ) =>
+      deletion.kind == OperationKind.objectDelete &&
+      deletion.payload.isEmpty &&
+      pending.every(
+        (local) =>
+            canApply(deletion, [local]) ||
+            (local.documentId == deletion.documentId &&
+                local.objectId == deletion.objectId &&
+                const {
+                  OperationKind.objectSet,
+                  OperationKind.objectTransform,
+                  OperationKind.objectReorder,
+                  OperationKind.assetAttach,
+                  OperationKind.assetDetach,
+                  OperationKind.textInsert,
+                  OperationKind.textDelete,
+                  OperationKind.textFormat,
+                }.contains(local.kind)),
+      );
+
   /// Reusing a verified immutable asset across two owners is safe.
   ///
   /// A create, embed or replacement carries no complete receipt and still

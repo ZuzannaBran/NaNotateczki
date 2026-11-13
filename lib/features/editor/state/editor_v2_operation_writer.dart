@@ -342,6 +342,7 @@ class EditorV2OperationWriter {
   Future<List<OperationEnvelope>> writeCreateNotebook({
     required Notebook notebook,
     Map<String, VerifiedEditorAsset> verifiedAssets = const {},
+    Future<void> Function(List<OperationEnvelope>)? onCommittedInTransaction,
   }) async {
     if (notebook.uid.isEmpty ||
         notebook.pages.isEmpty ||
@@ -371,14 +372,19 @@ class EditorV2OperationWriter {
       for (final page in notebook.pages)
         ..._bridge.planCreatePage(page, verifiedAssets: assets),
     ];
-    return _commit(notebook.uid, drafts);
+    return _commit(
+      notebook.uid,
+      drafts,
+      onCommittedInTransaction: onCommittedInTransaction,
+    );
   }
 
   Future<List<OperationEnvelope>> writeDeleteNotebook({
     required String documentId,
+    Future<void> Function(List<OperationEnvelope>)? onCommittedInTransaction,
   }) => _commit(documentId, [
     LocalOperationDraft(kind: OperationKind.documentDelete, payload: const {}),
-  ]);
+  ], onCommittedInTransaction: onCommittedInTransaction);
 
   /// Commits a multi-page gesture and stable-ID ink moves in one batch.
   ///

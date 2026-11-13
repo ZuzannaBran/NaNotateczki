@@ -422,12 +422,15 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
     var readCursor = durableCursor;
     Object? firstFailure;
     var hasGap = false;
-    for (var pageNumber = 0; pageNumber < maxPagesPerPass; pageNumber++) {
+    var verifiedPrefix = true;
+    final blockedDocuments = <String>{};
+    for (var pageNumber = 0; ; pageNumber++) {
       final page = await _authorized(() => gateway.readAfter(readCursor));
       if (!_isActive(generation)) {
         return;
       }
       _validateFeedPage(page, readCursor);
+      verifiedPrefix = verifiedPrefix && page.verifiedVisiblePrefix;
       var contiguous = durableCursor;
       var gap = hasGap;
       for (final item in page.operations) {
@@ -451,9 +454,12 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
             serverSequence: item.cursor,
             // The authenticated REST feed includes every operation visible
             // to this principal between the requested and returned cursors.
-            // Global cursor holes may belong to other accounts/documents.
-            // Custom gateways cannot assert that coverage implicitly.
-            coveredCursor: !gap && page.verifiedVisiblePrefix
+            // Compact causality is document-scoped. With a verified scan
+            // from the durable cursor, holes in other documents do not
+            // invalidate this document's observed prefix.
+            coveredCursor:
+                verifiedPrefix &&
+                    !blockedDocuments.contains(item.operation.documentId)
                 ? item.cursor - 1
                 : contiguous,
             apply: () async {
@@ -508,6 +514,7 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
           }
         } catch (error) {
           firstFailure ??= error;
+          blockedDocuments.add(item.operation.documentId);
           gap = true;
           hasGap = true;
         }
@@ -528,13 +535,10 @@ class SyncEngine extends ChangeNotifier with WidgetsBindingObserver {
         }
         return;
       }
-    }
-    // A blocked document never prevents later pages for other documents
-    // from being inspected. Their operations are committed idempotently,
-    // but the durable global checkpoint stays before the first gap.
-    _requested = true;
-    if (firstFailure != null) {
-      throw StateError('Operation feed has an unresolved gap: $firstFailure');
+      if (pageNumber + 1 >= maxPagesPerPass && !hasGap) {
+        _requested = true;
+        return;
+      }
     }
   }
 

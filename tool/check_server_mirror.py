@@ -30,6 +30,9 @@ SHARED = (
     "scripts/smoke-local-api.py",
     "scripts/run-stage12-real.sh",
     "scripts/stage13-activate-empty-canary.sh",
+    "scripts/stage13-verify-restore.sh",
+    "scripts/stage13_backup_check.py",
+    "scripts/tests/test_stage13_backup_check.py",
     "scripts/tests/test_stage13_canary_activation.py",
     "scripts/tests/test_stage12_runner_guard.py",
 )

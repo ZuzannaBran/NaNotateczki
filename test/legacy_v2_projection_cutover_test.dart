@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,11 +9,13 @@ import 'package:program/core/storage/text_storage.dart';
 import 'package:program/data/drift/notes_database.dart';
 import 'package:program/data/sync/api_client.dart';
 import 'package:program/data/sync/editor_sqlite_projector.dart';
+import 'package:program/data/sync/editor_v2_account_runtime.dart';
 import 'package:program/data/sync/legacy_v2_projection_cutover.dart';
 import 'package:program/data/sync/live_web_sync_service.dart';
 import 'package:program/data/sync/operation_protocol.dart';
 import 'package:program/data/sync/operation_store.dart';
 import 'package:program/features/notebook/data/notebook_repository.dart';
+import 'package:program/features/notebook/domain/text_block.dart';
 import 'package:uuid/uuid.dart';
 
 void main() {
@@ -193,26 +196,199 @@ void main() {
   );
 
   test(
-    'unsent deletes and divergent local content block before archival',
+    'converts an offline edit exactly once without overwriting remote fields',
     () async {
-      state['pending'] = ['removed-local'];
-      await expectLater(cutover.prepare(receipt), throwsStateError);
-      expect(requests, 0);
-      state['pending'] = <String>[];
-      remote['title'] = 'Different acknowledged revision';
-      await expectLater(cutover.prepare(receipt), throwsStateError);
-      expect(requests, 1);
-      expect((await repository.fetchNotebooks()).single.title, 'Saved v1');
+      final uid = local['uid'] as String;
+      state['pending'] = [uid];
+      remote['title'] = 'Accepted v1 title';
+      await cutover.prepare(receipt);
+      final runtime = EditorV2AccountRuntime(
+        repository: repository,
+        apiClient: api,
+        accountId: 'account-1',
+        actorId: 'migration-test',
+        enableRealtime: false,
+      );
+      addTearDown(runtime.dispose);
+      final remoteNotebook = repository.decodeBackupStrict([remote]).single;
+      final create = OperationEnvelope.fromJson({
+        'schemaVersion': 1,
+        'operationId': const Uuid().v4(),
+        'actorId': 'migration-source',
+        'actorSeq': 1,
+        'logicalClock': 1,
+        'documentId': uid,
+        'type': 'document.create',
+        'dependencies': <String>[],
+        'payload': {
+          'value': {
+            'title': remote['title'],
+            'folder': 'Remote folder',
+            'kindIndex': 0,
+            'createdAt': local['createdAt'],
+          },
+        },
+      });
+      final page = OperationEnvelope.fromJson({
+        'schemaVersion': 1,
+        'operationId': const Uuid().v4(),
+        'actorId': create.actorId,
+        'actorSeq': 2,
+        'logicalClock': 2,
+        'documentId': uid,
+        'type': 'page.create',
+        'dependencies': [create.operationId],
+        'objectId': remoteNotebook.pages.single.id,
+        'payload': {
+          'value': {
+            'title': remoteNotebook.pages.single.title,
+            'isBookmarked': false,
+          },
+        },
+      });
+      for (final op in [create, page]) {
+        await runtime.store.applyRemote(
+          op,
+          serverSequence: 88 + op.actorSeq,
+          checkpointScope: 'account:account-1',
+          apply: () => runtime.projector.apply(op),
+        );
+      }
+      await cutover.replayPending(writer: runtime.writer, store: runtime.store);
+      final queued = (await runtime.store.pending()).single;
+      expect(queued.kind, OperationKind.documentSet);
+      expect((await repository.getNotebook(uid))!.title, 'Saved v1');
+      expect((await repository.getNotebook(uid))!.folder, 'Remote folder');
+      await cutover.prepare(receipt);
+      await cutover.replayPending(writer: runtime.writer, store: runtime.store);
       expect(
-        await database
-            .customSelect(
-              "SELECT name FROM sqlite_master WHERE name = 'legacy_v1_notebook_rows'",
-            )
-            .get(),
-        isEmpty,
+        (await runtime.store.pending()).single.operationId,
+        queued.operationId,
       );
     },
   );
+
+  test('a remotely deleted UID is not revived by an offline edit', () async {
+    final uid = local['uid'] as String;
+    state['pending'] = [uid];
+    remote['title'] = 'Accepted title before deletion';
+    await cutover.prepare(receipt);
+    final runtime = EditorV2AccountRuntime(
+      repository: repository,
+      apiClient: api,
+      accountId: 'account-1',
+      actorId: 'migration-test',
+      enableRealtime: false,
+    );
+    addTearDown(runtime.dispose);
+    final deletion = OperationEnvelope.fromJson({
+      'schemaVersion': 1,
+      'operationId': const Uuid().v4(),
+      'actorId': 'server-deletion',
+      'actorSeq': 1,
+      'logicalClock': 1,
+      'documentId': uid,
+      'type': 'document.delete',
+      'dependencies': <String>[],
+      'payload': <String, dynamic>{},
+    });
+    await runtime.store.applyRemote(
+      deletion,
+      serverSequence: 90,
+      checkpointScope: 'account:account-1',
+      apply: () => runtime.projector.apply(deletion),
+    );
+    await cutover.replayPending(writer: runtime.writer, store: runtime.store);
+    expect(await repository.getNotebook(uid), isNull);
+    expect(await runtime.store.pending(), isEmpty);
+    expect((await cutover.conflicts()).single.uid, uid);
+    expect(await runtime.recoveryReport(), contains('Saved v1'));
+    await runtime.restoreRecoveryCopies(isCurrent: () => true);
+    await runtime.restoreRecoveryCopies(isCurrent: () => true);
+    final recovered = (await repository.fetchNotebooks()).single;
+    expect(recovered.uid, isNot(uid));
+    expect(recovered.title, 'Saved v1 (Recovered)');
+    expect(await repository.getNotebook(uid), isNull);
+  });
+
+  test(
+    'new offline document preserves its UID and converts an inline Quill image',
+    () async {
+      final fresh = await repository.createNotebook(title: 'Offline document');
+      final page = fresh.pages.single;
+      const bytes =
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ'
+          'AAAADUlEQVR4nGMQMgn7DwAClAGcHVtGXwAAAABJRU5ErkJggg==';
+      expect(
+        await repository.saveNotebook(
+          fresh.copyWith(
+            pages: [
+              page.copyWith(
+                textBlocks: [
+                  TextBlock(
+                    id: 'legacy-text-image',
+                    text: '\ufffc',
+                    position: Offset.zero,
+                    fontSize: 16,
+                    color: const Color(0xff000000),
+                    width: 100,
+                    deltaJson: jsonEncode([
+                      {
+                        'insert': {'image': 'data:image/png;base64,$bytes'},
+                      },
+                      {'insert': '\n'},
+                    ]),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        isTrue,
+      );
+      state['pending'] = [fresh.uid];
+      await cutover.prepare(receipt);
+      final runtime = EditorV2AccountRuntime(
+        repository: repository,
+        apiClient: api,
+        accountId: 'account-1',
+        actorId: 'migration-test',
+        enableRealtime: false,
+      );
+      addTearDown(runtime.dispose);
+      await cutover.replayPending(writer: runtime.writer, store: runtime.store);
+      final recovered = (await repository.getNotebook(fresh.uid))!;
+      final delta = recovered.pages.single.textBlocks.single.deltaJson!;
+      expect(delta, contains('asset:'));
+      expect(delta, isNot(contains('data:image')));
+      final queued = await runtime.store.pending();
+      expect(queued.map((op) => op.kind), contains(OperationKind.assetAttach));
+      expect(queued.every((op) => op.documentId == fresh.uid), isTrue);
+    },
+  );
+
+  test('unsent deletion of an already absent UID is a durable no-op', () async {
+    state['pending'] = ['removed-local'];
+    await cutover.prepare(receipt);
+    final runtime = EditorV2AccountRuntime(
+      repository: repository,
+      apiClient: api,
+      accountId: 'account-1',
+      actorId: 'migration-test',
+      enableRealtime: false,
+    );
+    addTearDown(runtime.dispose);
+    await cutover.replayPending(writer: runtime.writer, store: runtime.store);
+    final row = await database
+        .customSelect(
+          "SELECT uid, local_json, state FROM legacy_v1_cutover_intents "
+          "WHERE uid = 'removed-local'",
+        )
+        .getSingle();
+    expect(row.readNullable<String>('local_json'), isNull);
+    expect(row.read<String>('state'), 'converted');
+    expect(await runtime.store.pending(), isEmpty);
+  });
 
   test('tombstone for a never-present notebook survives replay', () async {
     final store = OperationStore(database);

@@ -1,11 +1,18 @@
 import 'dart:convert';
 
 import 'package:collection/collection.dart';
+import 'package:drift/drift.dart';
 
 import '../../core/storage/text_storage.dart';
+import '../../features/editor/state/editor_v2_operation_writer.dart';
+import '../../features/notebook/domain/note_page.dart';
+import '../../features/notebook/domain/notebook.dart';
 import '../../features/notebook/data/notebook_repository.dart';
 import 'api_client.dart';
 import 'live_web_sync_service.dart';
+import 'notebook_merge.dart';
+import 'operation_protocol.dart';
+import 'operation_store.dart';
 
 /// Move a proved legacy projection into a protected SQLite archive, then
 /// let the standard checkpointed operation feed rebuild the live projection.
@@ -72,47 +79,60 @@ class LegacyV2ProjectionCutover {
       if (repository.lastFetchSkippedCorruptRows) {
         throw StateError('Corrupt local notebook blocks historical cutover.');
       }
-      for (final notebook in notebooks) {
+      await _createQueue();
+      final local = {
+        for (final notebook in notebooks)
+          notebook.uid: LiveWebSyncService.encodeCutoverNotebook(notebook),
+      };
+      for (final uid in {...local.keys, ...localState.pending}) {
         _assertCurrent();
-        final revision = localState.revisions[notebook.uid];
-        if (revision == null) {
-          throw StateError('An unacknowledged legacy notebook blocks cutover.');
-        }
-        final response = await apiClient.get(
-          '/v2/activation/legacy-source',
-          query: {'uid': notebook.uid, 'revision': '$revision'},
-        );
-        final source = response.decodeJson();
-        if (source is! Map<String, dynamic> ||
-            source['revision'] != revision ||
-            source['notebook'] is! Map<String, dynamic>) {
-          throw const FormatException('Invalid archived legacy revision.');
-        }
-        final remote = repository.decodeBackupStrict([
-          source['notebook'],
-        ]).single;
-        if (remote.pages.any(
-          (page) =>
-              page.imageBlocks.any((image) => image.bytes?.isNotEmpty != true),
-        )) {
-          // Never resolve paths from archived server snapshots on a client.
-          throw StateError('Archived legacy revision has unverified media.');
-        }
-        final localValue = LiveWebSyncService.encodeCutoverNotebook(notebook);
-        final remoteValue = LiveWebSyncService.encodeCutoverNotebook(remote);
-        // Drift persisted whole seconds in v1. Compare within the same
-        // stored second while requiring exact equality of notebook content.
-        for (final field in ['createdAt', 'updatedAt']) {
-          final localTime = DateTime.parse(localValue[field] as String);
-          final remoteTime = DateTime.parse(remoteValue[field] as String);
-          if (localTime.millisecondsSinceEpoch ~/ 1000 ==
-              remoteTime.millisecondsSinceEpoch ~/ 1000) {
-            localValue[field] = remoteValue[field];
+        final snapshot = local[uid];
+        final revision = localState.revisions[uid];
+        Map<String, dynamic>? base;
+        if (revision != null) {
+          final response = await apiClient.get(
+            '/v2/activation/legacy-source',
+            query: {'uid': uid, 'revision': '$revision'},
+          );
+          final source = response.decodeJson();
+          if (source is! Map<String, dynamic> ||
+              source['revision'] != revision ||
+              (source['notebook'] != null && source['notebook'] is! Map)) {
+            throw const FormatException('Invalid archived legacy revision.');
+          }
+          if (source['notebook'] != null) {
+            final remote = repository.decodeBackupStrict([
+              source['notebook'],
+            ]).single;
+            if (remote.uid != uid ||
+                remote.pages.any(
+                  (page) => page.imageBlocks.any(
+                    (image) => image.bytes?.isNotEmpty != true,
+                  ),
+                )) {
+              throw StateError(
+                'Archived legacy revision has unverified identity or media.',
+              );
+            }
+            base = LiveWebSyncService.encodeCutoverNotebook(remote);
           }
         }
-        if (!const DeepCollectionEquality().equals(localValue, remoteValue)) {
-          throw StateError('Unsent legacy notebook changes block cutover.');
+        if (_sameSnapshot(snapshot, base) &&
+            (snapshot != null || revision != null)) {
+          continue;
         }
+        if (snapshot == null && !localState.pending.contains(uid)) {
+          throw StateError('No durable evidence of a legacy deletion.');
+        }
+        await database.customStatement(
+          'INSERT INTO legacy_v1_cutover_intents (uid, base_json, local_json, state) '
+          "VALUES (?, ?, ?, 'pending')",
+          [
+            uid,
+            base == null ? null : jsonEncode(base),
+            snapshot == null ? null : jsonEncode(snapshot),
+          ],
+        );
       }
       final library = await readStoredText('library_folders.json');
       final response = await apiClient.get('/v2/activation/legacy-library');
@@ -126,7 +146,16 @@ class LegacyV2ProjectionCutover {
       if (library != null &&
           library.isNotEmpty &&
           !_equivalentLibrary(jsonDecode(library), remoteLibrary)) {
-        throw StateError('Unsent legacy folder or task changes block cutover.');
+        await database.customStatement(
+          'INSERT INTO legacy_v1_cutover_intents '
+          "(uid, base_json, local_json, state, reason) VALUES (?, ?, ?, 'conflict', ?)",
+          [
+            OperationEnvelope.libraryDocumentId,
+            remoteLibrary == null ? null : jsonEncode(remoteLibrary),
+            library,
+            'Legacy folder or task edits need review.',
+          ],
+        );
       }
       _assertCurrent();
       for (final table in _tables) {
@@ -150,6 +179,240 @@ class LegacyV2ProjectionCutover {
       );
       _assertCurrent();
     });
+  }
+
+  Future<void> _createQueue() => repository.database.customStatement(
+    'CREATE TABLE IF NOT EXISTS legacy_v1_cutover_intents ('
+    'uid TEXT PRIMARY KEY, base_json TEXT, local_json TEXT, '
+    'state TEXT NOT NULL, reason TEXT)',
+  );
+
+  static bool _sameSnapshot(Map<String, dynamic>? a, Map<String, dynamic>? b) {
+    if (a == null || b == null) {
+      return a == b;
+    }
+    final left = Map<String, dynamic>.of(a)..remove('updatedAt');
+    final right = Map<String, dynamic>.of(b)..remove('updatedAt');
+    final localTime = DateTime.parse(left['createdAt'] as String);
+    final remoteTime = DateTime.parse(right['createdAt'] as String);
+    // Drift v1 persisted timestamps with whole-second precision.
+    if (localTime.millisecondsSinceEpoch ~/ 1000 ==
+        remoteTime.millisecondsSinceEpoch ~/ 1000) {
+      left['createdAt'] = right['createdAt'];
+    }
+    return const DeepCollectionEquality().equals(left, right);
+  }
+
+  /// Applies legacy deltas only after the authoritative v2 feed is current.
+  /// Conflicts preserve the original snapshot and deletion intent for review.
+  Future<void> replayPending({
+    required EditorV2OperationWriter writer,
+    required OperationStore store,
+  }) async {
+    await _createQueue();
+    final db = repository.database;
+    final rows = await db
+        .customSelect(
+          'SELECT uid, base_json, local_json FROM legacy_v1_cutover_intents '
+          "WHERE state = 'pending' ORDER BY uid",
+        )
+        .get();
+    for (final row in rows) {
+      _assertCurrent();
+      final uid = row.read<String>('uid');
+      final rawBase = row.readNullable<String>('base_json');
+      final rawLocal = row.readNullable<String>('local_json');
+      final base = rawBase == null
+          ? null
+          : jsonDecode(rawBase) as Map<String, dynamic>;
+      final local = rawLocal == null
+          ? null
+          : jsonDecode(rawLocal) as Map<String, dynamic>;
+      final notebook = await repository.getNotebook(uid);
+      if (repository.lastCorruptNotebookIds.contains(uid)) {
+        throw StateError(
+          'The v2 notebook cannot be read safely during cutover.',
+        );
+      }
+      final current = notebook == null
+          ? null
+          : LiveWebSyncService.encodeCutoverNotebook(notebook);
+      final tombstoned = await store.isTombstoned(uid, 'document', uid);
+      Future<void> mark(String state, [String? reason]) => db.customStatement(
+        'UPDATE legacy_v1_cutover_intents SET state = ?, reason = ? WHERE uid = ?',
+        [state, reason, uid],
+      );
+      Future<void> record(List<OperationEnvelope> operations) async {
+        _assertCurrent();
+        await mark('converted');
+      }
+
+      Future<void> convert(Future<void> Function() apply) async {
+        try {
+          await apply();
+        } on UnsupportedError {
+          _assertCurrent();
+          await mark(
+            'conflict',
+            'The legacy edit uses an unsupported v2 format.',
+          );
+        } on FormatException {
+          _assertCurrent();
+          await mark(
+            'conflict',
+            'The legacy edit could not be validated for v2.',
+          );
+        } on ArgumentError {
+          _assertCurrent();
+          await mark(
+            'conflict',
+            'The legacy edit cannot be represented as v2 operations.',
+          );
+        }
+      }
+
+      _assertCurrent();
+      if (_sameSnapshot(local, current)) {
+        await mark('converted');
+        continue;
+      }
+      if (local == null) {
+        final hasPostMigrationChanges = await _hasPostMigrationChanges(uid);
+        if (current != null &&
+            base != null &&
+            !hasPostMigrationChanges &&
+            _sameSnapshot(base, current)) {
+          await writer.writeDeleteNotebook(
+            documentId: uid,
+            onCommittedInTransaction: record,
+          );
+        } else {
+          await mark(
+            'conflict',
+            'A newer version exists for a locally deleted notebook.',
+          );
+        }
+        continue;
+      }
+      if (current == null) {
+        if (tombstoned || base != null) {
+          await mark(
+            'conflict',
+            'The notebook was deleted remotely. Local edits were archived.',
+          );
+        } else {
+          await convert(() async {
+            await writer.writeCreateNotebook(
+              notebook: _stageLegacyEmbeds(
+                writer,
+                repository.decodeBackupStrict([local]).single,
+              ),
+              onCommittedInTransaction: record,
+            );
+          });
+        }
+        continue;
+      }
+      if (base == null) {
+        await mark('conflict', 'The notebook identity is already used in v2.');
+        continue;
+      }
+      // Match dates normalized by the migrated projection to the original
+      // baseline, without treating cache or timestamps as user edits.
+      final original = {...base, 'createdAt': current['createdAt']};
+      final desired = {...local, 'createdAt': current['createdAt']};
+      final merged = mergeNotebookChanges(original, desired, current);
+      if (merged == null) {
+        await mark('conflict', 'Concurrent changes require review.');
+      } else if (_sameSnapshot(merged, current)) {
+        await mark('converted');
+      } else {
+        await convert(() async {
+          await writer.writeNotebookChange(
+            before: notebook!,
+            after: _stageLegacyEmbeds(
+              writer,
+              repository.decodeBackupStrict([merged]).single,
+            ),
+            onCommittedInTransaction: record,
+          );
+        });
+      }
+    }
+  }
+
+  Notebook _stageLegacyEmbeds(
+    EditorV2OperationWriter writer,
+    Notebook notebook,
+  ) {
+    final pages = <NotePage>[];
+    for (final page in notebook.pages) {
+      final blocks = [...page.textBlocks];
+      for (var i = 0; i < blocks.length; i++) {
+        final block = blocks[i];
+        if (block.deltaJson == null) {
+          continue;
+        }
+        final delta = jsonDecode(block.deltaJson!) as List<dynamic>;
+        var changed = false;
+        for (final item in delta) {
+          final embed = (item as Map)['insert'];
+          if (embed is! Map) {
+            continue;
+          }
+          final kind = embed.keys.single as String;
+          final data = embed.values.single;
+          if (data is! String) {
+            throw const FormatException('Invalid legacy Quill asset.');
+          }
+          if (data.startsWith('asset:')) {
+            continue;
+          }
+          final match = RegExp(r'^data:[^;]+;base64,').firstMatch(data);
+          if (match == null) {
+            throw const FormatException(
+              'No verified bytes for legacy Quill asset.',
+            );
+          }
+          final asset = writer.stageQuillAsset(
+            documentId: notebook.uid,
+            bytes: base64Decode(data.substring(match.end)),
+            embedType: kind,
+          );
+          item['insert'] = {kind: 'asset:${asset.assetId}'};
+          changed = true;
+        }
+        if (changed) {
+          blocks[i] = block.copyWith(deltaJson: jsonEncode(delta));
+        }
+      }
+      pages.add(page.copyWith(textBlocks: blocks));
+    }
+    return notebook.copyWith(pages: pages);
+  }
+
+  Future<bool> _hasPostMigrationChanges(String uid) async {
+    final entries = await repository.database
+        .customSelect(
+          "SELECT 1 FROM operations WHERE document_id = ? "
+          "AND actor_id NOT LIKE 'v1-cutover:%' LIMIT 1",
+          variables: [Variable<String>(uid)],
+        )
+        .getSingleOrNull();
+    return entries != null;
+  }
+
+  Future<List<({String uid, String reason})>> conflicts() async {
+    await _createQueue();
+    final rows = await repository.database
+        .customSelect(
+          "SELECT uid, reason FROM legacy_v1_cutover_intents WHERE state = 'conflict' ORDER BY uid",
+        )
+        .get();
+    return [
+      for (final row in rows)
+        (uid: row.read<String>('uid'), reason: row.read<String>('reason')),
+    ];
   }
 
   static bool _equivalentLibrary(Object? local, Object? remote) {

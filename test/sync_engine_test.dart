@@ -64,6 +64,8 @@ class _FakeGateway implements OperationGateway {
 }
 
 class _PagedFeedGateway extends _FakeGateway {
+  bool verifyPrefix = false;
+
   @override
   Future<OperationFeedPage> readAfter(int cursor) async {
     reads++;
@@ -79,6 +81,7 @@ class _PagedFeedGateway extends _FakeGateway {
       cursor: unread.first.cursor,
       hasMore: unread.length > 1,
       operations: [unread.first],
+      verifiedVisiblePrefix: verifyPrefix,
     );
   }
 }
@@ -342,6 +345,33 @@ void main() {
       (await database.customSelect('SELECT * FROM projection_probe').get()),
       hasLength(2),
     );
+  });
+
+  test('an unrelated compact frontier crosses a verified feed gap', () async {
+    await engine.stop();
+    engine.dispose();
+    final paged = _PagedFeedGateway()..verifyPrefix = true;
+    paged.seed(_remote('broken', 'blocked'));
+    final healthy = OperationEnvelope.fromJson({
+      ..._remote('healthy', 'kept', documentId: 'independent').toJson(),
+      'causalCursor': 1,
+    });
+    paged.seed(healthy);
+    engine = SyncEngine(
+      store: store,
+      gateway: paged,
+      actorId: 'actor-local',
+      checkpointScope: 'user-A-v2',
+      enableRealtime: false,
+      applyRemote: (op, _) async {
+        if (op.objectId == 'blocked') {
+          throw StateError('Conflict in another document.');
+        }
+      },
+    );
+    await engine.start();
+    expect(await store.operation(healthy.operationId), isNotNull);
+    expect(await store.checkpoint('user-A-v2'), 0);
   });
 
   test(

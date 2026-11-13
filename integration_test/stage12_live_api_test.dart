@@ -408,6 +408,61 @@ void main() {
           await second.runtime.store.pending(includeDeferred: true),
           isEmpty,
         );
+        // Both installations edit the same notebook while disconnected.
+        // A server-confirmed tombstone must win, but the offline contents
+        // must be exportable and the losing actor sequence must still ACK.
+        await first.runtime.stop();
+        await second.runtime.stop();
+        final original = (await first.repository.getNotebook(notebook.uid))!;
+        final localEdits = await first.runtime.writer.writeNotebookChange(
+          before: original,
+          after: original.copyWith(title: 'Offline title before remote delete'),
+        );
+        await second.runtime.writer.writeDeleteNotebook(
+          documentId: notebook.uid,
+        );
+        await second.sync(start: true);
+        await first.sync(start: true);
+        expect(await first.repository.getNotebook(notebook.uid), isNull);
+        expect(await second.repository.getNotebook(notebook.uid), isNull);
+        expect(
+          await first.runtime.store.isTombstoned(
+            notebook.uid,
+            'document',
+            notebook.uid,
+          ),
+          isTrue,
+        );
+        final archived =
+            jsonDecode((await first.runtime.recoveryReport())!) as Map;
+        final entry = (archived['concurrentDeletes'] as List).single as Map;
+        expect(
+          entry['notebook_json'],
+          contains('Offline title before remote delete'),
+        );
+        expect(entry['local_json'], contains(localEdits.single.operationId));
+        expect(
+          await first.runtime.store.pending(includeDeferred: true),
+          isEmpty,
+        );
+        final saved = await first.runtime.store.operation(
+          localEdits.single.operationId,
+        );
+        expect(saved?.actorSeq, localEdits.single.actorSeq);
+        final cursor = await first.runtime.store.checkpoint('account:$account');
+        await first.close();
+        first = _Peer(firstFile, 'live-first', account);
+        await first.initialize();
+        await first.sync(start: true);
+        expect(await first.repository.getNotebook(notebook.uid), isNull);
+        expect(
+          await first.runtime.store.checkpoint('account:$account'),
+          cursor,
+        );
+        expect(
+          await first.runtime.recoveryReport(),
+          contains('Offline title before remote delete'),
+        );
       });
     },
     skip: _baseUrl.isEmpty,

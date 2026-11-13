@@ -367,7 +367,13 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
                         'paused until the transfer and remote acknowledgements '
                         'are complete. Use Retry if the connection is restored.')
               : null,
-          child: const LibraryScreen(),
+          child: _v2AccountRuntime != null && session.userId != null
+              ? _SyncRecoveryNotice(
+                  key: ValueKey(session.userId),
+                  runtime: _v2AccountRuntime!,
+                  child: const LibraryScreen(),
+                )
+              : const LibraryScreen(),
         );
       },
     );
@@ -858,14 +864,18 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     if (!isCurrent()) {
       return;
     }
-    await LiveWebSyncService.requireEmptyLegacyOutbox(userId);
-    if (legacyCutover != null && isCurrent()) {
-      await LegacyV2ProjectionCutover(
-        repository: repository,
-        apiClient: apiClient,
-        accountId: userId,
-        isCurrent: isCurrent,
-      ).prepare(legacyCutover);
+    final cutover = legacyCutover == null
+        ? null
+        : LegacyV2ProjectionCutover(
+            repository: repository,
+            apiClient: apiClient,
+            accountId: userId,
+            isCurrent: isCurrent,
+          );
+    if (cutover == null) {
+      await LiveWebSyncService.requireEmptyLegacyOutbox(userId);
+    } else {
+      await cutover.prepare(legacyCutover!);
     }
     if (!isCurrent()) {
       return;
@@ -938,6 +948,18 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     }
     if (!isCurrent()) {
       return;
+    }
+    if (cutover != null) {
+      // Pause the feed while deriving deltas from the current projection.
+      // Concurrent server edits are handled by the ordinary v2 journal.
+      await runtime.stop();
+      if (!isCurrent()) {
+        return;
+      }
+      await cutover.replayPending(writer: runtime.writer, store: runtime.store);
+      if (!await runtime.startForCurrentAccount(isCurrent: isCurrent)) {
+        return;
+      }
     }
     await verifiedBackup.markDatabaseInitialized(userId);
     // Keep the archive's pending marker until the separate SQLite recovery
@@ -1516,6 +1538,94 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
           ),
         );
       },
+    );
+  }
+}
+
+/// Offers explicit recovery without interrupting the rest of the library.
+class _SyncRecoveryNotice extends StatelessWidget {
+  const _SyncRecoveryNotice({
+    super.key,
+    required this.runtime,
+    required this.child,
+  });
+
+  final EditorV2AccountRuntime runtime;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: runtime.engine,
+      builder: (context, _) => FutureBuilder<String?>(
+        future: runtime.recoveryReport(),
+        builder: (context, snapshot) {
+          final report = snapshot.data;
+          return Column(
+            children: [
+              if (report != null)
+                MaterialBanner(
+                  content: const Text(
+                    'Some sync changes need review. The original edits were kept.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () async {
+                        await Clipboard.setData(ClipboardData(text: report));
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Recovery data copied.'),
+                            ),
+                          );
+                        }
+                      },
+                      child: const Text('Copy recovery data'),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        try {
+                          final session = context
+                              .read<AccountSessionController>();
+                          final userId = session.userId;
+                          final namespace = ActiveStorageNamespace.current;
+                          await runtime.restoreRecoveryCopies(
+                            isCurrent: () =>
+                                context.mounted &&
+                                userId != null &&
+                                session.isSignedIn &&
+                                !session.isBusy &&
+                                session.userId == userId &&
+                                ActiveStorageNamespace.current == namespace,
+                          );
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Recovery copies checked.'),
+                              ),
+                            );
+                          }
+                        } catch (_) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'A recovery copy could not be created. The original data is still available.',
+                                ),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      child: const Text('Recover notebook copies'),
+                    ),
+                  ],
+                ),
+              Expanded(child: child),
+            ],
+          );
+        },
+      ),
     );
   }
 }

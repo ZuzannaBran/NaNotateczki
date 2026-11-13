@@ -1112,15 +1112,20 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
   /// A legacy delete may exist only in the v1 outbox, without a SQLite row.
   /// Do not switch writers while a device still holds unsent legacy intent.
   static Future<void> requireEmptyLegacyOutbox(String userId) async {
-    await readCutoverState(userId);
+    if ((await readCutoverState(userId)).pending.isNotEmpty) {
+      throw StateError('V2 activation blocked by unsent legacy edits.');
+    }
   }
 
-  static Future<({int cursor, Map<String, int> revisions})> readCutoverState(
-    String userId,
-  ) async {
+  static Future<({int cursor, Map<String, int> revisions, Set<String> pending})>
+  readCutoverState(String userId) async {
     final raw = await readStoredText(_stateKey(userId));
     if (raw == null) {
-      return (cursor: 0, revisions: const <String, int>{});
+      return (
+        cursor: 0,
+        revisions: const <String, int>{},
+        pending: const <String>{},
+      );
     }
     final state = jsonDecode(raw);
     if (state is! Map<String, dynamic> || state['version'] != 1) {
@@ -1131,9 +1136,6 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
         pending.any((uid) => uid is! String || uid.isEmpty)) {
       throw const FormatException('Invalid saved legacy outbox.');
     }
-    if (pending.isNotEmpty) {
-      throw StateError('V2 activation blocked by unsent legacy edits.');
-    }
     final cursor = state['cursor'] ?? 0;
     final revisions = state['revisions'] ?? const <String, dynamic>{};
     if (cursor is! int ||
@@ -1142,7 +1144,11 @@ class LiveWebSyncService extends ChangeNotifier with WidgetsBindingObserver {
         revisions.values.any((value) => value is! int || value < 1)) {
       throw const FormatException('Invalid saved legacy revision receipts.');
     }
-    return (cursor: cursor, revisions: Map<String, int>.from(revisions));
+    return (
+      cursor: cursor,
+      revisions: Map<String, int>.from(revisions),
+      pending: pending.cast<String>().toSet(),
+    );
   }
 
   Future<void> _loadState(String userId) async {
