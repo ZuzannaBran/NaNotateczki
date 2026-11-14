@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:collection/collection.dart';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
@@ -66,10 +65,7 @@ class LibraryV2OperationReducer {
     return 0;
   }
 
-  static LibraryV2Snapshot replay(
-    Iterable<OperationEnvelope> history, {
-    Iterable<int> migratedRecentCoverColors = const [],
-  }) {
+  static LibraryV2Snapshot replay(Iterable<OperationEnvelope> history) {
     final folders = <String, _LibraryNode>{};
     final tasks = <String, _LibraryNode>{};
     final deletedFolders = <String>{};
@@ -131,9 +127,7 @@ class LibraryV2OperationReducer {
         final cover = raw['cover'];
         final color = cover is Map ? cover['iconColor'] : null;
         final rank = node.versions['cover'];
-        if (!operation.actorId.startsWith('v1-cutover:') &&
-            color is int &&
-            rank?.last == operation.operationId) {
+        if (color is int && rank?.last == operation.operationId) {
           newCoverColors.add((rank!, color));
         }
       } else if (node.fields['plannerUid'] is! String ||
@@ -190,7 +184,6 @@ class LibraryV2OperationReducer {
     newCoverColors.sort((a, b) => compareRank(b.$1, a.$1));
     final recentColors = <int>{
       ...newCoverColors.map((entry) => entry.$2),
-      ...migratedRecentCoverColors,
       ...colors,
     }.take(12).toList();
     final folderNames = paths.keys.toList()..sort();
@@ -317,34 +310,7 @@ class LibraryV2OperationService {
 
   Future<LibraryV2Snapshot> snapshot() async {
     _requireNamespace();
-    final marker = await _database
-        .customSelect(
-          "SELECT name FROM sqlite_master WHERE name = 'legacy_v1_projection_cutover'",
-        )
-        .getSingleOrNull();
-    var colors = const <int>[];
-    if (marker != null) {
-      final archived = await _database
-          .customSelect(
-            'SELECT library_json FROM legacy_v1_projection_cutover '
-            'WHERE account_id = ?',
-            variables: [Variable<String>(accountId)],
-          )
-          .getSingleOrNull();
-      final raw = archived?.readNullable<String>('library_json');
-      if (raw != null) {
-        final library = jsonDecode(raw);
-        if (library is Map && library['recentCoverColors'] is List) {
-          colors = (library['recentCoverColors'] as List)
-              .whereType<int>()
-              .toList();
-        }
-      }
-    }
-    return LibraryV2OperationReducer.replay(
-      await _history(),
-      migratedRecentCoverColors: colors,
-    );
+    return LibraryV2OperationReducer.replay(await _history());
   }
 
   /// Invoked inside the journal transaction before an envelope is appended.
@@ -364,202 +330,6 @@ class LibraryV2OperationService {
       onError: (Object _, StackTrace _) {},
     );
     return refresh;
-  }
-
-  /// Converts safe legacy folder/task deltas without treating a cached
-  /// v1 snapshot as authoritative over a newer v2 journal.
-  Future<void> replayLegacyMetadata({
-    required Object? base,
-    required Object? local,
-    required Object? cutover,
-    required Set<String> protectedFolders,
-    required Future<void> Function(List<String>) onCommitted,
-  }) async {
-    _requireNamespace();
-    final state = await snapshot();
-    final before = _LegacyLibraryMetadata.parse(base);
-    final desired = _LegacyLibraryMetadata.parse(local);
-    final atCutover = _LegacyLibraryMetadata.parse(cutover);
-    final current = _LegacyLibraryMetadata.parse(state.value);
-    final conflicts = <String>[];
-    final drafts = <LocalOperationDraft>[];
-    // A device without a receipt cannot tell a local addition from an old
-    // copy of a deletion. Keep that delta for explicit recovery.
-    if (base == null && cutover != null) {
-      await engine.writeLocalBatch(
-        documentId: OperationEnvelope.libraryDocumentId,
-        operations: const [],
-        apply: apply,
-        onCommittedInTransaction: (_) async {
-          _requireNamespace();
-          await onCommitted([
-            'No acknowledged v1 library baseline on this device.',
-          ]);
-        },
-      );
-      return;
-    }
-    final folderIds = {...state.folderIdsByPath};
-    final deletedPaths = <String>{};
-    const equals = DeepCollectionEquality();
-
-    void add(OperationKind kind, String id, Map<String, dynamic> payload) {
-      drafts.add(
-        LocalOperationDraft(kind: kind, objectId: id, payload: payload),
-      );
-    }
-
-    String? parentOf(String path) {
-      final slash = path.lastIndexOf('/');
-      return slash < 0 ? null : path.substring(0, slash);
-    }
-
-    final desiredPaths = desired.folders.toList()
-      ..sort((a, b) => a.length.compareTo(b.length));
-    final changedSinceCutover = <String>{};
-    for (final op in await _history()) {
-      if (op.kind.target == OperationTarget.folder &&
-          !op.actorId.startsWith('v1-cutover:')) {
-        changedSinceCutover.add(op.objectId!);
-      }
-    }
-    for (final path in desiredPaths) {
-      if (folderIds.containsKey(path) || before.folders.contains(path)) {
-        continue;
-      }
-      if (atCutover.folders.contains(path)) {
-        conflicts.add('Folder changed or deleted remotely: $path');
-        continue;
-      }
-      final parent = parentOf(path);
-      if (parent != null && !folderIds.containsKey(parent)) {
-        conflicts.add('Missing parent for folder: $path');
-        continue;
-      }
-      final id = const Uuid().v5(
-        Namespace.url.value,
-        jsonEncode(['legacy-folder-delta', accountId, path]),
-      );
-      if (await engine.store.isTombstoned(
-        OperationEnvelope.libraryDocumentId,
-        'folder',
-        id,
-      )) {
-        conflicts.add('Folder identity was already deleted: $path');
-        continue;
-      }
-      folderIds[path] = id;
-      add(OperationKind.folderCreate, id, {
-        'value': {'name': path.split('/').last, 'parentId': folderIds[parent]},
-      });
-    }
-    if (base != null) {
-      final removals = before.folders.difference(desired.folders).toList()
-        ..sort((a, b) => b.length.compareTo(a.length));
-      for (final path in removals) {
-        final id = folderIds[path];
-        if (id == null) {
-          continue;
-        }
-        if (changedSinceCutover.contains(id) ||
-            !atCutover.folders.contains(path) ||
-            protectedFolders.any((p) => p == path || p.startsWith('$path/')) ||
-            folderIds.keys.any((p) => p.startsWith('$path/')) ||
-            !equals.equals(before.covers[path], current.covers[path])) {
-          conflicts.add('Folder removal needs review: $path');
-          continue;
-        }
-        add(OperationKind.folderDelete, id, const {});
-        deletedPaths.add(path);
-        folderIds.remove(path);
-      }
-    }
-    for (final path in {...before.covers.keys, ...desired.covers.keys}) {
-      if (deletedPaths.contains(path)) {
-        continue;
-      }
-      final old = before.covers[path];
-      final next = desired.covers[path];
-      final actual = current.covers[path];
-      if (equals.equals(old, next) || equals.equals(actual, next)) {
-        continue;
-      }
-      final id = folderIds[path];
-      if (id == null || !equals.equals(old, actual)) {
-        conflicts.add('Folder cover changed concurrently: $path');
-        continue;
-      }
-      add(OperationKind.folderSet, id, {
-        'properties': {'cover': next},
-      });
-    }
-
-    for (final id in {...before.tasks.keys, ...desired.tasks.keys}) {
-      final old = before.tasks[id];
-      final next = desired.tasks[id];
-      final actual = current.tasks[id];
-      if (equals.equals(old, next) || equals.equals(next, actual)) {
-        continue;
-      }
-      if (next == null) {
-        if (equals.equals(old, actual)) {
-          add(OperationKind.taskDelete, id, const {});
-        } else {
-          conflicts.add('Task removal conflicts with a remote edit: $id');
-        }
-        continue;
-      }
-      if (old == null) {
-        if (actual != null ||
-            atCutover.tasks.containsKey(id) ||
-            await wasTaskDeleted(id)) {
-          conflicts.add('Task identity was used or deleted remotely: $id');
-        } else {
-          final planner = next['plannerUid'];
-          final max = current.tasks.values
-              .where((task) => task['plannerUid'] == planner)
-              .fold<int>(-1, (n, task) {
-                final rank = task['sortIndex'] as int;
-                return rank > n ? rank : n;
-              });
-          add(OperationKind.taskCreate, id, {
-            'value': {
-              ...next,
-              'sortIndex': max + 1 + (next['sortIndex'] as int),
-            },
-          });
-        }
-        continue;
-      }
-      if (actual == null) {
-        conflicts.add('Task was removed remotely: $id');
-        continue;
-      }
-      final changes = <String, dynamic>{};
-      for (final key in next.keys) {
-        if (equals.equals(old[key], next[key]) ||
-            equals.equals(actual[key], next[key])) {
-          continue;
-        }
-        if (!equals.equals(old[key], actual[key])) {
-          conflicts.add('Task field changed concurrently: $id/$key');
-        } else {
-          changes[key] = next[key];
-        }
-      }
-      if (changes.isNotEmpty) {
-        add(OperationKind.taskSet, id, {'properties': changes});
-      }
-    }
-    await engine.writeLocalBatch(
-      documentId: OperationEnvelope.libraryDocumentId,
-      operations: drafts,
-      apply: apply,
-      onCommittedInTransaction: (_) async {
-        _requireNamespace();
-        await onCommitted(conflicts);
-      },
-    );
   }
 
   Future<void> _commit(
@@ -806,61 +576,5 @@ class LibraryV2OperationService {
     if (refresh) {
       await refreshReadModel();
     }
-  }
-}
-
-class _LegacyLibraryMetadata {
-  const _LegacyLibraryMetadata(this.folders, this.covers, this.tasks);
-
-  final Set<String> folders;
-  final Map<String, dynamic> covers;
-  final Map<String, Map<String, dynamic>> tasks;
-
-  static _LegacyLibraryMetadata parse(Object? raw) {
-    if (raw == null) {
-      return const _LegacyLibraryMetadata({}, {}, {});
-    }
-    final value = raw is List ? {'folders': raw} : raw;
-    if (value is! Map || value['folders'] is! List) {
-      throw const FormatException('Invalid legacy library snapshot.');
-    }
-    final paths = (value['folders'] as List).cast<String>().toSet();
-    final covers = Map<String, dynamic>.from(value['covers'] as Map? ?? {});
-    paths.addAll(covers.keys);
-    for (final path in paths.toList()) {
-      final parts = path.split('/');
-      if (parts.any((item) => item.isEmpty || item.trim() != item)) {
-        throw const FormatException('Invalid legacy folder path.');
-      }
-      for (var i = 1; i < parts.length; i++) {
-        paths.add(parts.take(i).join('/'));
-      }
-    }
-    final tasks = <String, Map<String, dynamic>>{};
-    final byPlanner = Map<String, dynamic>.from(
-      value['plannerTasks'] as Map? ?? {},
-    );
-    for (final entry in byPlanner.entries) {
-      final items = entry.value as List;
-      for (var i = 0; i < items.length; i++) {
-        final task = items[i] as Map;
-        final uid = task['id'];
-        if (uid is! String ||
-            uid.isEmpty ||
-            tasks.containsKey(uid) ||
-            task['title'] is! String) {
-          throw const FormatException('Invalid legacy task identity or title.');
-        }
-        tasks[uid] = {
-          'plannerUid': entry.key,
-          'title': task['title'],
-          'completed': task['completed'] == true,
-          'deadline': task['deadline'],
-          'deadlineHasTime': task['deadlineHasTime'] == true,
-          'sortIndex': i,
-        };
-      }
-    }
-    return _LegacyLibraryMetadata(paths, covers, tasks);
   }
 }

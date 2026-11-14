@@ -204,7 +204,11 @@ void main() {
         f.rejectPosts = true;
         await f.runtime.engine.syncNow();
         final saved = (await f.repository.getNotebook(note.uid))!;
-        expect(saved.pages, hasLength(scenario.object ? 2 : 1));
+        expect(
+          saved.pages,
+          hasLength(scenario.object ? 2 : 1),
+          reason: f.runtime.engine.lastError,
+        );
         expect(saved.pages.last.id, 'surviving-destination');
         expect(
           saved.pages.last.inkStrokes,
@@ -2215,7 +2219,7 @@ void main() {
     );
   });
 
-  test('same-page delete holds pending page edits', () async {
+  test('same-page delete archives pending page edits and advances', () async {
     final f = _Fixture(NativeDatabase.memory());
     addTearDown(f.close);
     expect(
@@ -2261,9 +2265,17 @@ void main() {
     f.accepted.add(remove.toJson());
     await f.runtime.engine.syncNow();
     final saved = (await f.repository.getNotebook(note.uid))!;
-    expect(saved.pages, hasLength(2));
-    expect(saved.pages.first.title, 'Still local');
-    expect(await f.runtime.store.checkpoint('account:startup-account'), 3);
+    expect(saved.pages, hasLength(1));
+    expect(saved.pages.single.id, 'kept-after-conflict');
+    expect(await f.runtime.store.checkpoint('account:startup-account'), 4);
+    final report = jsonDecode((await f.runtime.recoveryReport())!) as Map;
+    final conflict = (report['concurrentDeletes'] as List).single as Map;
+    expect(conflict['notebook_json'], contains('Still local'));
+    expect(conflict['local_json'], contains(local.operationId));
+    expect(
+      (await f.runtime.store.operation(local.operationId))!.toJson(),
+      local.toJson(),
+    );
     expect(
       (await f.runtime.store.pending(
         includeDeferred: true,

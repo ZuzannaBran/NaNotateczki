@@ -50,7 +50,28 @@ class LocalOperationDraft {
 /// flushed and checksummed before the transaction; a transaction only commits
 /// their references. Legacy snapshot writers are migrated in later stages.
 class OperationStore {
-  OperationStore(this.database, {this.checkpointScope});
+  OperationStore(
+    this.database, {
+    this.checkpointScope,
+    this.projectionReplay = false,
+  });
+
+  final bool projectionReplay;
+
+  String get projectionHistoryTable =>
+      projectionReplay ? 'temp.v2_rebase_history' : 'v2_projection_history';
+
+  Future<void> ensureProjectionHistory() async {
+    await database.customStatement(
+      'CREATE TABLE IF NOT EXISTS v2_projection_noops ('
+      'operation_id TEXT PRIMARY KEY, document_id TEXT NOT NULL)',
+    );
+    await database.customStatement(
+      'CREATE VIEW IF NOT EXISTS v2_projection_history AS '
+      'SELECT o.* FROM operations o WHERE NOT EXISTS ('
+      'SELECT 1 FROM v2_projection_noops n WHERE n.operation_id = o.operation_id)',
+    );
+  }
 
   final NotesDatabase database;
 
@@ -131,9 +152,10 @@ class OperationStore {
     if (documentId.isEmpty || pageId.isEmpty || objectId.isEmpty) {
       throw ArgumentError('Text CRDT lookup needs complete identity.');
     }
+    await ensureProjectionHistory();
     final rows = await database
         .customSelect(
-          'SELECT envelope_json FROM operations '
+          'SELECT envelope_json FROM $projectionHistoryTable '
           // Object IDs are unique throughout a notebook. A v2 object.move
           // changes its page, not its CRDT identity or earlier atom history.
           'WHERE document_id = ? AND object_id = ? '
@@ -382,6 +404,10 @@ class OperationStore {
               (checkpointScope == null ? 0 : await checkpoint(checkpointScope)),
           serverSequence: serverSequence,
         );
+        await _advanceCheckpoint(
+          'remote-operation:${operation.operationId}',
+          serverSequence,
+        );
         final actorScope = _remoteActorScope(operation.actorId);
         if (serverSequence > await checkpoint(actorScope)) {
           await _advanceCheckpoint(actorScope, serverSequence);
@@ -470,16 +496,6 @@ class OperationStore {
     }
     // The server may accept an old concurrent edit as an ignored no-op.
     // Record its actor sequence and cursor without resurrecting the target.
-    final pageObjectTombstones =
-        !deleted && entry.kind == OperationKind.pageDelete
-        ? await _objectsOnPage(entry.documentId, entry.objectId!)
-        : const <String>[];
-    final sourceMoves =
-        !deleted &&
-            entry.kind == OperationKind.pageDelete &&
-            serverSequence != null
-        ? await movesAfterSourceDeletion(entry, serverSequence)
-        : const <OperationEnvelope>[];
     final deletedMoveDestination =
         !deleted &&
         entry.kind == OperationKind.objectMove &&
@@ -492,8 +508,20 @@ class OperationStore {
     if (deletedMoveDestination && source == 'local') {
       throw StateError('Cannot move into a deleted page.');
     }
+    if (!deleted && entry.kind == OperationKind.pageDelete) {
+      // Child tombstones and rebase refer to this journal entry before it is
+      // appended below. Enforce those references at this transaction's commit.
+      await database.customStatement('PRAGMA defer_foreign_keys = ON');
+    }
     if (!deleted) {
       await apply();
+    } else {
+      await ensureProjectionHistory();
+      await database.customStatement(
+        'INSERT OR IGNORE INTO v2_projection_noops (operation_id, document_id) '
+        'VALUES (?, ?)',
+        [entry.operationId, entry.documentId],
+      );
     }
 
     final now = DateTime.now().toUtc().millisecondsSinceEpoch;
@@ -534,12 +562,6 @@ class OperationStore {
     }
     if (!deleted) {
       await _writeTombstone(entry);
-      for (final uid in pageObjectTombstones) {
-        await _writeMoveTombstone(entry, entry.objectId!, uid);
-      }
-      for (final move in sourceMoves) {
-        await _writeMoveTombstone(entry, entry.objectId!, move.objectId!);
-      }
       if (deletedMoveDestination &&
           !await _hasLiveObject(entry.documentId, entry.objectId!)) {
         await _writeMoveTombstone(
@@ -552,6 +574,78 @@ class OperationStore {
     return true;
   }
 
+  /// Replays projection state only; the immutable journal and outbox are untouched.
+  Future<bool> projectForRebase(
+    OperationEnvelope entry,
+    Future<void> Function() apply,
+  ) async {
+    if (await _isDeletedTarget(entry)) {
+      await database.customStatement(
+        'INSERT OR IGNORE INTO v2_projection_noops (operation_id, document_id) '
+        'VALUES (?, ?)',
+        [entry.operationId, entry.documentId],
+      );
+      return false;
+    }
+    await apply();
+    await _writeTombstone(entry);
+    if (entry.kind == OperationKind.objectMove &&
+        await isTombstoned(
+          entry.documentId,
+          'page',
+          entry.payload['toPageId'] as String,
+        ) &&
+        !await _hasLiveObject(entry.documentId, entry.objectId!)) {
+      await _writeMoveTombstone(
+        entry,
+        entry.payload['toPageId'] as String,
+        entry.objectId!,
+      );
+    }
+    return true;
+  }
+
+  /// Exact server order followed by still-local intents in durable creation order.
+  Future<List<OperationEnvelope>> rebaseTimeline(
+    OperationEnvelope incoming,
+    int cursor,
+  ) async {
+    final rows = await database
+        .customSelect(
+          'SELECT o.envelope_json, o.source, COALESCE(a.server_sequence, r.server_sequence) AS cursor '
+          'FROM operations o LEFT JOIN operation_ack a ON a.operation_id = o.operation_id '
+          "LEFT JOIN sync_checkpoints r ON r.scope = 'remote-operation:' || o.operation_id "
+          'WHERE o.document_id = ? ORDER BY o.rowid',
+          variables: [Variable<String>(incoming.documentId)],
+        )
+        .get();
+    if (rows.length > 50000) {
+      throw StateError(
+        'Placement rebase requires a durable history checkpoint.',
+      );
+    }
+    final committed = <(int, OperationEnvelope)>[(cursor, incoming)];
+    final pending = <OperationEnvelope>[];
+    for (final row in rows) {
+      final operation = OperationEnvelope.fromJson(
+        Map<String, dynamic>.from(
+          jsonDecode(row.read<String>('envelope_json')) as Map,
+        ),
+      );
+      final receipt = row.readNullable<int>('cursor');
+      if (receipt == null) {
+        if (row.read<String>('source') != 'local') {
+          throw StateError('Remote history lacks an exact server receipt.');
+        }
+        pending.add(operation);
+      } else {
+        committed.add((receipt, operation));
+      }
+    }
+    committed.sort((a, b) => a.$1.compareTo(b.$1));
+    return [for (final entry in committed) entry.$2, ...pending];
+  }
+
   Future<bool> _hasLiveObject(String document, String uid) async {
     return await _row(
           'SELECT 1 FROM (SELECT uid, page_uid FROM ink_stroke_rows UNION ALL '
@@ -562,81 +656,6 @@ class OperationStore {
           [document, uid],
         ) !=
         null;
-  }
-
-  /// Local moves accepted after the source deletion are server no-ops.
-  /// Their optimistic copies must be archived and removed, including when
-  /// the ACK arrived before the deletion was pulled. Earlier ACKs survive.
-  Future<List<OperationEnvelope>> movesAfterSourceDeletion(
-    OperationEnvelope deletion,
-    int cursor,
-  ) async {
-    if (deletion.kind != OperationKind.pageDelete) {
-      return [];
-    }
-    final rows = await database
-        .customSelect(
-          'SELECT o.envelope_json FROM operations o '
-          'LEFT JOIN operation_ack ack ON ack.operation_id = o.operation_id '
-          "WHERE o.document_id = ? AND o.page_id = ? AND o.kind = 'object.move' "
-          "AND o.source = 'local' AND (ack.server_sequence IS NULL OR ack.server_sequence > ?)",
-          variables: [
-            Variable<String>(deletion.documentId),
-            Variable<String>(deletion.objectId!),
-            Variable<int>(cursor),
-          ],
-        )
-        .get();
-    final result = <OperationEnvelope>[];
-    for (final row in rows) {
-      final move = OperationEnvelope.fromJson(
-        Map<String, dynamic>.from(
-          jsonDecode(row.read<String>('envelope_json')) as Map,
-        ),
-      );
-      if (!await _hasLiveObject(deletion.documentId, move.objectId!)) {
-        continue;
-      }
-      // A second committed relocation needs a full placement rebase. Keep
-      // that case blocked instead of removing a possibly surviving object.
-      final alternate = await database
-          .customSelect(
-            'SELECT 1 FROM operations o LEFT JOIN operation_ack ack '
-            'ON ack.operation_id = o.operation_id '
-            "WHERE o.document_id = ? AND o.object_id = ? AND o.kind = 'object.move' "
-            'AND o.operation_id != ? AND '
-            "(o.source = 'remote' OR ack.server_sequence <= ?) LIMIT 1",
-            variables: [
-              Variable<String>(deletion.documentId),
-              Variable<String>(move.objectId!),
-              Variable<String>(move.operationId),
-              Variable<int>(cursor),
-            ],
-          )
-          .getSingleOrNull();
-      if (alternate != null) {
-        throw StateError(
-          'Source deletion requires a rebase of multiple committed moves.',
-        );
-      }
-      result.add(move);
-    }
-    return result;
-  }
-
-  Future<List<String>> _objectsOnPage(String document, String page) async {
-    final result = await database
-        .customSelect(
-          'SELECT live.uid FROM ('
-          'SELECT uid, page_uid FROM ink_stroke_rows UNION ALL '
-          'SELECT uid, page_uid FROM image_block_rows UNION ALL '
-          'SELECT uid, page_uid FROM text_block_rows'
-          ') live JOIN page_rows p ON p.uid = live.page_uid '
-          'WHERE p.notebook_uid = ? AND p.uid = ?',
-          variables: [Variable<String>(document), Variable<String>(page)],
-        )
-        .get();
-    return [for (final row in result) row.read<String>('uid')];
   }
 
   Future<void> _writeMoveTombstone(
@@ -738,7 +757,7 @@ class OperationStore {
       return;
     }
     await database.customStatement(
-      'INSERT INTO object_tombstones '
+      'INSERT OR IGNORE INTO object_tombstones '
       '(document_id, target_kind, page_id, object_id, operation_id) '
       'VALUES (?, ?, ?, ?, ?)',
       [

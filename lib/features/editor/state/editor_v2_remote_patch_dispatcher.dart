@@ -93,6 +93,21 @@ class EditorV2RemotePatchDispatcher {
 
     if (operation.kind.target == OperationTarget.page) {
       final id = operation.objectId!;
+      // Deleting the final page creates the protocol's fresh empty page.
+      // Install it before removing the old selection so the editor always
+      // has a valid current page, including when a notification is retried.
+      if (operation.kind == OperationKind.pageDelete) {
+        for (final durable in notebook.pages) {
+          if (_page(editor.pages, durable.id) == null &&
+              !editor.applyConfirmedV2PagePatch(
+                pageId: durable.id,
+                page: durable,
+                pageIndex: editor.pages.length,
+              )) {
+            throw StateError('Committed replacement page was deferred.');
+          }
+        }
+      }
       final index = notebook.pages.indexWhere((page) => page.id == id);
       final page = index < 0 ? null : notebook.pages[index];
       final applied = editor.applyConfirmedV2PagePatch(
@@ -111,16 +126,10 @@ class EditorV2RemotePatchDispatcher {
           if (visible == null) {
             continue;
           }
-          final ids = [
-            ...visible.inkStrokes.map((object) => object.id),
-            ...visible.textBlocks.map((object) => object.id),
-            ...visible.imageBlocks.map((object) => object.id),
-          ];
-          if (ids.any((id) => !_ownsObject(durable, id)) &&
-              !editor.applyConfirmedV2PagePatch(
-                pageId: durable.id,
-                page: durable,
-              )) {
+          if (!editor.applyConfirmedV2PagePatch(
+            pageId: durable.id,
+            page: durable,
+          )) {
             throw StateError('Committed source deletion patch was deferred.');
           }
         }

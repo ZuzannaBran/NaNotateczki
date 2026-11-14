@@ -7409,5 +7409,289 @@
       },
       "tombstones": []
     }
+  },
+  {
+    "name": "concurrent deletion of all pages/pqr",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000101",
+        "actorId": "actor-101",
+        "actorSeq": 1,
+        "logicalClock": 101,
+        "documentId": "parity-doc",
+        "type": "page.delete",
+        "objectId": "p",
+        "payload": {},
+        "dependencies": []
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000102",
+        "actorId": "actor-102",
+        "actorSeq": 1,
+        "logicalClock": 102,
+        "documentId": "parity-doc",
+        "type": "page.delete",
+        "objectId": "q",
+        "payload": {},
+        "dependencies": []
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000103",
+        "actorId": "actor-103",
+        "actorSeq": 1,
+        "logicalClock": 103,
+        "documentId": "parity-doc",
+        "type": "page.delete",
+        "objectId": "r",
+        "payload": {},
+        "dependencies": []
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "empty-cc5784a50b6342d5db152e1d727de3a40cc2cfa80eecf6231353006184867810": {
+            "title": "Page 1",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": [
+        [
+          "page",
+          "",
+          "p"
+        ],
+        [
+          "page",
+          "",
+          "q"
+        ],
+        [
+          "page",
+          "",
+          "r"
+        ]
+      ]
+    }
+  },
+  {
+    "name": "concurrent deletion of all pages/rpq",
+    "operations": [
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000001",
+        "actorId": "actor-1",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "document.create",
+        "payload": {
+          "value": {
+            "title": "Parity",
+            "folder": "Notes",
+            "kindIndex": 0,
+            "createdAt": "2026-11-13T00:00:00.000Z"
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 1
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000002",
+        "actorId": "actor-2",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "One",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 2,
+        "objectId": "p"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000003",
+        "actorId": "actor-3",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Two",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 3,
+        "objectId": "q"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000004",
+        "actorId": "actor-4",
+        "actorSeq": 1,
+        "documentId": "parity-doc",
+        "type": "page.create",
+        "payload": {
+          "value": {
+            "title": "Three",
+            "isBookmarked": false
+          }
+        },
+        "dependencies": [],
+        "logicalClock": 4,
+        "objectId": "r"
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000101",
+        "actorId": "actor-101",
+        "actorSeq": 1,
+        "logicalClock": 101,
+        "documentId": "parity-doc",
+        "type": "page.delete",
+        "objectId": "r",
+        "payload": {},
+        "dependencies": []
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000102",
+        "actorId": "actor-102",
+        "actorSeq": 1,
+        "logicalClock": 102,
+        "documentId": "parity-doc",
+        "type": "page.delete",
+        "objectId": "p",
+        "payload": {},
+        "dependencies": []
+      },
+      {
+        "schemaVersion": 1,
+        "operationId": "00000000-0000-0000-0000-000000000103",
+        "actorId": "actor-103",
+        "actorSeq": 1,
+        "logicalClock": 103,
+        "documentId": "parity-doc",
+        "type": "page.delete",
+        "objectId": "q",
+        "payload": {},
+        "dependencies": []
+      }
+    ],
+    "expected": {
+      "document": {
+        "title": "Parity",
+        "folder": "Notes",
+        "kindIndex": 0,
+        "pages": {
+          "empty-cc5784a50b6342d5db152e1d727de3a40cc2cfa80eecf6231353006184867810": {
+            "title": "Page 1",
+            "isBookmarked": false,
+            "objects": {},
+            "order": []
+          }
+        }
+      },
+      "tombstones": [
+        [
+          "page",
+          "",
+          "p"
+        ],
+        [
+          "page",
+          "",
+          "q"
+        ],
+        [
+          "page",
+          "",
+          "r"
+        ]
+      ]
+    }
   }
 ]

@@ -22,51 +22,121 @@ import 'verified_editor_asset_buffer.dart';
 /// Cross-page moves relocate those references in the same SQLite transaction.
 /// This class does not enable the production protocol switch.
 class EditorSqliteProjector {
-  EditorSqliteProjector(this.database, {this.verifiedAssetBuffer})
-    : _store = OperationStore(database);
+  EditorSqliteProjector(
+    this.database, {
+    this.verifiedAssetBuffer,
+    bool projectionReplay = false,
+  }) : _store = OperationStore(database, projectionReplay: projectionReplay);
+
+  String get _historyTable => _store.projectionHistoryTable;
 
   final NotesDatabase database;
   final VerifiedEditorAssetBuffer? verifiedAssetBuffer;
   final OperationStore _store;
   final ShareInkEditAdapter _ink = ShareInkEditAdapter();
 
-  /// Removes only optimistic relocations invalidated by an earlier server
-  /// source-page deletion. The caller archives content in this transaction.
-  Future<void> removeMovesAfterSourceDeletion(
+  /// Rebuild only this document's materialized rows through the same reducer.
+  /// The caller archives optimistic data first, inside the enclosing transaction.
+  Future<void> rebasePageDeletion(
     OperationEnvelope deletion,
-    List<OperationEnvelope> moves,
+    int cursor,
   ) async {
-    for (final id in moves.map((move) => move.objectId!).toSet()) {
-      final rows = await database
-          .customSelect(
-            'SELECT page_uid FROM ink_stroke_rows WHERE uid = ? '
-            'UNION ALL SELECT page_uid FROM image_block_rows WHERE uid = ? '
-            'UNION ALL SELECT page_uid FROM text_block_rows WHERE uid = ?',
-            variables: [
-              Variable<String>(id),
-              Variable<String>(id),
-              Variable<String>(id),
-            ],
-          )
-          .get();
-      if (rows.isEmpty) {
-        continue;
-      }
-      if (rows.length != 1) {
-        throw StateError('Source deletion has an ambiguous moved UID.');
-      }
-      await _deleteObject(
-        OperationEnvelope.fromJson({
-          ...deletion.toJson(),
-          'type': 'object.delete',
-          'pageId': rows.single.read<String>('page_uid'),
-          'objectId': id,
-        }),
+    await _store.ensureProjectionHistory();
+    final timeline = await _store.rebaseTimeline(deletion, cursor);
+    if (timeline.isEmpty ||
+        timeline.first.kind != OperationKind.documentCreate) {
+      throw StateError(
+        'Rebase requires the complete operational document history.',
       );
+    }
+    final buffer = VerifiedEditorAssetBuffer();
+    for (final operation in timeline) {
+      if (operation.kind == OperationKind.assetAttach) {
+        buffer.stage(
+          receipt: operation.payload,
+          bytes: await verifiedUploadBytes(operation.payload),
+        );
+      }
+    }
+    await database.customStatement(
+      'CREATE TEMP TABLE v2_rebase_history AS SELECT * FROM operations WHERE 0',
+    );
+    try {
+      for (final table in [
+        'ink_stroke_rows',
+        'image_block_rows',
+        'text_block_rows',
+      ]) {
+        await database.customStatement(
+          'DELETE FROM $table WHERE page_uid IN '
+          '(SELECT uid FROM page_rows WHERE notebook_uid = ?)',
+          [deletion.documentId],
+        );
+      }
+      await database.customStatement(
+        'DELETE FROM page_rows WHERE notebook_uid = ?',
+        [deletion.documentId],
+      );
+      await database.customStatement(
+        'DELETE FROM notebook_rows WHERE uid = ?',
+        [deletion.documentId],
+      );
+      await database.customStatement(
+        'DELETE FROM asset_references WHERE document_id = ?',
+        [deletion.documentId],
+      );
+      await database.customStatement(
+        'DELETE FROM object_tombstones WHERE document_id = ?',
+        [deletion.documentId],
+      );
+      await database.customStatement(
+        'DELETE FROM v2_projection_noops WHERE document_id = ?',
+        [deletion.documentId],
+      );
+      final projector = EditorSqliteProjector(
+        database,
+        verifiedAssetBuffer: buffer,
+        projectionReplay: true,
+      );
+      for (final operation in timeline) {
+        final applied = await _store.projectForRebase(
+          operation,
+          () => projector.apply(operation),
+        );
+        if (applied) {
+          await database.customStatement(
+            'INSERT INTO temp.v2_rebase_history SELECT * FROM main.operations WHERE operation_id = ?',
+            [operation.operationId],
+          );
+          // The incoming operation has not been appended to the real journal yet.
+          if (operation.operationId == deletion.operationId) {
+            await database.customStatement(
+              'INSERT INTO temp.v2_rebase_history (operation_id, actor_id, actor_seq, '
+              'document_id, object_id, kind, envelope_json, logical_clock, schema_version, source, created_at) '
+              "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'remote', 0)",
+              [
+                operation.operationId,
+                operation.actorId,
+                operation.actorSeq,
+                operation.documentId,
+                operation.objectId,
+                operation.kind.wireName,
+                jsonEncode(operation.toJson()),
+                operation.logicalClock,
+                operation.schemaVersion,
+              ],
+            );
+          }
+        }
+      }
+    } finally {
+      await database.customStatement('DROP TABLE temp.v2_rebase_history');
+      buffer.clear();
     }
   }
 
   Future<void> apply(OperationEnvelope operation) async {
+    await _store.ensureProjectionHistory();
     operation.validateForV2Projection();
     if (operation.kind == OperationKind.documentCreate) {
       await _createDocument(operation);
@@ -131,9 +201,7 @@ class EditorSqliteProjector {
           'No verified SQLite editor reducer for ${projected.kind.wireName}.',
         );
     }
-    if (!operation.actorId.startsWith('v1-cutover:')) {
-      await _touchNotebook(operation.documentId);
-    }
+    await _touchNotebook(operation.documentId);
   }
 
   /// Resolve an older pageId only when a different actor has already moved
@@ -180,7 +248,7 @@ class EditorSqliteProjector {
     }
     final history = await database
         .customSelect(
-          'SELECT envelope_json FROM operations WHERE document_id = ? '
+          'SELECT envelope_json FROM $_historyTable WHERE document_id = ? '
           "AND object_id = ? AND kind = 'object.move'",
           variables: [
             Variable<String>(operation.documentId),
@@ -224,9 +292,7 @@ class EditorSqliteProjector {
       throw StateError('V2 document creation cannot import a legacy row.');
     }
     final value = Map<String, dynamic>.from(op.payload['value'] as Map);
-    final migrated = op.actorId.startsWith('v1-cutover:');
-    if (value.length != (migrated ? 5 : 4) ||
-        (migrated && value['updatedAt'] is! String) ||
+    if (value.length != 4 ||
         value['title'] is! String ||
         (value['title'] as String).isEmpty ||
         value['folder'] is! String ||
@@ -237,9 +303,7 @@ class EditorSqliteProjector {
       throw const FormatException('Invalid v2 notebook creation.');
     }
     final createdAt = DateTime.tryParse(value['createdAt'] as String);
-    final updatedAt = migrated
-        ? DateTime.tryParse(value['updatedAt'] as String)
-        : createdAt;
+    final updatedAt = createdAt;
     if (createdAt == null || updatedAt == null) {
       throw const FormatException('Invalid v2 notebook creation time.');
     }
@@ -355,7 +419,7 @@ class EditorSqliteProjector {
               "'object.transform', 'object.reorder', 'object.move')";
     final rows = await database
         .customSelect(
-          'SELECT envelope_json FROM operations '
+          'SELECT envelope_json FROM $_historyTable '
           'WHERE document_id = ? AND '
           '${documentTarget ? 'object_id IS NULL' : 'object_id = ?'} '
           'AND kind IN $kinds',
@@ -522,12 +586,21 @@ class EditorSqliteProjector {
     if (page['notebook_uid'] != op.documentId) {
       throw StateError('Deleted page belongs to another notebook.');
     }
-    final count = await _row(
-      'SELECT COUNT(*) AS total FROM page_rows WHERE notebook_uid = ?',
-      [Variable<String>(op.documentId)],
-    );
-    if ((count?['total'] as int? ?? 0) <= 1) {
-      throw StateError('The last notebook page cannot be deleted.');
+    final children = await database
+        .customSelect(
+          'SELECT uid FROM ink_stroke_rows WHERE page_uid = ? '
+          'UNION ALL SELECT uid FROM text_block_rows WHERE page_uid = ? '
+          'UNION ALL SELECT uid FROM image_block_rows WHERE page_uid = ?',
+          variables: [for (var i = 0; i < 3; i++) Variable<String>(pageId)],
+        )
+        .get();
+    for (final child in children) {
+      await database.customStatement(
+        'INSERT OR IGNORE INTO object_tombstones '
+        '(document_id, target_kind, page_id, object_id, operation_id) '
+        "VALUES (?, 'object', ?, ?, ?)",
+        [op.documentId, pageId, child.read<String>('uid'), op.operationId],
+      );
     }
 
     final imageRows = await database
@@ -639,6 +712,31 @@ class EditorSqliteProjector {
       'DELETE FROM page_rows WHERE uid = ? AND notebook_uid = ?',
       [pageId, op.documentId],
     );
+    final remaining = await _row(
+      'SELECT uid FROM page_rows WHERE notebook_uid = ? LIMIT 1',
+      [Variable<String>(op.documentId)],
+    );
+    if (remaining == null) {
+      final deleted = await database
+          .customSelect(
+            'SELECT object_id FROM object_tombstones WHERE document_id = ? '
+            "AND target_kind = 'page'",
+            variables: [Variable<String>(op.documentId)],
+          )
+          .get();
+      final ids = {
+        pageId,
+        for (final row in deleted) row.read<String>('object_id'),
+      }.toList()..sort();
+      final identity = jsonEncode([op.documentId, ids]);
+      final replacement =
+          'empty-${crypto.sha256.convert(utf8.encode(identity))}';
+      await database.customStatement(
+        'INSERT INTO page_rows '
+        '(uid, notebook_uid, page_index, title, is_bookmarked) VALUES (?, ?, 0, ?, 0)',
+        [replacement, op.documentId, 'Page 1'],
+      );
+    }
   }
 
   Future<void> _objectIdUnused(String objectId) async {
@@ -709,7 +807,7 @@ class EditorSqliteProjector {
     final index = _index(op.payload['sortIndex']);
     final priorMoves = await database
         .customSelect(
-          'SELECT envelope_json FROM operations '
+          'SELECT envelope_json FROM $_historyTable '
           "WHERE document_id = ? AND object_id = ? AND kind = 'object.move'",
           variables: [
             Variable<String>(op.documentId),
@@ -1124,9 +1222,10 @@ class EditorSqliteProjector {
     required String objectId,
     required String assetId,
   }) async {
+    await _store.ensureProjectionHistory();
     final rows = await database
         .customSelect(
-          'SELECT envelope_json FROM operations WHERE document_id = ? '
+          'SELECT envelope_json FROM $_historyTable WHERE document_id = ? '
           'AND object_id = ? AND kind = ?',
           variables: [
             Variable<String>(documentId),
@@ -1160,9 +1259,10 @@ class EditorSqliteProjector {
     required String documentId,
     required String assetId,
   }) async {
+    await _store.ensureProjectionHistory();
     final rows = await database
         .customSelect(
-          'SELECT envelope_json FROM operations '
+          'SELECT envelope_json FROM $_historyTable '
           'WHERE document_id = ? AND kind = ? LIMIT 50001',
           variables: [
             Variable<String>(documentId),
@@ -1540,7 +1640,7 @@ class EditorSqliteProjector {
       return;
     }
     final original = await _row(
-      'SELECT envelope_json FROM operations '
+      'SELECT envelope_json FROM $_historyTable '
       'WHERE document_id = ? AND object_id = ? '
       "AND kind = 'object.create' ORDER BY rowid LIMIT 1",
       [Variable<String>(operation.documentId), Variable<String>(objectId)],

@@ -18,19 +18,27 @@ abstract final class V2DeleteConflictArchive {
     required NotebookRepository repository,
     required EditorSqliteProjector projector,
   }) async {
-    final sourceMoves = await OperationStore(
-      repository.database,
-    ).movesAfterSourceDeletion(operation, cursor);
-    final movedIds = sourceMoves.map((move) => move.objectId).toSet();
-    final sourceConflict =
-        sourceMoves.isNotEmpty &&
-        pending.every(
-          (local) =>
-              V2OutboxConflictPolicy.canApply(operation, [local]) ||
-              (local.documentId == operation.documentId &&
-                  local.kind.target == OperationTarget.object &&
-                  movedIds.contains(local.objectId)),
+    final store = OperationStore(repository.database);
+    if (operation.kind == OperationKind.pageDelete) {
+      final timeline = await store.rebaseTimeline(operation, cursor);
+      final after = timeline
+          .skipWhile((op) => op.operationId != operation.operationId)
+          .skip(1);
+      final local = <OperationEnvelope>[];
+      for (final op in after) {
+        if (await store.isLocalOperation(op.operationId)) local.add(op);
+      }
+      if (local.isNotEmpty) {
+        await archive(
+          operation,
+          local,
+          repository: repository,
+          projector: projector,
         );
+      }
+      await projector.rebasePageDeletion(operation, cursor);
+      return;
+    }
     final canApply = V2OutboxConflictPolicy.canApply(operation, pending);
     final destructivePending = pending.any(
       (local) =>
@@ -42,7 +50,6 @@ abstract final class V2DeleteConflictArchive {
                   local.payload['toPageId'] == operation.objectId)),
     );
     if (!canApply &&
-        !sourceConflict &&
         operation.kind != OperationKind.documentDelete &&
         !V2OutboxConflictPolicy.canArchiveObjectDelete(operation, pending) &&
         !V2OutboxConflictPolicy.canArchiveMoveDestinationDelete(
@@ -51,17 +58,14 @@ abstract final class V2DeleteConflictArchive {
         )) {
       throw StateError('Remote v2 operation awaits local outbox ACK.');
     }
-    if (!canApply || destructivePending || sourceMoves.isNotEmpty) {
+    if (!canApply || destructivePending) {
       await archive(
         operation,
-        {
-          for (final op in [...pending, ...sourceMoves]) op.operationId: op,
-        }.values.toList(),
+        {for (final op in pending) op.operationId: op}.values.toList(),
         repository: repository,
         projector: projector,
       );
     }
-    await projector.removeMovesAfterSourceDeletion(operation, sourceMoves);
     await projector.apply(operation);
   }
 

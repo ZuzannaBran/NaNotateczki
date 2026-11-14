@@ -70,78 +70,34 @@ void main() {
     ActiveStorageNamespace.activate(StorageNamespace.local());
   });
 
-  test(
-    'legacy library deltas keep newer fields and archived deletions',
-    () async {
-      const user = 'historical-library';
-      ActiveStorageNamespace.activate(StorageNamespace.account(user));
-      final db = NotesDatabase(NativeDatabase.memory());
-      addTearDown(db.close);
-      final store = OperationStore(db);
-      final engine = SyncEngine(
-        store: store,
-        gateway: _NoNetworkGateway(),
-        actorId: 'offline',
-        checkpointScope: 'account:$user',
-        enableRealtime: false,
-        applyRemote: (operation, pending) async {},
-      );
-      addTearDown(engine.dispose);
-      final library = LibraryV2OperationService(
-        engine: engine,
-        accountId: user,
-      );
-      await library.createFolder('Shared');
-      await library.createFolder('RemoteOnly');
-      await library.createTask('planner', {
-        'id': 'task-live',
-        'title': 'Remote title',
-      }, 0);
-      await library.createTask('planner', {
-        'id': 'task-deleted',
-        'title': 'Old',
-      }, 1);
-      await library.deleteTask('task-deleted');
-      final base = {
-        'folders': ['Shared'],
-        'plannerTasks': {
-          'planner': [
-            {'id': 'task-live', 'title': 'Base title'},
-            {'id': 'task-deleted', 'title': 'Old'},
-          ],
-        },
-      };
-      final local = {
-        'folders': ['Shared', 'Shared/Offline'],
-        'plannerTasks': {
-          'planner': [
-            {'id': 'task-live', 'title': 'Base title', 'completed': true},
-            {'id': 'task-deleted', 'title': 'Offline edit'},
-          ],
-        },
-      };
-      final snapshot = await library.snapshot();
-      List<String>? conflicts;
-      await library.replayLegacyMetadata(
-        base: base,
-        local: local,
-        cutover: snapshot.value,
-        protectedFolders: {},
-        onCommitted: (items) async => conflicts = items,
-      );
-      final after = await library.snapshot();
-      expect(
-        after.folderIdsByPath.keys,
-        containsAll(['Shared/Offline', 'RemoteOnly']),
-      );
-      final task =
-          (after.value['plannerTasks']['planner'] as List).single as Map;
-      expect(task['title'], 'Remote title');
-      expect(task['completed'], isTrue);
-      expect(conflicts!.single, contains('task-deleted'));
-      expect(await library.wasTaskDeleted('task-deleted'), isTrue);
-    },
-  );
+  test('library projection ignores retired snapshot metadata', () async {
+    const user = 'journal-library';
+    ActiveStorageNamespace.activate(StorageNamespace.account(user));
+    final db = NotesDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    final engine = SyncEngine(
+      store: OperationStore(db),
+      gateway: _NoNetworkGateway(),
+      actorId: 'offline',
+      checkpointScope: 'account:$user',
+      enableRealtime: false,
+      applyRemote: (operation, pending) async {},
+    );
+    addTearDown(engine.dispose);
+    final library = LibraryV2OperationService(engine: engine, accountId: user);
+    await library.createFolder('Current');
+    final before = (await library.snapshot()).value;
+    await db.customStatement(
+      'CREATE TABLE legacy_v1_projection_cutover '
+      '(account_id TEXT PRIMARY KEY, library_json TEXT)',
+    );
+    await db.customStatement(
+      'INSERT INTO legacy_v1_projection_cutover VALUES (?, ?)',
+      [user, 'invalid retired snapshot'],
+    );
+    expect((await library.snapshot()).value, before);
+    expect(await db.customSelect('PRAGMA foreign_key_check').get(), isEmpty);
+  });
 
   test('planner, folder subtree and task changes use the v2 journal', () async {
     const user = 'v2-integration-account';

@@ -1,3 +1,8 @@
+## Audyt serwera i klienta — 2026-11-14
+
+[AUDYT_V2_2026_11_14_SERWER.md](docs/AUDYT_V2_2026_11_14_SERWER.md)
+opisuje potwierdzone wdrożenie, odzyskany rebase i otwarte issues #2/#4/#5/#6/#7.
+
 ## Audyt i regresje v2 — 2026-11-13
 
 - `lib/data/sync/sync_engine.dart:49`: `SyncEngine` przyjmuje dokładnie

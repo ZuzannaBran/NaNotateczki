@@ -2373,19 +2373,20 @@ void main() {
     },
   );
 
-  test('the last page cannot be removed through v2', () async {
-    await expectLater(
-      write([
-        LocalOperationDraft(
-          kind: OperationKind.pageDelete,
-          objectId: pageId,
-          payload: const {},
-        ),
-      ]),
-      throwsStateError,
-    );
-    expect((await notebooks.getNotebook(documentId))?.pages, hasLength(1));
-    expect(await store.pending(), isEmpty);
+  test('deleting the last page creates a fresh empty identity', () async {
+    await write([
+      LocalOperationDraft(
+        kind: OperationKind.pageDelete,
+        objectId: pageId,
+        payload: const {},
+      ),
+    ]);
+    final saved = (await notebooks.getNotebook(documentId))!;
+    expect(saved.pages, hasLength(1));
+    expect(saved.pages.single.id, startsWith('empty-'));
+    expect(saved.pages.single.id, isNot(pageId));
+    expect(await store.isTombstoned(documentId, 'page', pageId), isTrue);
+    expect(await store.pending(), hasLength(1));
   });
 
   test('committed ink and outbox survive restarting SQLite', () async {
