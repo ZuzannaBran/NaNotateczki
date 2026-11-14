@@ -40,9 +40,9 @@ void main() {
     }
   });
 
-  test('both themes use a bundled Georgia-like serif', () {
-    expect(AppTypography.fontFamily, 'Gelasio');
-    expect(AppTypography.fontFamilyFallback.first, 'Georgia');
+  test('both themes prefer Georgia with a bundled Gelasio fallback', () {
+    expect(AppTypography.fontFamily, 'Georgia');
+    expect(AppTypography.fontFamilyFallback.first, 'Gelasio');
     expect(AppTypography.fontFamilyFallback, contains('Noto Serif'));
     expect(AppTypography.fontFamilyFallback, contains('DejaVu Serif'));
     for (final theme in [AppTheme.light(), AppTheme.dark()]) {

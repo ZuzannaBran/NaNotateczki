@@ -11,6 +11,7 @@ import 'package:program/features/notebook/data/notebook_repository.dart';
 import 'package:program/features/notebook/domain/notebook_kind.dart';
 import 'package:uuid/uuid.dart';
 
+import '../test/support/app_icon_check.dart';
 import 'support/sqlite_runtime_check_stub.dart'
     if (dart.library.io) 'support/sqlite_runtime_check_io.dart';
 
@@ -18,6 +19,11 @@ const _isolated = bool.fromEnvironment('NANOTATECZKI_ISOLATED_CI');
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets(
+    'bundled Material icons retain their glyphs on the platform',
+    verifyAppIcons,
+  );
 
   testWidgets(
     'native SQLite loads in the app and Drift worker after a restart',

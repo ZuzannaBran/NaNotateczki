@@ -15,6 +15,29 @@ spec.loader.exec_module(package)
 
 
 class CloudflareWebPackageTest(unittest.TestCase):
+    def test_ui_fonts_require_icons_and_bundled_serif_with_nonempty_assets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = []
+            for family in ("MaterialIcons", "Gelasio"):
+                (root / f"{family}.ttf").write_bytes(b"font")
+                manifest.append({"family": family, "fonts": [
+                    {"asset": f"{family}.ttf"}
+                ]})
+            path = root / "FontManifest.json"
+            path.write_text(json.dumps(manifest))
+            package.verify_ui_fonts(root)
+            for omitted in ("MaterialIcons", "Gelasio"):
+                path.write_text(json.dumps([
+                    item for item in manifest if item["family"] != omitted
+                ]))
+                with self.assertRaisesRegex(ValueError, omitted):
+                    package.verify_ui_fonts(root)
+            path.write_text(json.dumps(manifest))
+            (root / "MaterialIcons.ttf").write_bytes(b"")
+            with self.assertRaisesRegex(ValueError, "Missing UI font"):
+                package.verify_ui_fonts(root)
+
     def test_font_flattening_keeps_every_font_byte_and_removes_empty_folders(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

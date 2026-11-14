@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 
 /// Shared typography for application UI; document content is independent.
 class AppTypography {
-  /// Bundled Georgia-like font, consistent across web and desktop.
-  static const String fontFamily = 'Gelasio';
+  /// Native Georgia where available, with a bundled cross-platform fallback.
+  static const String fontFamily = 'Georgia';
   static const List<String> fontFamilyFallback = [
-    'Georgia',
+    'Gelasio',
     'Noto Serif',
     'DejaVu Serif',
     'Liberation Serif',

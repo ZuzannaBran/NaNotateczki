@@ -42,9 +42,9 @@
 - Kanoniczny serwer i jego lustro: `0016_retire_legacy_sync.sql`,
   `api/app/owner_lock.py`, `scripts/deploy-v2.sh`.
   Nowe i puste konta są v2 bez flagi klienta. Zarchiwizowane
-  konta wymagają konwersji albo jawnego resetu testowego.
+  konta historyczne nie są już importowane przy starcie klienta v2.
 - Testy: `test/app_scope_v2_shutdown_test.dart`,
-  `test/study_share_http_test.dart`, `test/legacy_v2_projection_cutover_test.dart`,
+  `test/study_share_http_test.dart`, `test/retired_outbox_guard_test.dart`,
   `server/api/tests/test_http_boundary.py`,
   `server/api/tests/test_stage12_real_stack.py`.
   Dalsze sekcje o aktywnym v1 opisują stan historyczny.
@@ -285,13 +285,14 @@ lib/
 
 ## 2. Start i aplikacja
 
-### `lib/main.dart` (169 linii)
+### `lib/main.dart` (171 linii)
 
 Start aplikacji, globalne logowanie błędów i linuksowy filtr błędnych zdarzeń
 klawiatury. Przed wczytaniem logów przygotowuje i migruje prywatny katalog
-danych aplikacji.
+danych aplikacji. Font ikon jest ładowany przed pierwszym UI.
 
-- 37: `main`; 48: `_runApp`; 77–169: handlery błędów i watchdog key data.
+- 38: `main`; 49: `_runApp` ładuje Material Icons przed pierwszą klatką
+  również dla gościa Share; 79–171: handlery błędów i watchdog key data.
 
 ### `lib/app/notes_app.dart` (12 linii)
 
@@ -299,7 +300,7 @@ Root widget przekazujący sterowanie do scope aplikacji.
 
 - 5: `NotesApp`.
 
-### `lib/app/app_scope.dart` (2038 linii)
+### `lib/app/app_scope.dart` (1891 linii)
 
 Otwiera bazę, buduje serwisy/Providery, nakłada zapisany kolor akcentu bez
 przebudowywania `MaterialApp` i planuje backup po zapisie. Scope przechwytuje
@@ -375,11 +376,15 @@ Retry i Log out, pokazując błędy działań. Regresja widgetowa:
 - `lib/core/theme/app_metrics.dart` (3): współdzielone metryki A4.
   1: `AppMetrics`.
 - `lib/core/theme/app_typography.dart`: cztery rozmiary tekstu interfejsu
-  (18/16/14/12 px), wbudowane Gelasio (zbliżone do Georgii) z fallbackiem
-  Georgia / Noto Serif / DejaVu Serif / Liberation Serif / Times New Roman /
+  (18/16/14/12 px), Georgia z lokalnym fallbackiem Gelasio /
+  Noto Serif / DejaVu Serif / Liberation Serif / Times New Roman /
   serif; regular/medium/semibold/bold oraz kursywa są lokalnymi assetami
   `assets/fonts/` (SIL OFL), również na web. Dokumenty z ręcznie
   wybraną czcionką zachowują własny krój i rozmiar.
+- `lib/core/theme/app_font_loader.dart`: `loadAppIconFonts` (4) ładuje
+  istniejący MaterialIcons przed startem UI. Test pikseli
+  `test/app_icon_font_test.dart` wykrywa kwadraty zamiast ikony; ten sam
+  scenariusz działa w platformowym `document_lifecycle_test.dart`.
 - `lib/core/theme/app_theme.dart`: `AppTheme.light` i `AppTheme.dark`
   z kontrastowymi kontrolkami i nagłówkami. Tekstowe i konturowe
   przyciski jasnego motywu używają `onSurface` zamiast bladego akcentu.
@@ -1242,11 +1247,13 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   (`AppErrorLog`), bez treści odpowiedzi i tokenów; wyklucza health
   oraz diagnostyczny pomiar zegara, aby nie powstała pętla raportowania.
   HTTP 4xx, w tym zwykły konflikt 409, nie tworzy wpisu.
-  7: `ApiResponse`; 18: `ApiException`; 29: `ApiClient`.
+  9: `ApiResponse`; 20: `ApiException`; 32: `ApiClient`.
+  Uwierzytelnienie używa wyłącznie `/v2/auth`; regresja
+  rejestracji/refresh/logout: `test/account_session_controller_test.dart`.
   Domyślny adres dla wszystkich platform to `https://api.nanotateczki.pl`;
   `BACKEND_URL` może go nadpisać w buildach lokalnych/testowych.
 - `lib/data/sync/device_clock_check.dart`: jednorazowy pomiar
-  czasu UTC przy rozpoczęciu zalogowanej sesji przez `GET /v1/time`.
+  czasu UTC przy rozpoczęciu zalogowanej sesji przez `GET /v2/time`.
   `Stopwatch` mierzy RTT; szacowanie środka żądania ma tolerancję
   60 sekund + połowę RTT, pomija RTT ponad 10 s i skok zegara w trakcie
   pomiaru. Różnicę wpisuje do Errors i pokazuje SnackBar w `AppScope`
@@ -1262,7 +1269,7 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   oraz żądanie bez tokenu.
 - `lib/data/sync/diagnostics_upload_service.dart`: podczas zalogowanej sesji
   nasłuchuje trzech lokalnych logów i przesyła aktualny snapshot po
-  12 s bezczynności do `PUT /v1/reports/diagnostics`; błędy ponawia
+  12 s bezczynności do `PUT /v2/reports/diagnostics`; błędy ponawia
   po 5 min, nie blokuje aplikacji; jeden trwały UUID urządzenia.
   Backend utrwala `errors` w
   `data/diagnostics/<account UUID>/<device UUID>.json` i nadpisuje
@@ -1280,6 +1287,7 @@ folderze; remis timestampów wygrywa lokalny snapshot.
   serializowane z operacjami na magazynie sekretów; ponowny login
   nie traci danych lokalnych. Przy logout kończy zapisy i synchronizację
   przed odwołaniem serwerowej sesji; błąd flush pozostawia aktywne konto.
+  Cały cykl konta korzysta wyłącznie z `/v2/auth`.
   `isBusy` obejmuje cały logout, także odwołanie HTTP i usunięcie sekretu;
   równoczesne wylogowania współdzielą Future. Błąd zwalnia blokadę i
   pozwala ponowić logout. Regresje: `test/account_session_controller_test.dart`.
@@ -3700,14 +3708,13 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   pełne sprawdzenie listy plików, manifest staged-not-activated.
 - `tool/test_stage11_migrate.py`: 19 regresji m.in. staging konta,
   profile, nowe źródła, osierocone assety, symlinki, resume i WAL.
-- `server/api/app/legacy_cutover.py`, `legacy_operation_plan.py` i migracja
-  0015: dry-run, deterministyczny dziennik v2, trwały receipt i blokada v1.
-- `lib/data/sync/legacy_v2_projection_cutover.dart`: potwierdzenie rewizji,
-  transakcyjne archiwum SQLite i kolejka intencji offline, odbudowa przez
-  SyncEngine i scalenie offline notatek, folderów oraz zadań na bazie
-  ostatniej potwierdzonej wersji po osiągnięciu checkpointu. Regresje w
-  `test/legacy_v2_projection_cutover_test.dart`
-  i `server/api/tests/test_stage12_real_stack.py`.
+- Po świeżym starcie wycofano klientowy i serwerowy importer snapshotów.
+  Migracje historyczne pozostają w łańcuchu checksum; migracja 0017 usuwa
+  tabele v1. Start konta nie wywołuje już endpointów legacy-source/library.
+- `lib/data/sync/retired_outbox_guard.dart`: `requireEmptyRetiredOutbox` (8)
+  jedynie odczytuje poprzednią kolejkę i blokuje start przy niewysłanych
+  intencjach. Nie importuje ani nie zapisuje snapshotów. Regresje:
+  `test/retired_outbox_guard_test.dart`, `test/api_client_test.dart`.
 - `lib/data/sync/v2_delete_conflict_archive.dart`: konto i gość Share
   zachowują oryginalne koperty oraz kopię treści z mediami przed
   potwierdzonym usunięciem. Konto umożliwia też odtworzenie nowej kopii.
@@ -3792,7 +3799,7 @@ Linux: użytkownik instaluje `zenity` (file picker) i `poppler-utils` (PDF).
   reset pozwala jedynie na próby API v2, nie na użytkowanie aplikacji.
 
 - `ApiClient.ensureLegacyAccountProtocol` i `AppScope._startAccountSync`:
-  przed recovery i legacy sync sprawdza `GET /v1/auth/protocol`;
+  przed recovery i legacy sync sprawdza `GET /v2/auth/protocol`;
   konto v2 nie może uruchomić klienta v1. Jedynie 404 starego API
   zachowuje kompatybilność, inne błędy nie przełączają writera.
   Regresje: `test/api_client_test.dart`; backend: auth.py

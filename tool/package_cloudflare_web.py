@@ -79,6 +79,19 @@ def flatten_font_paths(directory, checksums):
             child.rmdir()
 
 
+def verify_ui_fonts(directory):
+    font_manifest = json.loads((directory / "FontManifest.json").read_text())
+    families = {family["family"] for family in font_manifest if family["fonts"]}
+    for required in ("MaterialIcons", "Gelasio"):
+        if required not in families:
+            raise ValueError(f"Missing UI font family: {required}")
+    for family in font_manifest:
+        for font in family["fonts"]:
+            asset = directory / font["asset"]
+            if not asset.is_file() or asset.stat().st_size == 0:
+                raise ValueError(f"Missing UI font: {font['asset']}")
+
+
 def main():
     prepare_runtime_directory()
     index = (BUILD / "index.html").read_text()
@@ -111,11 +124,7 @@ def main():
             "/vendor/flutter-fonts/:family/:version/:font "
             "/vendor/flutter-fonts/files/:font 200\n"
         )
-    font_manifest = json.loads((BUILD / "assets/FontManifest.json").read_text())
-    for family in font_manifest:
-        for font in family["fonts"]:
-            if (BUILD / "assets" / font["asset"]).stat().st_size == 0:
-                raise ValueError(f"Missing UI font: {font['asset']}")
+    verify_ui_fonts(BUILD / "assets")
     hashes = {
         str(path.relative_to(BUILD)): digest(path)
         for path in sorted(BUILD.rglob("*"))

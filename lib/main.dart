@@ -12,6 +12,7 @@ import 'core/diagnostics/optimization_log.dart';
 import 'core/error/app_error_log.dart';
 import 'core/input/stylus_button_state.dart';
 import 'core/storage/app_data_directory.dart';
+import 'core/theme/app_font_loader.dart';
 import 'features/share/presentation/study_share_guest_screen.dart';
 
 ui.KeyDataCallback? _wrappedKeyDataHandler;
@@ -47,6 +48,7 @@ void main() {
 
 Future<void> _runApp() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await loadAppIconFonts();
   if (kIsWeb) {
     final path = Uri.base.pathSegments;
     if (path.length == 2 && path.first == 'share' && path.last.isNotEmpty) {

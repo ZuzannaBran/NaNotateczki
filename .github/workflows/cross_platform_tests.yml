@@ -42,6 +42,8 @@ jobs:
           git diff --exit-code -- lib test integration_test test_driver
       - name: Analyze Dart source before installing native packages
         run: dart analyze
+      - name: Verify bundled icon glyphs before native package downloads
+        run: flutter test test/app_icon_font_test.dart --reporter expanded
       - name: Verify native SQLite packaging before installing system SQLite
         run: flutter test test/sqlite_native_packaging_test.dart --reporter expanded
       - name: Test operational v2 rebase before installing native packages

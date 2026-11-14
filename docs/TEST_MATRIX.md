@@ -6,6 +6,14 @@ a platform as tested until its actual Actions job succeeds.
 
 ## Execution policy
 
+The analysis job checks the actual Material Icons glyph pixels before native
+package installation. The same check runs in `document_lifecycle_test.dart`
+on the platform matrix, including Web. It keeps the existing icon set.
+`dark_mode_theme_test.dart` checks Georgia with bundled Gelasio fallback and
+all eight font assets. The Web packager rejects missing icon/serif families.
+Manual visual acceptance after a full restart: library, editor toolbar,
+settings and Share in both themes; see `AUDYT_V2_2026_11_14.md`.
+
 - Every push or pull request against `dev`: format, analyze, native unit/widget
   tests (excluding the PNG/PDF renderer) and coverage on Ubuntu; a separate
   render job runs real PNG/PDF export tests with a two-minute per-test limit;
