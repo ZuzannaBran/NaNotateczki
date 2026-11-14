@@ -1071,3 +1071,26 @@ Nie są to potwierdzone wyniki automatycznych testów E2E.
    bez ponawiania co 5 minut, a inne dokumenty nadal synchronizują.
 10. Przeprowadzić migrację istniejącego outboxu SQLite v4 → v5, bez
    utraty operacji oraz bez zerowania prób/terminów retry.
+# Natywne SQLite i ponowne uruchomienie — 2026-11-14
+
+`dart analyze` nie uruchamia loadera bibliotek. Bezpośrednio po analizie CI
+wykonuje `test/sqlite_native_packaging_test.dart`: przeniesiona paczka CMake
+musi rozwiązać `libsqlite3.so` bez LD_LIBRARY_PATH i bez podmiany na wersję
+systemową. Regresja odtworzyła błąd przed zmianą OUTPUT_NAME pluginu.
+
+`integration_test/document_lifecycle_test.dart` sprawdza prawdziwe SQLite
+w aplikacji oraz w izolacie Drift, JSON/FTS5, zapis i ponowne otwarcie pliku.
+Ten sam przypadek jest w macierzy Linux/Windows/macOS/Android/iOS. Część
+natywna ma import warunkowy; Web zachowuje własne testy SQLite WASM.
+
+Zmiana nazwy biblioteki C/C++ wymaga zamknięcia starego procesu i pełnego
+`flutter run -d linux` lub `flutter build linux --debug`. Hot reload/restart
+nie przebudowuje paczki natywnej. Poprawna paczka ma
+`build/linux/x64/debug/bundle/lib/libsqlite3.so`, a `readelf -d` wykonywalnego
+`program` pokazuje NEEDED `libsqlite3.so`.
+
+Lokalna weryfikacja 2026-11-14: pełna budowa Linux oraz natywny test SQLite
+w procesie Flutter i izolacie Drift przeszły bez obejścia LD_LIBRARY_PATH.
+Poprzednia macierz CI `43526945751` zaliczyła 16/17 zadań, w tym wszystkie
+systemy natywne i backend. Jedyny błąd był w kompilacji testu Web po
+bezwarunkowym imporcie FFI; rozdzielenie IO/stub usuwa ten import z Web.

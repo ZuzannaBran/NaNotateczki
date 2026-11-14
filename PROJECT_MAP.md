@@ -3234,6 +3234,9 @@ Dodatkowe testy i automatyzacja wieloplatformowa:
   Dodatkowa regresja ładuje SQLite w procesie aplikacji i nowym izolacie
   Drift, sprawdza JSON/FTS5 oraz zapis i ponowne otwarcie pliku. Wchodzi
   do istniejącej macierzy Linux/Windows/macOS/Android/iOS.
+  Natywne importy są wydzielone do warunkowego
+  `integration_test/support/sqlite_runtime_check_io.dart`; Web wybiera stub
+  i pomija wyłącznie ten przypadek, zachowując testy SQLite WASM.
 - `test/support/native_test_documents.dart`: katalog testowy i natywny
   oczekujący na zakończenie kolejki I/O przed sprzątaniem.
   adapter PathProvider; opcjonalny pamięciowy tekstowy storage zapobiega
