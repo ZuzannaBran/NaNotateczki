@@ -100,7 +100,7 @@ void main() {
         final path = request.url.path;
         calls.add('${request.method} $path');
         switch (path) {
-          case '/v1/auth/refresh':
+          case '/v2/auth/refresh':
             return json({
               'accessToken': 'access',
               'refreshToken': 'refresh',
@@ -108,7 +108,7 @@ void main() {
               'userId': owner,
               'username': 'test_user',
             });
-          case '/v1/time':
+          case '/v2/time':
             return http.Response('', 404);
           case '/v2/activation/readiness':
             return json({'protocol': 'v2', 'writeEnabled': true, 'version': 1});
@@ -132,7 +132,7 @@ void main() {
               'sha256': archiveHash,
               'verifiedAt': '2026-11-13T07:00:00Z',
             });
-          case '/v1/auth/logout':
+          case '/v2/auth/logout':
             return http.Response('', 204);
           default:
             return http.Response('', 404);
@@ -194,12 +194,12 @@ void main() {
     expect(
       calls,
       containsAllInOrder([
-        'POST /v1/auth/refresh',
+        'POST /v2/auth/refresh',
         'GET /v2/activation/readiness',
         'GET /v2/operations',
       ]),
     );
-    expect(calls.where((call) => call.contains('/v1/auth/protocol')), isEmpty);
+    expect(calls.where((call) => call.contains('/v2/auth/protocol')), isEmpty);
     expect(calls.where((call) => call.contains('/v1/sync/')), isEmpty);
     runtime = tester.element(library).read<EditorV2AccountRuntime?>()!;
     final backupScheduler = tester
@@ -246,7 +246,7 @@ void main() {
       calls,
       containsAllInOrder([
         'POST /v2/backups/$backup/finalize',
-        'POST /v1/auth/logout',
+        'POST /v2/auth/logout',
       ]),
     );
     expect(

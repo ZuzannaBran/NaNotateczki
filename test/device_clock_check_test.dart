@@ -14,7 +14,7 @@ void main() {
       baseUri: Uri.parse('https://api.example.com'),
       httpClient: MockClient((request) async {
         expect(request.method, 'GET');
-        expect(request.url.path, '/v1/time');
+        expect(request.url.path, '/v2/time');
         expect(request.headers.containsKey('Authorization'), isFalse);
         return http.Response(
           jsonEncode({'serverTimeMs': serverTime.millisecondsSinceEpoch}),

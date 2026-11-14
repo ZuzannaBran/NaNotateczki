@@ -115,7 +115,7 @@ class DiagnosticsUploadService {
       if (_lastAccount == account && _lastUploaded == encoded) {
         return;
       }
-      await _apiClient.putJson('/v1/reports/diagnostics', payload);
+      await _apiClient.putJson('/v2/reports/diagnostics', payload);
       if (_session.userId == account && !_disposed) {
         _lastAccount = account;
         _lastUploaded = encoded;

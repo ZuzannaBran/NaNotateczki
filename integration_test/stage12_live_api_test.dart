@@ -205,7 +205,7 @@ void main() {
         late final String account;
         try {
           final profile =
-              (await identityApi.get('/v1/auth/me')).decodeJson() as Map;
+              (await identityApi.get('/v2/auth/me')).decodeJson() as Map;
           account = profile['userId'] as String;
         } finally {
           identityApi.close();

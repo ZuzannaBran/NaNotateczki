@@ -28,14 +28,7 @@ class ApiException implements Exception {
   String toString() => 'ApiException($statusCode): $message';
 }
 
-/// Cursors for restoring a historical account into the v2 journal.
-class LegacyCutoverReceipt {
-  const LegacyCutoverReceipt(this.legacyCursor, this.operationCursor);
-
-  final int legacyCursor;
-  final int operationCursor;
-}
-
+/// Authenticated HTTP transport for the v2 API.
 class ApiClient {
   ApiClient({
     Uri? baseUri,
@@ -96,7 +89,7 @@ class ApiClient {
 
   /// Verifies the persisted protocol marker and server readiness before starting v2.
   /// Missing endpoints never allow a fallback to a legacy writer.
-  Future<LegacyCutoverReceipt?> ensureV2AccountReady() async {
+  Future<void> ensureV2AccountReady() async {
     final response = await get('/v2/activation/readiness');
     final payload = response.decodeJson();
     if (payload is! Map<String, dynamic> ||
@@ -107,23 +100,12 @@ class ApiClient {
         'V2 account activation is not verified by this server.',
       );
     }
-    final cutover = payload['legacyCutover'];
-    if (cutover == null) {
-      return null;
+    if (payload['legacyCutover'] != null) {
+      throw const FormatException(
+        'Historical cutover is not supported by this v2-only client.',
+      );
     }
-    if (cutover is! Map<String, dynamic> ||
-        !_safeCursor(cutover['legacyCursor']) ||
-        !_safeCursor(cutover['operationCursor'])) {
-      throw const FormatException('Invalid historical cutover receipt.');
-    }
-    return LegacyCutoverReceipt(
-      cutover['legacyCursor'] as int,
-      cutover['operationCursor'] as int,
-    );
   }
-
-  static bool _safeCursor(Object? value) =>
-      value is int && value >= 0 && value <= 9007199254740991;
 
   Future<ApiResponse> get(
     String path, {
@@ -240,8 +222,8 @@ class ApiClient {
 
   // Diagnostic uploads must never report their own failures recursively.
   bool _shouldRecordFailure(String path) =>
-      path != '/v1/reports/diagnostics' &&
-      path != '/v1/time' &&
+      path != '/v2/reports/diagnostics' &&
+      path != '/v2/time' &&
       path != '/health';
 
   void _recordServerFailure(String method, String path, int statusCode) {

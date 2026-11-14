@@ -27,7 +27,7 @@ class DeviceClockCheck {
   Future<DeviceClockDifference?> measure() async {
     final startedAt = _clock().toUtc();
     final stopwatch = Stopwatch()..start();
-    final response = await apiClient.get('/v1/time', authenticated: false);
+    final response = await apiClient.get('/v2/time', authenticated: false);
     stopwatch.stop();
     final finishedAt = _clock().toUtc();
 

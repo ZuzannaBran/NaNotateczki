@@ -55,7 +55,7 @@ void main() {
       expect(_role, anyOf('a', 'b'));
       final api = ApiClient(baseUri: endpoint)..setAccessToken(_token);
       addTearDown(api.close);
-      final profile = (await api.get('/v1/auth/me')).decodeJson() as Map;
+      final profile = (await api.get('/v2/auth/me')).decodeJson() as Map;
       final account = profile['userId'] as String;
       final databaseFile = _file('$_role.sqlite');
 

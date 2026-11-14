@@ -22,6 +22,7 @@ SHARED = (
     "docs/OPERATION_PROTOCOL_V1.md",
     "docs/STAGE14_TEST_RESET_PL.md",
     "docs/RESET_ALL_TEST_DATA_PL.md",
+    "docs/V2_DEPLOYED_2026_11_13_PL.md",
     "compose.yaml",
     "compose.local.yaml",
     "compose.stage12.yaml",

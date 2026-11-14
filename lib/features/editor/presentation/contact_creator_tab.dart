@@ -58,7 +58,7 @@ class _ContactCreatorTabState extends State<ContactCreatorTab> {
       _error = null;
     });
     try {
-      await context.read<ApiClient>().postJson('/v1/reports/feedback', {
+      await context.read<ApiClient>().postJson('/v2/reports/feedback', {
         'system': _system,
         'issue': _issueController.text.trim(),
       }, authenticated: false);

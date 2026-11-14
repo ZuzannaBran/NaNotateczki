@@ -13,8 +13,8 @@ void main() {
     if (override.trim().isEmpty) {
       expect(client.baseUri.toString(), 'https://api.nanotateczki.pl');
       expect(
-        client.resolve('/v1/auth/login').toString(),
-        'https://api.nanotateczki.pl/v1/auth/login',
+        client.resolve('/v2/auth/login').toString(),
+        'https://api.nanotateczki.pl/v2/auth/login',
       );
     } else {
       expect(client.baseUri.toString(), override.trim());
@@ -123,6 +123,8 @@ void main() {
       '{"protocol":"v2","writeEnabled":false,"version":1}',
       '{"protocol":"v2","writeEnabled":true}',
       '{"protocol":"v2","writeEnabled":"true","version":1}',
+      '{"protocol":"v2","writeEnabled":true,"version":1,'
+          '"legacyCutover":{"legacyCursor":1,"operationCursor":1}}',
       '[]',
     ]) {
       final client = ApiClient(

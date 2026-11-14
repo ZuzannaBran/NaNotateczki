@@ -162,7 +162,7 @@ class AccountSessionController extends ChangeNotifier {
     bool importLocalData = false,
   }) async {
     await _authenticate(
-      '/v1/auth/register',
+      '/v2/auth/register',
       username,
       password,
       importLocalData: importLocalData,
@@ -175,7 +175,7 @@ class AccountSessionController extends ChangeNotifier {
     bool importLocalData = false,
   }) async {
     await _authenticate(
-      '/v1/auth/login',
+      '/v2/auth/login',
       username,
       password,
       importLocalData: importLocalData,
@@ -199,7 +199,7 @@ class AccountSessionController extends ChangeNotifier {
         'Use a username of 3 to 32 letters, numbers or underscores.',
       );
     }
-    if (path == '/v1/auth/register' &&
+    if (path == '/v2/auth/register' &&
         (password.length < 8 || password.length > 128)) {
       throw const FormatException(
         'The password must contain 8 to 128 characters.',
@@ -276,7 +276,7 @@ class AccountSessionController extends ChangeNotifier {
         expectedUsername == null) {
       throw StateError('No refresh session is available.');
     }
-    final response = await apiClient.postJson('/v1/auth/refresh', {
+    final response = await apiClient.postJson('/v2/auth/refresh', {
       'refreshToken': refreshToken,
     }, authenticated: false);
     if (_disposed || refreshToken != _refreshToken || !isSignedIn) {
@@ -334,7 +334,7 @@ class AccountSessionController extends ChangeNotifier {
         await _discardRestoredCredential(generation);
         return;
       }
-      final response = await apiClient.postJson('/v1/auth/refresh', {
+      final response = await apiClient.postJson('/v2/auth/refresh', {
         'refreshToken': data['refreshToken'],
       }, authenticated: false);
       if (_disposed || generation != _sessionGeneration) {
@@ -431,7 +431,7 @@ class AccountSessionController extends ChangeNotifier {
     error = null;
     _notifyIfActive();
     try {
-      await apiClient.postJson('/v1/auth/change-password', {
+      await apiClient.postJson('/v2/auth/change-password', {
         'currentPassword': currentPassword,
         'newPassword': newPassword,
       });
@@ -488,7 +488,7 @@ class AccountSessionController extends ChangeNotifier {
           refreshToken != null &&
           apiClient.accessToken != null) {
         await apiClient
-            .postJson('/v1/auth/logout', {'refreshToken': refreshToken})
+            .postJson('/v2/auth/logout', {'refreshToken': refreshToken})
             .timeout(const Duration(seconds: 5));
       }
     } catch (failure, stackTrace) {

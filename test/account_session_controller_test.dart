@@ -24,6 +24,59 @@ void main() {
     textStorageWriteOverride = null;
   });
 
+  test(
+    'registers, refreshes and logs out with v2-only auth endpoints',
+    () async {
+      final stored = <String, String>{};
+      textStorageReadOverride = (key) async => stored[key];
+      textStorageWriteOverride = (key, value) async => stored[key] = value;
+      final visited = <String>[];
+      final client = ApiClient(
+        baseUri: Uri.parse('https://api.example.com'),
+        httpClient: MockClient((request) async {
+          visited.add(request.url.path);
+          if (request.url.path == '/v2/auth/logout') {
+            expect(request.headers['authorization'], 'Bearer access');
+            return http.Response('', 204);
+          }
+          expect(
+            request.url.path,
+            isIn(['/v2/auth/register', '/v2/auth/refresh']),
+          );
+          return http.Response(
+            jsonEncode({
+              'accessToken': 'access',
+              'refreshToken': 'refresh-token-with-at-least-forty-characters',
+              'expiresIn': 600,
+              'userId': 'user-1',
+              'username': 'test_user',
+            }),
+            request.url.path.endsWith('/register') ? 201 : 200,
+          );
+        }),
+      );
+      addTearDown(client.close);
+      final session = AccountSessionController(
+        client,
+        credentialStore: credentials,
+      );
+      addTearDown(session.dispose);
+      await session.loadProfile();
+      await session.register('test_user', 'first-secure-password');
+      expect(session.isSignedIn, isTrue);
+      expect(credentials.value, contains('refresh-token'));
+      await session.refresh();
+      await session.logout();
+      expect(session.isSignedIn, isFalse);
+      expect(credentials.value, isNull);
+      expect(visited, [
+        '/v2/auth/register',
+        '/v2/auth/refresh',
+        '/v2/auth/logout',
+      ]);
+    },
+  );
+
   test('sends account-start signal before remote session restore', () async {
     final events = <String>[];
     textStorageReadOverride = (key) async {
@@ -109,7 +162,7 @@ void main() {
       final client = ApiClient(
         baseUri: Uri.parse('https://api.example.com'),
         httpClient: MockClient((request) async {
-          if (request.url.path == '/v1/auth/register') {
+          if (request.url.path == '/v2/auth/register') {
             return http.Response(
               jsonEncode({
                 'accessToken': 'access-secret',
@@ -121,7 +174,7 @@ void main() {
               201,
             );
           }
-          if (request.url.path == '/v1/auth/change-password') {
+          if (request.url.path == '/v2/auth/change-password') {
             expect(request.method, 'POST');
             expect(request.headers['authorization'], 'Bearer access-secret');
             passwordRequest = jsonDecode(request.body) as Map<String, dynamic>;
@@ -181,7 +234,7 @@ void main() {
       final client = ApiClient(
         baseUri: Uri.parse('https://api.example.com'),
         httpClient: MockClient((request) async {
-          if (request.url.path == '/v1/auth/login') {
+          if (request.url.path == '/v2/auth/login') {
             return http.Response(
               jsonEncode({
                 'accessToken': 'access-1',
@@ -193,7 +246,7 @@ void main() {
               200,
             );
           }
-          if (request.url.path == '/v1/auth/refresh') {
+          if (request.url.path == '/v2/auth/refresh') {
             refreshCalls++;
             final body = jsonDecode(request.body) as Map<String, dynamic>;
             expect(body['refreshToken'], 'refresh-$refreshCalls');
@@ -208,7 +261,7 @@ void main() {
               200,
             );
           }
-          if (request.url.path == '/v1/auth/logout') {
+          if (request.url.path == '/v2/auth/logout') {
             return http.Response('', 204);
           }
           fail('Unexpected request: ${request.url}');
@@ -386,7 +439,7 @@ void main() {
     final client = ApiClient(
       baseUri: Uri.parse('https://api.example.com'),
       httpClient: MockClient((request) async {
-        if (request.url.path == '/v1/auth/login') {
+        if (request.url.path == '/v2/auth/login') {
           return http.Response(
             jsonEncode({
               'accessToken': 'access-test',
@@ -398,7 +451,7 @@ void main() {
             200,
           );
         }
-        if (request.url.path == '/v1/auth/logout') {
+        if (request.url.path == '/v2/auth/logout') {
           revokeCalled = true;
           expect(request.headers['authorization'], 'Bearer access-test');
           revokeStarted.complete();
@@ -464,7 +517,7 @@ void main() {
     final client = ApiClient(
       baseUri: Uri.parse('https://api.example.com'),
       httpClient: MockClient((request) async {
-        if (request.url.path == '/v1/auth/login') {
+        if (request.url.path == '/v2/auth/login') {
           return http.Response(
             jsonEncode({
               'accessToken': 'access-test',
@@ -476,7 +529,7 @@ void main() {
             200,
           );
         }
-        if (request.url.path == '/v1/auth/logout') {
+        if (request.url.path == '/v2/auth/logout') {
           revokeCalls++;
           return http.Response('', 204);
         }
@@ -515,7 +568,7 @@ void main() {
     final client = ApiClient(
       baseUri: Uri.parse('https://api.example.com'),
       httpClient: MockClient((request) async {
-        if (request.url.path == '/v1/auth/login') {
+        if (request.url.path == '/v2/auth/login') {
           return http.Response(
             jsonEncode({
               'accessToken': 'access',
@@ -527,7 +580,7 @@ void main() {
             200,
           );
         }
-        if (request.url.path == '/v1/auth/logout') {
+        if (request.url.path == '/v2/auth/logout') {
           return http.Response('', 204);
         }
         fail('Unexpected authentication endpoint.');
@@ -560,7 +613,7 @@ void main() {
     final client = ApiClient(
       baseUri: Uri.parse('https://api.example.com'),
       httpClient: MockClient((request) async {
-        if (request.url.path == '/v1/auth/login') {
+        if (request.url.path == '/v2/auth/login') {
           return http.Response(
             jsonEncode({
               'accessToken': 'access',
@@ -599,9 +652,9 @@ void main() {
     final client = ApiClient(
       baseUri: Uri.parse('https://api.example.com'),
       httpClient: MockClient((request) async {
-        if (request.url.path == '/v1/auth/login' ||
-            request.url.path == '/v1/auth/refresh') {
-          if (request.url.path == '/v1/auth/refresh') {
+        if (request.url.path == '/v2/auth/login' ||
+            request.url.path == '/v2/auth/refresh') {
+          if (request.url.path == '/v2/auth/refresh') {
             refreshes++;
           }
           return http.Response(
@@ -615,7 +668,7 @@ void main() {
             200,
           );
         }
-        if (request.url.path == '/v1/auth/logout') {
+        if (request.url.path == '/v2/auth/logout') {
           revocations++;
           return http.Response('', 204);
         }
@@ -690,7 +743,7 @@ void main() {
     final client = ApiClient(
       baseUri: Uri.parse('https://api.example.com'),
       httpClient: MockClient((request) async {
-        if (request.url.path == '/v1/auth/login') {
+        if (request.url.path == '/v2/auth/login') {
           return http.Response(
             jsonEncode({
               'accessToken': 'access-v2',
@@ -756,7 +809,7 @@ void main() {
     final client = ApiClient(
       baseUri: Uri.parse('https://api.example.com'),
       httpClient: MockClient((request) async {
-        if (request.url.path == '/v1/auth/login') {
+        if (request.url.path == '/v2/auth/login') {
           return http.Response(
             jsonEncode({
               'accessToken': 'old-access',
@@ -768,7 +821,7 @@ void main() {
             200,
           );
         }
-        if (request.url.path == '/v1/auth/refresh') {
+        if (request.url.path == '/v2/auth/refresh') {
           refreshCalls++;
           return responsePending.future;
         }
@@ -829,8 +882,8 @@ void main() {
     );
     await session.register('test_user', '12345678');
     await session.login('test_user', 'short');
-    expect(requests['/v1/auth/register'], '12345678');
-    expect(requests['/v1/auth/login'], 'short');
+    expect(requests['/v2/auth/register'], '12345678');
+    expect(requests['/v2/auth/login'], 'short');
     await expectLater(
       session.register('test_user', '1234567'),
       throwsA(isA<FormatException>()),
@@ -844,7 +897,7 @@ void main() {
       final client = ApiClient(
         baseUri: Uri.parse('https://api.example.com'),
         httpClient: MockClient((request) async {
-          if (request.url.path == '/v1/auth/login') {
+          if (request.url.path == '/v2/auth/login') {
             return http.Response(
               jsonEncode({
                 'accessToken': 'access',
@@ -887,7 +940,7 @@ void main() {
       baseUri: Uri.parse('https://api.example.com'),
       httpClient: MockClient((request) async {
         final path = request.url.path;
-        if (path == '/v1/auth/refresh') {
+        if (path == '/v2/auth/refresh') {
           refreshCalls++;
           return http.Response(
             jsonEncode({
@@ -900,7 +953,7 @@ void main() {
             200,
           );
         }
-        expect(path, '/v1/auth/login');
+        expect(path, '/v2/auth/login');
         loginCalls++;
         final username =
             (jsonDecode(request.body) as Map<String, dynamic>)['username'];
@@ -962,7 +1015,7 @@ void main() {
         baseUri: Uri.parse('https://api.example.com'),
         httpClient: MockClient((request) async {
           expect(request.method, 'POST');
-          expect(request.url.path, '/v1/auth/login');
+          expect(request.url.path, '/v2/auth/login');
           loginCalls++;
           final username =
               (jsonDecode(request.body) as Map<String, dynamic>)['username'];
@@ -1123,7 +1176,7 @@ void main() {
       final client = ApiClient(
         baseUri: Uri.parse('https://api.example.com'),
         httpClient: MockClient((request) async {
-          if (request.url.path == '/v1/auth/login') {
+          if (request.url.path == '/v2/auth/login') {
             final username = (jsonDecode(request.body) as Map)['username'];
             return http.Response(
               jsonEncode({
@@ -1136,7 +1189,7 @@ void main() {
               200,
             );
           }
-          if (request.url.path == '/v1/auth/refresh') {
+          if (request.url.path == '/v2/auth/refresh') {
             return http.Response(
               jsonEncode({
                 'accessToken': 'access-refreshed',

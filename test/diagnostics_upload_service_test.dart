@@ -34,7 +34,7 @@ void main() {
         if (request.url.path == '/v1/sync/changes') {
           return http.Response('{"detail":"Internal server error."}', 503);
         }
-        if (request.url.path == '/v1/reports/diagnostics') {
+        if (request.url.path == '/v2/reports/diagnostics') {
           expect(request.method, 'PUT');
           expect(request.headers['authorization'], 'Bearer test-token');
           uploads.add(jsonDecode(request.body) as Map<String, dynamic>);
@@ -96,7 +96,7 @@ void main() {
         if (request.url.path == '/v1/sync/notebooks/note') {
           return http.Response('{"detail":"Conflict"}', 409);
         }
-        if (request.url.path == '/v1/reports/diagnostics') {
+        if (request.url.path == '/v2/reports/diagnostics') {
           return http.Response('{"detail":"Service unavailable"}', 503);
         }
         if (request.url.path == '/v1/sync/bootstrap') {
@@ -114,7 +114,7 @@ void main() {
     expect(AppErrorLog.instance.isEmpty, isTrue);
 
     await expectLater(
-      client.putJson('/v1/reports/diagnostics', {}),
+      client.putJson('/v2/reports/diagnostics', {}),
       throwsA(isA<ApiException>()),
     );
     expect(AppErrorLog.instance.isEmpty, isTrue);

@@ -31,8 +31,7 @@ import '../data/sync/diagnostics_upload_service.dart';
 import '../data/sync/device_clock_check.dart';
 import '../data/sync/editor_v2_account_runtime.dart';
 import '../data/sync/local_account_import_service.dart';
-import '../data/sync/legacy_v2_projection_cutover.dart';
-import '../data/sync/legacy_sync_archive.dart';
+import '../data/sync/retired_outbox_guard.dart';
 import '../data/sync/operation_store.dart';
 import '../data/sync/persistent_operation_actor.dart';
 import '../data/sync/planner_sync_service.dart';
@@ -815,23 +814,11 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     if (repository == null || apiClient == null || library == null) {
       throw StateError('V2 account cannot start without its SQLite scope.');
     }
-    final legacyCutover = await apiClient.ensureV2AccountReady();
+    await apiClient.ensureV2AccountReady();
     if (!isCurrent()) {
       return;
     }
-    final cutover = legacyCutover == null
-        ? null
-        : LegacyV2ProjectionCutover(
-            repository: repository,
-            apiClient: apiClient,
-            accountId: userId,
-            isCurrent: isCurrent,
-          );
-    if (cutover == null) {
-      await LegacySyncArchive.requireEmptyLegacyOutbox(userId);
-    } else {
-      await cutover.prepare(legacyCutover!);
-    }
+    await requireEmptyRetiredOutbox(userId);
     if (!isCurrent()) {
       return;
     }
@@ -896,29 +883,11 @@ class _AppScopeState extends State<AppScope> with WidgetsBindingObserver {
     final currentCursor =
         (cursorResponse.decodeJson() as Map<String, dynamic>)['cursor'];
     if (currentCursor is! int ||
-        (legacyCutover != null &&
-            currentCursor < legacyCutover.operationCursor) ||
         await runtime.store.checkpoint('account:$userId') != currentCursor) {
       throw StateError('V2 recovery has not reached the server checkpoint.');
     }
     if (!isCurrent()) {
       return;
-    }
-    if (cutover != null) {
-      // Pause the feed while deriving deltas from the current projection.
-      // Concurrent server edits are handled by the ordinary v2 journal.
-      await runtime.stop();
-      if (!isCurrent()) {
-        return;
-      }
-      await cutover.replayPending(
-        writer: runtime.writer,
-        store: runtime.store,
-        library: runtime.libraryOperations,
-      );
-      if (!await runtime.startForCurrentAccount(isCurrent: isCurrent)) {
-        return;
-      }
     }
     await verifiedBackup.markDatabaseInitialized(userId);
     // Keep the archive's pending marker until the separate SQLite recovery

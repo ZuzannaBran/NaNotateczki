@@ -2,14 +2,15 @@
 
 Konto i Share zapisują dokumenty wyłącznie operacjami v2. Planner
 używa rewizji CAS, ustawienia `/v2/account-settings`, a backup zdalny
-formatu 3 z dziennikiem. Autoryzacja i zegar zachowują adresy `/v1/auth`
-oraz `/v1/time`; nie są protokołem zapisu notatek. Local nie łączy się
+formatu 3 z dziennikiem. Autoryzacja, zegar i diagnostyka używają `/v2/auth`, `/v2/time`
+oraz `/v2/reports`; stare adresy v1 nie są obsługiwane. Local nie łączy się
 z kontem i może trzymać własny backup na urządzeniu.
 
 Migracja 0016 aktywuje puste konta, zakłada marker dla nowych użytkowników
 i odbiera roli API możliwość modyfikacji historycznych tabel snapshotów.
-Stare dokumenty są dostępne tylko dla importera. Ich zachowanie nie
-oznacza możliwości uruchomienia starego synchronizatora. Dalsze
+Migracja 0017 usuwa tabele snapshotów v1; importer kont historycznych
+został wycofany po świeżym starcie. Klient blokuje start przy wykryciu
+niewysłanej starej kolejki, bez nadpisywania jej zawartości. Dalsze
 opisy produkcyjnego v1 są historyczne.
 
 Przypisanie protokołu v2 nie włącza globalnego zapisu. Domyślny tryb API

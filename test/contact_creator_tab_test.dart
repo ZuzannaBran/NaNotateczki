@@ -16,7 +16,7 @@ void main() {
     final api = ApiClient(
       baseUri: Uri.parse('http://localhost:18080'),
       httpClient: MockClient((request) async {
-        expect(request.url.path, '/v1/reports/feedback');
+        expect(request.url.path, '/v2/reports/feedback');
         expect(request.headers['authorization'], isNull);
         sent = jsonDecode(request.body) as Map<String, dynamic>;
         return http.Response('{"reportId":"ok"}', 201);

@@ -17,7 +17,7 @@ def test_health_exposes_no_data_and_disables_caching() -> None:
 def test_auth_request_is_rejected_before_large_body_is_parsed() -> None:
     with TestClient(app) as client:
         response = client.post(
-            "/v1/auth/login",
+            "/v2/auth/login",
             content=b"{}",
             headers={"Content-Length": str(1024 * 1024 + 1)},
         )
@@ -34,9 +34,30 @@ def test_operation_batch_limit_is_enforced_at_http_boundary() -> None:
     assert response.status_code == 413
 
 
+def test_system_routes_use_v2_without_retired_v1_aliases() -> None:
+    with TestClient(app) as client:
+        for route in ("register", "login", "refresh"):
+            # Invalid bodies test routing without creating accounts or sessions.
+            assert client.post(f"/v2/auth/{route}", json={}).status_code == 422
+            assert client.post(f"/v1/auth/{route}", json={}).status_code == 404
+        assert client.get("/v2/auth/protocol").status_code == 401
+        assert client.get("/v1/auth/protocol").status_code == 404
+        assert client.get("/v2/time").status_code == 200
+        assert client.get("/v1/time").status_code == 404
+        assert client.put("/v2/reports/diagnostics", json={}).status_code == 401
+        assert client.put("/v1/reports/diagnostics", json={}).status_code == 404
+
+
 def test_legacy_writers_are_not_routed_even_without_account_protocol():
     retired = (
         ("GET", "/v1/sync/bootstrap"),
+        ("GET", "/v1/auth/protocol"),
+        ("POST", "/v1/auth/login"),
+        ("POST", "/v1/auth/register"),
+        ("GET", "/v1/time"),
+        ("POST", "/v1/reports/feedback"),
+        ("GET", "/v2/activation/legacy-source"),
+        ("GET", "/v2/activation/legacy-library"),
         ("PUT", "/v1/sync/notebooks/item"),
         ("DELETE", "/v1/sync/notebooks/item"),
         ("PUT", "/v1/planner/entries/item"),
@@ -56,7 +77,7 @@ def test_legacy_writers_are_not_routed_even_without_account_protocol():
 def test_password_change_requires_authentication() -> None:
     with TestClient(app) as client:
         response = client.post(
-            "/v1/auth/change-password",
+            "/v2/auth/change-password",
             json={
                 "currentPassword": "old long password",
                 "newPassword": "a different long password",
